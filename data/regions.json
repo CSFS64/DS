@@ -1,0 +1,1120 @@
+{
+  "version": 1,
+  "regions": [
+    {
+      "id": "01",
+      "region": "Republic of Adygea",
+      "region_label": "Республика Адыгея",
+      "mchs_host": "01.mchs.gov.ru",
+      "mchs_operational_url": "https://01.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://01.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Adygea",
+        "Republic of Adygea"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "02",
+      "region": "Republic of Bashkortostan",
+      "region_label": "Республика Башкортостан",
+      "mchs_host": "02.mchs.gov.ru",
+      "mchs_operational_url": "https://02.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://02.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Bashkortostan",
+        "Republic of Bashkortostan"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "03",
+      "region": "Republic of Buryatia",
+      "region_label": "Республика Бурятия",
+      "mchs_host": "03.mchs.gov.ru",
+      "mchs_operational_url": "https://03.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://03.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Buryatia",
+        "Republic of Buryatia"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "04",
+      "region": "Altai Republic",
+      "region_label": "Республика Алтай",
+      "mchs_host": "04.mchs.gov.ru",
+      "mchs_operational_url": "https://04.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://04.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Altai Republic",
+        "Republic of Altai"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "05",
+      "region": "Republic of Dagestan",
+      "region_label": "Республика Дагестан",
+      "mchs_host": "05.mchs.gov.ru",
+      "mchs_operational_url": "https://05.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://05.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Dagestan",
+        "Republic of Dagestan"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "06",
+      "region": "Republic of Ingushetia",
+      "region_label": "Республика Ингушетия",
+      "mchs_host": "06.mchs.gov.ru",
+      "mchs_operational_url": "https://06.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://06.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Ingushetia",
+        "Republic of Ingushetia"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "07",
+      "region": "Kabardino-Balkarian Republic",
+      "region_label": "Кабардино-Балкарская Республика",
+      "mchs_host": "07.mchs.gov.ru",
+      "mchs_operational_url": "https://07.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://07.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Kabardino-Balkaria",
+        "Kabardino-Balkarian Republic"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "08",
+      "region": "Republic of Kalmykia",
+      "region_label": "Республика Калмыкия",
+      "mchs_host": "08.mchs.gov.ru",
+      "mchs_operational_url": "https://08.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://08.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Kalmykia",
+        "Republic of Kalmykia"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "09",
+      "region": "Karachay-Cherkess Republic",
+      "region_label": "Карачаево-Черкесская Республика",
+      "mchs_host": "09.mchs.gov.ru",
+      "mchs_operational_url": "https://09.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://09.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Karachay-Cherkessia",
+        "Karachay-Cherkess Republic"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "10",
+      "region": "Republic of Karelia",
+      "region_label": "Республика Карелия",
+      "mchs_host": "10.mchs.gov.ru",
+      "mchs_operational_url": "https://10.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://10.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Karelia",
+        "Republic of Karelia"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "11",
+      "region": "Komi Republic",
+      "region_label": "Республика Коми",
+      "mchs_host": "11.mchs.gov.ru",
+      "mchs_operational_url": "https://11.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://11.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Komi",
+        "Komi Republic"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "12",
+      "region": "Mari El Republic",
+      "region_label": "Республика Марий Эл",
+      "mchs_host": "12.mchs.gov.ru",
+      "mchs_operational_url": "https://12.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://12.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Mari El",
+        "Mari El Republic"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "13",
+      "region": "Republic of Mordovia",
+      "region_label": "Республика Мордовия",
+      "mchs_host": "13.mchs.gov.ru",
+      "mchs_operational_url": "https://13.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://13.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Mordovia",
+        "Republic of Mordovia"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "14",
+      "region": "Sakha Republic (Yakutia)",
+      "region_label": "Республика Саха (Якутия)",
+      "mchs_host": "14.mchs.gov.ru",
+      "mchs_operational_url": "https://14.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://14.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Sakha",
+        "Yakutia",
+        "Sakha Republic"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "15",
+      "region": "Republic of North Ossetia–Alania",
+      "region_label": "Республика Северная Осетия - Алания",
+      "mchs_host": "15.mchs.gov.ru",
+      "mchs_operational_url": "https://15.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://15.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "North Ossetia",
+        "North Ossetia-Alania",
+        "Republic of North Ossetia-Alania"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "16",
+      "region": "Republic of Tatarstan",
+      "region_label": "Республика Татарстан",
+      "mchs_host": "16.mchs.gov.ru",
+      "mchs_operational_url": "https://16.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://16.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Tatarstan",
+        "Republic of Tatarstan"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "17",
+      "region": "Tuva Republic",
+      "region_label": "Республика Тыва",
+      "mchs_host": "17.mchs.gov.ru",
+      "mchs_operational_url": "https://17.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://17.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Tuva",
+        "Tyva",
+        "Tuva Republic"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "18",
+      "region": "Udmurt Republic",
+      "region_label": "Удмуртская Республика",
+      "mchs_host": "18.mchs.gov.ru",
+      "mchs_operational_url": "https://18.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://18.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Udmurtia",
+        "Udmurt Republic"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "19",
+      "region": "Republic of Khakassia",
+      "region_label": "Республика Хакасия",
+      "mchs_host": "19.mchs.gov.ru",
+      "mchs_operational_url": "https://19.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://19.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Khakassia",
+        "Republic of Khakassia"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "21",
+      "region": "Chuvash Republic",
+      "region_label": "Чувашская Республика - Чувашии",
+      "mchs_host": "21.mchs.gov.ru",
+      "mchs_operational_url": "https://21.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://21.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Chuvashia",
+        "Chuvash Republic"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "22",
+      "region": "Altai Krai",
+      "region_label": "Алтайский край",
+      "mchs_host": "22.mchs.gov.ru",
+      "mchs_operational_url": "https://22.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://22.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Altai Krai",
+        "Altaysky Krai"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "23",
+      "region": "Krasnodar Krai",
+      "region_label": "Краснодарский край",
+      "mchs_host": "23.mchs.gov.ru",
+      "mchs_operational_url": "https://23.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://23.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Krasnodar Krai"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "24",
+      "region": "Krasnoyarsk Krai",
+      "region_label": "Красноярский край",
+      "mchs_host": "24.mchs.gov.ru",
+      "mchs_operational_url": "https://24.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://24.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Krasnoyarsk Krai"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "25",
+      "region": "Primorsky Krai",
+      "region_label": "Приморский край",
+      "mchs_host": "25.mchs.gov.ru",
+      "mchs_operational_url": "https://25.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://25.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Primorsky Krai",
+        "Primorye"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "26",
+      "region": "Stavropol Krai",
+      "region_label": "Ставропольский край",
+      "mchs_host": "26.mchs.gov.ru",
+      "mchs_operational_url": "https://26.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://26.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Stavropol Krai"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "27",
+      "region": "Khabarovsk Krai",
+      "region_label": "Хабаровский край",
+      "mchs_host": "27.mchs.gov.ru",
+      "mchs_operational_url": "https://27.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://27.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Khabarovsk Krai"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "28",
+      "region": "Amur Oblast",
+      "region_label": "Амурская область",
+      "mchs_host": "28.mchs.gov.ru",
+      "mchs_operational_url": "https://28.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://28.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Amur Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "29",
+      "region": "Arkhangelsk Oblast",
+      "region_label": "Архангельская область",
+      "mchs_host": "29.mchs.gov.ru",
+      "mchs_operational_url": "https://29.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://29.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Arkhangelsk Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "30",
+      "region": "Astrakhan Oblast",
+      "region_label": "Астраханская область",
+      "mchs_host": "30.mchs.gov.ru",
+      "mchs_operational_url": "https://30.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://30.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Astrakhan Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "31",
+      "region": "Belgorod Oblast",
+      "region_label": "Белгородская область",
+      "mchs_host": "31.mchs.gov.ru",
+      "mchs_operational_url": "https://31.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://31.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Belgorod Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "32",
+      "region": "Bryansk Oblast",
+      "region_label": "Брянская область",
+      "mchs_host": "32.mchs.gov.ru",
+      "mchs_operational_url": "https://32.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://32.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Bryansk Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "33",
+      "region": "Vladimir Oblast",
+      "region_label": "Владимирская область",
+      "mchs_host": "33.mchs.gov.ru",
+      "mchs_operational_url": "https://33.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://33.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Vladimir Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "34",
+      "region": "Volgograd Oblast",
+      "region_label": "Волгоградская область",
+      "mchs_host": "34.mchs.gov.ru",
+      "mchs_operational_url": "https://34.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://34.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Volgograd Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "35",
+      "region": "Vologda Oblast",
+      "region_label": "Вологодская область",
+      "mchs_host": "35.mchs.gov.ru",
+      "mchs_operational_url": "https://35.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://35.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Vologda Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "36",
+      "region": "Voronezh Oblast",
+      "region_label": "Воронежская область",
+      "mchs_host": "36.mchs.gov.ru",
+      "mchs_operational_url": "https://36.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://36.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Voronezh Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "37",
+      "region": "Ivanovo Oblast",
+      "region_label": "Ивановская область",
+      "mchs_host": "37.mchs.gov.ru",
+      "mchs_operational_url": "https://37.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://37.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Ivanovo Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "38",
+      "region": "Irkutsk Oblast",
+      "region_label": "Иркутская область",
+      "mchs_host": "38.mchs.gov.ru",
+      "mchs_operational_url": "https://38.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://38.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Irkutsk Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "39",
+      "region": "Kaliningrad Oblast",
+      "region_label": "Калининградская область",
+      "mchs_host": "39.mchs.gov.ru",
+      "mchs_operational_url": "https://39.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://39.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Kaliningrad Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "40",
+      "region": "Kaluga Oblast",
+      "region_label": "Калужская область",
+      "mchs_host": "40.mchs.gov.ru",
+      "mchs_operational_url": "https://40.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://40.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Kaluga Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "41",
+      "region": "Kamchatka Krai",
+      "region_label": "Камчатский край",
+      "mchs_host": "41.mchs.gov.ru",
+      "mchs_operational_url": "https://41.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://41.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Kamchatka Krai"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "42",
+      "region": "Kemerovo Oblast",
+      "region_label": "Кемеровская область - Кузбасс",
+      "mchs_host": "42.mchs.gov.ru",
+      "mchs_operational_url": "https://42.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://42.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Kemerovo Oblast",
+        "Kuzbass"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "43",
+      "region": "Kirov Oblast",
+      "region_label": "Кировская область",
+      "mchs_host": "43.mchs.gov.ru",
+      "mchs_operational_url": "https://43.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://43.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Kirov Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "44",
+      "region": "Kostroma Oblast",
+      "region_label": "Костромская область",
+      "mchs_host": "44.mchs.gov.ru",
+      "mchs_operational_url": "https://44.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://44.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Kostroma Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "45",
+      "region": "Kurgan Oblast",
+      "region_label": "Курганская область",
+      "mchs_host": "45.mchs.gov.ru",
+      "mchs_operational_url": "https://45.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://45.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Kurgan Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "46",
+      "region": "Kursk Oblast",
+      "region_label": "Курская область",
+      "mchs_host": "46.mchs.gov.ru",
+      "mchs_operational_url": "https://46.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://46.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Kursk Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "47",
+      "region": "Leningrad Oblast",
+      "region_label": "Ленинградская область",
+      "mchs_host": "47.mchs.gov.ru",
+      "mchs_operational_url": "https://47.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://47.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Leningrad Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "48",
+      "region": "Lipetsk Oblast",
+      "region_label": "Липецкая область",
+      "mchs_host": "48.mchs.gov.ru",
+      "mchs_operational_url": "https://48.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://48.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Lipetsk Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "49",
+      "region": "Magadan Oblast",
+      "region_label": "Магаданская область",
+      "mchs_host": "49.mchs.gov.ru",
+      "mchs_operational_url": "https://49.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://49.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Magadan Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "50",
+      "region": "Moscow Oblast",
+      "region_label": "Московская область",
+      "mchs_host": "50.mchs.gov.ru",
+      "mchs_operational_url": "https://50.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://50.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Moscow Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "51",
+      "region": "Murmansk Oblast",
+      "region_label": "Мурманская область",
+      "mchs_host": "51.mchs.gov.ru",
+      "mchs_operational_url": "https://51.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://51.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Murmansk Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "52",
+      "region": "Nizhny Novgorod Oblast",
+      "region_label": "Нижегородская область",
+      "mchs_host": "52.mchs.gov.ru",
+      "mchs_operational_url": "https://52.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://52.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Nizhny Novgorod Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "53",
+      "region": "Novgorod Oblast",
+      "region_label": "Новгородская область",
+      "mchs_host": "53.mchs.gov.ru",
+      "mchs_operational_url": "https://53.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://53.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Novgorod Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "54",
+      "region": "Novosibirsk Oblast",
+      "region_label": "Новосибирская область",
+      "mchs_host": "54.mchs.gov.ru",
+      "mchs_operational_url": "https://54.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://54.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Novosibirsk Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "55",
+      "region": "Omsk Oblast",
+      "region_label": "Омская область",
+      "mchs_host": "55.mchs.gov.ru",
+      "mchs_operational_url": "https://55.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://55.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Omsk Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "56",
+      "region": "Orenburg Oblast",
+      "region_label": "Оренбургская область",
+      "mchs_host": "56.mchs.gov.ru",
+      "mchs_operational_url": "https://56.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://56.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Orenburg Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "57",
+      "region": "Oryol Oblast",
+      "region_label": "Орловская область",
+      "mchs_host": "57.mchs.gov.ru",
+      "mchs_operational_url": "https://57.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://57.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Oryol Oblast",
+        "Orel Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "58",
+      "region": "Penza Oblast",
+      "region_label": "Пензенская область",
+      "mchs_host": "58.mchs.gov.ru",
+      "mchs_operational_url": "https://58.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://58.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Penza Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "59",
+      "region": "Perm Krai",
+      "region_label": "Пермский край",
+      "mchs_host": "59.mchs.gov.ru",
+      "mchs_operational_url": "https://59.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://59.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Perm Krai"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "60",
+      "region": "Pskov Oblast",
+      "region_label": "Псковская область",
+      "mchs_host": "60.mchs.gov.ru",
+      "mchs_operational_url": "https://60.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://60.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Pskov Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "61",
+      "region": "Rostov Oblast",
+      "region_label": "Ростовская область",
+      "mchs_host": "61.mchs.gov.ru",
+      "mchs_operational_url": "https://61.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://61.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Rostov Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "62",
+      "region": "Ryazan Oblast",
+      "region_label": "Рязанская область",
+      "mchs_host": "62.mchs.gov.ru",
+      "mchs_operational_url": "https://62.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://62.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Ryazan Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "63",
+      "region": "Samara Oblast",
+      "region_label": "Самарская область",
+      "mchs_host": "63.mchs.gov.ru",
+      "mchs_operational_url": "https://63.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://63.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Samara Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "64",
+      "region": "Saratov Oblast",
+      "region_label": "Саратовская область",
+      "mchs_host": "64.mchs.gov.ru",
+      "mchs_operational_url": "https://64.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://64.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Saratov Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "65",
+      "region": "Sakhalin Oblast",
+      "region_label": "Сахалинская область",
+      "mchs_host": "65.mchs.gov.ru",
+      "mchs_operational_url": "https://65.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://65.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Sakhalin Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "66",
+      "region": "Sverdlovsk Oblast",
+      "region_label": "Свердловская область",
+      "mchs_host": "66.mchs.gov.ru",
+      "mchs_operational_url": "https://66.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://66.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Sverdlovsk Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "67",
+      "region": "Smolensk Oblast",
+      "region_label": "Смоленская область",
+      "mchs_host": "67.mchs.gov.ru",
+      "mchs_operational_url": "https://67.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://67.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Smolensk Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "68",
+      "region": "Tambov Oblast",
+      "region_label": "Тамбовская область",
+      "mchs_host": "68.mchs.gov.ru",
+      "mchs_operational_url": "https://68.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://68.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Tambov Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "69",
+      "region": "Tver Oblast",
+      "region_label": "Тверская область",
+      "mchs_host": "69.mchs.gov.ru",
+      "mchs_operational_url": "https://69.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://69.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Tver Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "70",
+      "region": "Tomsk Oblast",
+      "region_label": "Томская область",
+      "mchs_host": "70.mchs.gov.ru",
+      "mchs_operational_url": "https://70.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://70.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Tomsk Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "71",
+      "region": "Tula Oblast",
+      "region_label": "Тульская область",
+      "mchs_host": "71.mchs.gov.ru",
+      "mchs_operational_url": "https://71.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://71.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Tula Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "72",
+      "region": "Tyumen Oblast",
+      "region_label": "Тюменская область",
+      "mchs_host": "72.mchs.gov.ru",
+      "mchs_operational_url": "https://72.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://72.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Tyumen Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "73",
+      "region": "Ulyanovsk Oblast",
+      "region_label": "Ульяновская область",
+      "mchs_host": "73.mchs.gov.ru",
+      "mchs_operational_url": "https://73.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://73.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Ulyanovsk Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "74",
+      "region": "Chelyabinsk Oblast",
+      "region_label": "Челябинская область",
+      "mchs_host": "74.mchs.gov.ru",
+      "mchs_operational_url": "https://74.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://74.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Chelyabinsk Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "75",
+      "region": "Zabaykalsky Krai",
+      "region_label": "Забайкальский край",
+      "mchs_host": "75.mchs.gov.ru",
+      "mchs_operational_url": "https://75.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://75.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Zabaykalsky Krai",
+        "Zabaikalsky Krai"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "76",
+      "region": "Yaroslavl Oblast",
+      "region_label": "Ярославская область",
+      "mchs_host": "76.mchs.gov.ru",
+      "mchs_operational_url": "https://76.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://76.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Yaroslavl Oblast"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "77",
+      "region": "Moscow",
+      "region_label": "г. Москва",
+      "mchs_host": "moscow.mchs.gov.ru",
+      "mchs_operational_url": "https://moscow.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://moscow.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Moscow",
+        "Moscow City"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "78",
+      "region": "Saint Petersburg",
+      "region_label": "г. Санкт-Петербург",
+      "mchs_host": "78.mchs.gov.ru",
+      "mchs_operational_url": "https://78.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://78.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Saint Petersburg",
+        "St. Petersburg"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "79",
+      "region": "Jewish Autonomous Oblast",
+      "region_label": "Еврейская автономная область",
+      "mchs_host": "79.mchs.gov.ru",
+      "mchs_operational_url": "https://79.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://79.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Jewish Autonomous Oblast",
+        "Jewish Autonomous Region"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "80",
+      "region": "Donetsk",
+      "region_label": "Донецкая Народная Республика",
+      "mchs_host": "80.mchs.gov.ru",
+      "mchs_operational_url": "https://80.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://80.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Donetsk",
+        "Donetsk People's Republic"
+      ],
+      "enabled": true,
+      "jurisdiction_note": "Listed here because it appears in the Russian MChS regional directory; international legal status is disputed."
+    },
+    {
+      "id": "81",
+      "region": "Luhansk",
+      "region_label": "Луганская Народная Республика",
+      "mchs_host": "81.mchs.gov.ru",
+      "mchs_operational_url": "https://81.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://81.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Luhansk",
+        "Lugansk",
+        "Luhansk People's Republic"
+      ],
+      "enabled": true,
+      "jurisdiction_note": "Listed here because it appears in the Russian MChS regional directory; international legal status is disputed."
+    },
+    {
+      "id": "82",
+      "region": "Crimea",
+      "region_label": "Республика Крым",
+      "mchs_host": "82.mchs.gov.ru",
+      "mchs_operational_url": "https://82.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://82.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Crimea",
+        "Republic of Crimea"
+      ],
+      "enabled": true,
+      "jurisdiction_note": "Listed here because it appears in the Russian MChS regional directory; international legal status is disputed."
+    },
+    {
+      "id": "83",
+      "region": "Nenets Autonomous Okrug",
+      "region_label": "Ненецкий АО",
+      "mchs_host": "83.mchs.gov.ru",
+      "mchs_operational_url": "https://83.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://83.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Nenets Autonomous Okrug"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "84",
+      "region": "Kherson",
+      "region_label": "Херсонская область",
+      "mchs_host": "84.mchs.gov.ru",
+      "mchs_operational_url": "https://84.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://84.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Kherson",
+        "Kherson Oblast"
+      ],
+      "enabled": true,
+      "jurisdiction_note": "Listed here because it appears in the Russian MChS regional directory; international legal status is disputed."
+    },
+    {
+      "id": "85",
+      "region": "Zaporizhzhia",
+      "region_label": "Запорожская область",
+      "mchs_host": "85.mchs.gov.ru",
+      "mchs_operational_url": "https://85.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://85.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Zaporizhzhia",
+        "Zaporozhye",
+        "Zaporizhzhia Oblast"
+      ],
+      "enabled": true,
+      "jurisdiction_note": "Listed here because it appears in the Russian MChS regional directory; international legal status is disputed."
+    },
+    {
+      "id": "86",
+      "region": "Khanty-Mansi Autonomous Okrug",
+      "region_label": "Ханты-Мансийский АО - Югра",
+      "mchs_host": "86.mchs.gov.ru",
+      "mchs_operational_url": "https://86.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://86.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Khanty-Mansi Autonomous Okrug",
+        "Khanty-Mansiysk",
+        "Yugra"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "87",
+      "region": "Chukotka Autonomous Okrug",
+      "region_label": "Чукотский АО",
+      "mchs_host": "87.mchs.gov.ru",
+      "mchs_operational_url": "https://87.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://87.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Chukotka Autonomous Okrug"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "89",
+      "region": "Yamalo-Nenets Autonomous Okrug",
+      "region_label": "Ямало-Ненецкий АО",
+      "mchs_host": "89.mchs.gov.ru",
+      "mchs_operational_url": "https://89.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://89.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Yamalo-Nenets Autonomous Okrug"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "92",
+      "region": "Sevastopol",
+      "region_label": "г. Севастополь",
+      "mchs_host": "92.mchs.gov.ru",
+      "mchs_operational_url": "https://92.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://92.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Sevastopol"
+      ],
+      "enabled": true,
+      "jurisdiction_note": "Listed here because it appears in the Russian MChS regional directory; international legal status is disputed."
+    },
+    {
+      "id": "95",
+      "region": "Chechen Republic",
+      "region_label": "Чеченская Республика",
+      "mchs_host": "95.mchs.gov.ru",
+      "mchs_operational_url": "https://95.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya",
+      "mchs_rss_url": "https://95.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "geo_aliases": [
+        "Chechnya",
+        "Chechen Republic"
+      ],
+      "enabled": true
+    }
+  ]
+}

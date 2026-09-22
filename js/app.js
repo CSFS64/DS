@@ -1,10 +1,18 @@
-const GEOJSON_URL = "https://raw.githubusercontent.com/codeforgermany/click_that_hood/main/public/data/russia.geojson";
+const REGION_GEOJSON_URLS = [
+  "data/russia.geojson",
+  "https://raw.githubusercontent.com/codeforgermany/click_that_hood/main/public/data/russia.geojson",
+];
+const PRIMARY_TILE_URL = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+const OSM_FALLBACK_TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 const MOSCOW_OFFSET = "+03:00";
 
 const state = {
   archive: null,
   sources: null,
+  regions: null,
   map: null,
+  tileLayer: null,
+  tileErrors: 0,
   regionLayers: new Map(),
   cityMarkers: new Map(),
   currentMs: 0,
@@ -47,9 +55,18 @@ function formatDuration(start, end) {
   return h ? `${h}h ${m}m` : `${m}m`;
 }
 
+function normalizeAdminName(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/ё/g, "е")
+    .replace(/[–—−]/g, "-")
+    .replace(/[^a-zа-я0-9]+/g, " ")
+    .trim();
+}
+
 function sourcePlaceIndex() {
   const map = new Map();
-  for (const source of state.sources.sources) {
+  for (const source of state.sources.sources || []) {
     for (const place of source.places || []) {
       const key = `${source.region}::${place.name}`;
       if (!map.has(key)) map.set(key, place);
@@ -66,9 +83,10 @@ async function loadJson(path) {
 
 async function init() {
   try {
-    [state.archive, state.sources] = await Promise.all([
+    [state.archive, state.sources, state.regions] = await Promise.all([
       loadJson("data/events.json"),
       loadJson("data/sources.json"),
+      loadJson("data/regions.json"),
     ]);
   } catch (err) {
     console.error(err);
@@ -83,35 +101,115 @@ async function init() {
   wireControls();
   rebuildTimeline();
   render();
+  updateDataStatus();
+}
 
+function updateDataStatus() {
   const generated = state.archive.generated_at ? formatTime(Date.parse(state.archive.generated_at), "Europe/Moscow") : "—";
-  els.dataStatus.textContent = `${state.archive.events.length} PAIRED ALERTS · UPDATED ${generated} MSK · ${state.archive.safety_lag_hours ?? 24}H ARCHIVE LAG`;
+  const c = state.archive.coverage || {};
+  const configured = c.regions_configured ?? state.regions.regions?.length ?? 0;
+  const rssOk = c.regions_rss_ok;
+  const hiRes = c.high_resolution_sources_configured ?? state.sources.sources?.filter(s => s.enabled).length ?? 0;
+  const coverageText = configured
+    ? `${Number.isInteger(rssOk) ? `${rssOk}/${configured}` : `PENDING/${configured}`} REGION FEEDS · ${hiRes} HIGH-RES`
+    : `${hiRes} HIGH-RES`;
+  els.dataStatus.textContent = `${state.archive.events.length} PAIRED ALERTS · ${coverageText} · UPDATED ${generated} MSK · ${state.archive.safety_lag_hours ?? 24}H ARCHIVE LAG`;
 }
 
 function initMap() {
-  state.map = L.map("map", { zoomControl: true, attributionControl: true, minZoom: 3, maxZoom: 11 }).setView([53.2, 39.0], 5);
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution: "© OpenStreetMap contributors",
-  }).addTo(state.map);
+  state.map = L.map("map", {
+    zoomControl: true,
+    attributionControl: true,
+    minZoom: 3,
+    maxZoom: 11,
+    preferCanvas: true,
+  }).setView([53.2, 39.0], 5);
+
+  state.tileLayer = L.tileLayer(PRIMARY_TILE_URL, {
+    subdomains: "abcd",
+    maxZoom: 20,
+    maxNativeZoom: 20,
+    attribution: "© OpenStreetMap contributors © CARTO",
+    updateWhenIdle: true,
+    updateWhenZooming: false,
+    keepBuffer: 4,
+  });
+
+  state.tileLayer.on("tileerror", (ev) => {
+    state.tileErrors += 1;
+    const tile = ev.tile;
+    const coords = ev.coords;
+    if (!tile || !coords) return;
+
+    // One coordinate-preserving fallback attempt. The previous build had no
+    // tileerror handler, so a single failed raster request remained a black square.
+    if (tile.dataset.fallbackProvider !== "osm") {
+      tile.dataset.fallbackProvider = "osm";
+      tile.src = OSM_FALLBACK_TILE_URL
+        .replace("{z}", String(coords.z))
+        .replace("{x}", String(coords.x))
+        .replace("{y}", String(coords.y));
+      return;
+    }
+
+    // If both providers fail, keep the map usable without a broken-image icon.
+    tile.style.visibility = "hidden";
+  });
+
+  state.tileLayer.addTo(state.map);
+}
+
+async function fetchRegionGeoJson() {
+  let lastError = null;
+  for (const url of REGION_GEOJSON_URLS) {
+    try {
+      const res = await fetch(url, { cache: "force-cache" });
+      if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError || new Error("No region GeoJSON source available");
+}
+
+function regionAliases(region) {
+  return [region.region, region.region_label, ...(region.geo_aliases || [])]
+    .map(normalizeAdminName)
+    .filter(Boolean);
 }
 
 async function loadRegions() {
   try {
-    const res = await fetch(GEOJSON_URL, { cache: "force-cache" });
-    if (!res.ok) throw new Error(`GeoJSON HTTP ${res.status}`);
-    const data = await res.json();
+    const data = await fetchRegionGeoJson();
+    const featureLayers = [];
     L.geoJSON(data, {
       style: () => regionStyle(false),
       onEachFeature: (feature, layer) => {
-        const name = feature.properties?.name_latin || feature.properties?.name;
-        if (name) state.regionLayers.set(name, layer);
+        const names = new Set();
+        for (const value of Object.values(feature.properties || {})) {
+          if (typeof value === "string" && value.length < 160) names.add(normalizeAdminName(value));
+        }
+        featureLayers.push({ layer, names, feature });
       },
     }).addTo(state.map);
+
+    for (const region of state.regions.regions || []) {
+      const aliases = regionAliases(region);
+      const matched = featureLayers.find(entry => aliases.some(a => entry.names.has(a)));
+      if (matched) state.regionLayers.set(region.region, matched.layer);
+    }
+
+    // Preserve compatibility with event names that are already exact GeoJSON values.
+    for (const entry of featureLayers) {
+      for (const name of entry.names) {
+        if (!state.regionLayers.has(name)) state.regionLayers.set(name, entry.layer);
+      }
+    }
   } catch (err) {
-    console.warn("Region GeoJSON unavailable; using fallback circles", err);
-    for (const source of state.sources.sources) {
-      if (!source.region_center) continue;
+    console.warn("Region GeoJSON unavailable; region highlighting limited to configured center fallbacks", err);
+    for (const source of state.sources.sources || []) {
+      if (!source.region_center || state.regionLayers.has(source.region)) continue;
       const layer = L.circle(source.region_center, { radius: 120000, ...regionStyle(false) }).addTo(state.map);
       state.regionLayers.set(source.region, layer);
     }
@@ -126,10 +224,21 @@ function regionStyle(active) {
   };
 }
 
+function getRegionLayer(regionName) {
+  if (state.regionLayers.has(regionName)) return state.regionLayers.get(regionName);
+  const region = (state.regions.regions || []).find(r => r.region === regionName);
+  if (region) {
+    for (const alias of regionAliases(region)) {
+      if (state.regionLayers.has(alias)) return state.regionLayers.get(alias);
+    }
+  }
+  return null;
+}
+
 function createCityLamps() {
   const index = sourcePlaceIndex();
   for (const [key, place] of index) {
-    if (!place.lat || !place.lon) continue;
+    if (place.lat == null || place.lon == null) continue;
     const icon = L.divIcon({
       className: "city-lamp-icon",
       html: `<div class="city-lamp-wrap"><div class="city-lamp"></div><div class="city-lamp-label">${escapeHtml(place.label || place.name)}</div></div>`,
@@ -226,6 +335,7 @@ function buildEventBars() {
     const right = Math.min(100, pctInTimeline(Math.min(end, state.timelineEndMs)));
     const bar = document.createElement("span");
     bar.className = `event-bar ${event.scope === "region" ? "region" : "city"}`;
+    if (event.precision === "parent_region_fallback") bar.classList.add("fallback");
     bar.style.left = `${left}%`; bar.style.width = `${Math.max(.3, right - left)}%`;
     bar.title = `${event.place} ${formatTime(start, "Europe/Moscow")}–${formatTime(end, "Europe/Moscow")}`;
     els.eventBars.appendChild(bar);
@@ -257,10 +367,20 @@ function render() {
 }
 
 function renderMap(active) {
+  // Reset all known region polygons once, then activate by canonical region id.
+  const resetLayers = new Set();
+  for (const region of state.regions.regions || []) {
+    const layer = getRegionLayer(region.region);
+    if (layer && !resetLayers.has(layer)) {
+      layer.setStyle?.(regionStyle(false));
+      resetLayers.add(layer);
+    }
+  }
+
   const activeRegions = new Set(active.filter(e => e.scope === "region").map(e => e.region));
-  for (const [name, layer] of state.regionLayers) {
-    const isActive = activeRegions.has(name);
-    if (layer.setStyle) layer.setStyle(regionStyle(isActive));
+  for (const regionName of activeRegions) {
+    const layer = getRegionLayer(regionName);
+    layer?.setStyle?.(regionStyle(true));
   }
 
   const activePlaces = new Set(active.filter(e => e.scope !== "region").map(e => `${e.region}::${e.place}`));
@@ -316,6 +436,7 @@ function showPlaceDetail(key) {
     const s = Date.parse(nearest.start), e = Date.parse(nearest.end);
     const related = reports.filter(r => Date.parse(r.at) >= s - 2 * 3600000 && Date.parse(r.at) <= e + 6 * 3600000);
     let text = `${formatTime(s, "Europe/Moscow")} → ${formatTime(e, "Europe/Moscow")} MSK\nDuration ${formatDuration(s,e)}`;
+    if (nearest.precision === "parent_region_fallback") text += "\nPrecision: mapped to parent region (local place not resolved)";
     if (related.length) text += `\n\nLocal reports:\n${related.map(r => `• ${r.count ?? "—"} ${r.count_type || "reported"}`).join("\n")}`;
     els.detailBody.textContent = text;
     els.detailSource.href = nearest.start_url || nearest.source_url;

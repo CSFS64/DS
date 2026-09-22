@@ -35,7 +35,7 @@ button, input, select { font: inherit; }
 .map-panel { position: relative; min-height: 0; overflow: hidden; }
 #map { position: absolute; inset: 0; background: #050a0f; }
 .leaflet-container { background: #050a0f; font-family: inherit; }
-.leaflet-tile-pane { filter: grayscale(.9) invert(.92) hue-rotate(175deg) brightness(.58) contrast(1.15); }
+.leaflet-tile-pane { filter: grayscale(.75) saturate(.72) brightness(.78) contrast(1.12); }
 .leaflet-control-zoom a {
   background: rgba(6, 15, 23, .92) !important;
   color: var(--cyan) !important;
@@ -202,6 +202,7 @@ button, input, select { font: inherit; }
 .event-bars { position: absolute; left: 0; right: 0; top: 39px; height: 4px; }
 .event-bar { position: absolute; height: 3px; min-width: 2px; border-radius: 999px; background: rgba(255,66,88,.70); box-shadow: 0 0 5px rgba(255,66,88,.25); }
 .event-bar.region { background: rgba(57,216,255,.72); box-shadow: 0 0 5px rgba(57,216,255,.25); }
+.event-bar.fallback { opacity: .58; outline: 1px dashed rgba(57,216,255,.55); outline-offset: 1px; }
 .selection-band { position: absolute; top: 22px; height: 5px; border-radius: 999px; background: linear-gradient(90deg, rgba(57,216,255,.88), rgba(62,242,141,.88)); pointer-events: none; }
 .report-dots { position: absolute; left: 0; right: 0; top: 20px; height: 12px; pointer-events: none; }
 .report-dot { position: absolute; width: 6px; height: 6px; transform: translateX(-50%); border-radius: 50%; background: var(--amber); box-shadow: 0 0 7px rgba(255,186,82,.8); }

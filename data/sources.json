@@ -97,7 +97,9 @@
             "валуйском"
           ]
         }
-      ]
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true
     },
     {
       "region": "Kursk Oblast",
@@ -148,7 +150,9 @@
             "курчатове"
           ]
         }
-      ]
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true
     },
     {
       "region": "Voronezh Oblast",
@@ -246,7 +250,9 @@
             "калачеевском"
           ]
         }
-      ]
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true
     },
     {
       "region": "Lipetsk Oblast",
@@ -287,7 +293,13 @@
             "г. елец"
           ]
         }
-      ]
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true
     }
+  ],
+  "notes": [
+    "High-resolution official local sources. Nationwide regional fallback sources are in data/regions.json.",
+    "When a valid UAV alert cannot be resolved to a configured city/municipality, the collector retains it at parent-region precision instead of dropping it."
   ]
 }

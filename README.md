@@ -127,3 +127,20 @@ The frontend loads Russian ADM1 GeoJSON from the public `codeforgermany/click_th
 - Different regions use different alert wording. Unknown scopes are retained in diagnostics rather than assigned to a city by guesswork.
 - A local government saying `attacked`, `detected`, `destroyed`, `shot down`, or `suppressed` are not treated as interchangeable categories.
 - The starter source list is not yet nationwide. Add/verify more official local feeds in `data/sources.json`; the UI and collector are already designed for that expansion.
+
+## v2: tile reliability + nationwide regional fallback
+
+The v2 frontend uses CARTO Dark Matter as the primary raster basemap and retries an individual failed tile from the standard OpenStreetMap endpoint. Leaflet's `tileerror` event is handled explicitly, so one failed network tile no longer remains as a permanent black square.
+
+`data/regions.json` contains 89 regional entries following the regional directory exposed by the Russian MChS website. Each entry has an official regional MChS operational-events RSS URL. The daily GitHub Action now tries all of these feeds as a **region-level public fallback**, while `data/sources.json` remains the higher-resolution source registry for official governor / operational-headquarters Telegram feeds.
+
+Resolution precedence is:
+
+1. city (when the official post resolves to a configured city),
+2. municipality / district,
+3. region,
+4. parent-region fallback when the alert wording is valid but the smaller place cannot be resolved.
+
+Fallbacks are tagged with `precision: parent_region_fallback` so the UI can distinguish them from an explicit region-wide alert. Nothing is silently promoted without keeping that provenance.
+
+Important: the public MChS regional RSS feeds do not necessarily mirror every push notification sent through the MChS mobile app. The nationwide registry therefore guarantees that every region has an official public fallback source configured, **not** that every regional START/END push will appear in RSS. High-resolution local official channels should continue to be added to `data/sources.json` as they are verified.
