@@ -1,9 +1,9 @@
 {
   "schema_version": 2,
-  "generated_at": "2026-09-22T19:16:35.097121+00:00",
+  "generated_at": "2026-09-22T19:57:56.780751+00:00",
   "safety_lag_hours": 24,
-  "window_start": "2026-09-19T19:16:35.097121+00:00",
-  "window_end": "2026-09-21T19:16:35.097121+00:00",
+  "window_start": "2026-09-19T19:57:56.780751+00:00",
+  "window_end": "2026-09-21T19:57:56.780751+00:00",
   "coverage": {
     "regions_configured": 89,
     "regions_rss_ok": 81,
@@ -598,6 +598,18 @@
       "text": "Внимание! Россошанский район — тревога в связи с угрозой непосредственного удара БПЛА. Работают системы оповещения. Зайдите в помещение, отойдите от окон. Если увидели БПЛА — сразу уходите из зоны его видимости и позвоните по телефону 112."
     },
     {
+      "type": "start_scope_fell_back_to_region",
+      "region": "Voronezh Oblast",
+      "url": "https://t.me/gusev_36/7368",
+      "text": "Внимание! Богучарский и Кантемировский районы — тревога в связи с угрозой непосредственного удара БПЛА. Работают системы оповещения. Зайдите в помещение, отойдите от окон. Если увидели БПЛА — сразу уходите из зоны его видимости и позвоните по телефону 112."
+    },
+    {
+      "type": "start_scope_fell_back_to_region",
+      "region": "Voronezh Oblast",
+      "url": "https://t.me/gusev_36/7369",
+      "text": "Внимание! Аннинский и Бутурлиновский районы — тревога в связи с угрозой непосредственного удара БПЛА. Работают системы оповещения. Зайдите в помещение, отойдите от окон. Если увидели БПЛА — сразу уходите из зоны его видимости и позвоните по телефону 112."
+    },
+    {
       "type": "unmatched_start",
       "region": "Voronezh Oblast",
       "place": "Voronezh Oblast",
@@ -644,6 +656,22 @@
       "start": "2026-09-21T19:08:54+00:00",
       "url": "https://t.me/gusev_36/7366",
       "text": "Внимание! Россошанский район — тревога в связи с угрозой непосредственного удара БПЛА. Работают системы оповещения. Зайдите в помещение, отойдите от окон. Если увидели БПЛА — сразу уходите из зоны его видимости и позвоните по телефону 112."
+    },
+    {
+      "type": "unmatched_start",
+      "region": "Voronezh Oblast",
+      "place": "Voronezh Oblast",
+      "start": "2026-09-21T19:22:31+00:00",
+      "url": "https://t.me/gusev_36/7368",
+      "text": "Внимание! Богучарский и Кантемировский районы — тревога в связи с угрозой непосредственного удара БПЛА. Работают системы оповещения. Зайдите в помещение, отойдите от окон. Если увидели БПЛА — сразу уходите из зоны его видимости и позвоните по телефону 112."
+    },
+    {
+      "type": "unmatched_start",
+      "region": "Voronezh Oblast",
+      "place": "Voronezh Oblast",
+      "start": "2026-09-21T19:47:27+00:00",
+      "url": "https://t.me/gusev_36/7369",
+      "text": "Внимание! Аннинский и Бутурлиновский районы — тревога в связи с угрозой непосредственного удара БПЛА. Работают системы оповещения. Зайдите в помещение, отойдите от окон. Если увидели БПЛА — сразу уходите из зоны его видимости и позвоните по телефону 112."
     },
     {
       "type": "unmatched_start",
@@ -710,7 +738,7 @@
       "source": "operativno31",
       "region": "Belgorod Oblast",
       "ok": true,
-      "posts": 92,
+      "posts": 93,
       "events": 4,
       "reports": 17
     },
@@ -780,7 +808,7 @@
       "source": "https://38.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
       "region": "Irkutsk Oblast",
       "ok": true,
-      "posts": 7,
+      "posts": 6,
       "events": 0,
       "reports": 0
     },
@@ -807,7 +835,7 @@
       "source": "https://07.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
       "region": "Kabardino-Balkarian Republic",
       "ok": true,
-      "posts": 3,
+      "posts": 4,
       "events": 0,
       "reports": 0
     },
@@ -949,7 +977,7 @@
       "source": "gubernator_46",
       "region": "Kursk Oblast",
       "ok": true,
-      "posts": 25,
+      "posts": 26,
       "events": 0,
       "reports": 0
     },
@@ -1438,7 +1466,7 @@
       "source": "gusev_36",
       "region": "Voronezh Oblast",
       "ok": true,
-      "posts": 15,
+      "posts": 17,
       "events": 4,
       "reports": 1
     },
