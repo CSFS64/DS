@@ -1,31 +1,9 @@
-const REGION_GEOJSON_URLS = [
-  "data/russia.geojson",
-  "https://raw.githubusercontent.com/rnekrasov-msk/geojson/master/admin_level_1.geojson",
-  "https://raw.githubusercontent.com/imsha/russia_geojson_regions_2021/main/ru.json",
-  "https://raw.githubusercontent.com/antibioticbook/russian-geo-data/master/geo.json",
-  "https://raw.githubusercontent.com/rnekrasov-msk/geojson/master/regions.geojson",
-];
+const REGION_GEOJSON_URL = "data/russia.geojson";
+const WORLD_GEOJSON_URL = "data/world.geojson";
 
-// No-key raster stack. CARTO Dark Matter now requires an API key, so it is
-// intentionally not used here. Failed individual tiles cascade across these
-// public OSM-derived providers while preserving the same z/x/y coordinate.
-const TILE_PROVIDERS = [
-  {
-    name: "OpenStreetMap Standard",
-    url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-    subdomains: "",
-  },
-  {
-    name: "OSM Humanitarian",
-    url: "https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
-    subdomains: "abc",
-  },
-  {
-    name: "OSM France",
-    url: "https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png",
-    subdomains: "abc",
-  },
-];
+// v4 intentionally uses no raster tile provider. The basemap is rendered
+// entirely from GeoJSON committed with the repository, eliminating missing
+// tiles, provider rate limits, API keys, and mixed-provider seams.
 const MOSCOW_OFFSET = "+03:00";
 
 const state = {
@@ -33,8 +11,7 @@ const state = {
   sources: null,
   regions: null,
   map: null,
-  tileLayer: null,
-  tileErrors: 0,
+  worldLayer: null,
   regionLayers: new Map(),
   regionMatchedCount: 0,
   regionGeoJsonSource: null,
@@ -84,7 +61,10 @@ function normalizeAdminName(value) {
     .toLowerCase()
     .replace(/ё/g, "е")
     .replace(/[–—−]/g, "-")
+    .replace(/\b(the|federal city|autonomous oblast|autonomous okrug|autonomous district|republic of|republic|oblast|krai|region)\b/g, " ")
+    .replace(/\b(республика|область|край|автономная область|автономный округ|город федерального значения)\b/g, " ")
     .replace(/[^a-zа-я0-9]+/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -119,6 +99,7 @@ async function init() {
   }
 
   initMap();
+  await loadWorld();
   await loadRegions();
   createCityLamps();
   initializeDates();
@@ -141,73 +122,48 @@ function updateDataStatus() {
   els.dataStatus.textContent = `${state.archive.events.length} PAIRED ALERTS · ${coverageText} · UPDATED ${generated} MSK · ${state.archive.safety_lag_hours ?? 24}H ARCHIVE LAG`;
 }
 
-function tileUrl(provider, coords) {
-  let url = provider.url;
-  if (url.includes("{s}")) {
-    const subs = provider.subdomains || "abc";
-    const sub = subs[(Math.abs(coords.x) + Math.abs(coords.y)) % subs.length] || "a";
-    url = url.replace("{s}", sub);
-  }
-  return url
-    .replace("{z}", String(coords.z))
-    .replace("{x}", String(coords.x))
-    .replace("{y}", String(coords.y));
-}
-
 function initMap() {
   state.map = L.map("map", {
     zoomControl: true,
     attributionControl: true,
-    minZoom: 3,
-    maxZoom: 11,
+    minZoom: 2,
+    maxZoom: 10,
     preferCanvas: true,
-  }).setView([53.2, 39.0], 5);
+    worldCopyJump: true,
+  }).setView([54.0, 55.0], 4);
 
-  const primary = TILE_PROVIDERS[0];
-  state.tileLayer = L.tileLayer(primary.url, {
-    maxZoom: 19,
-    maxNativeZoom: 19,
-    attribution: "© OpenStreetMap contributors · fallback tiles: HOT / OSM France",
-    updateWhenIdle: true,
-    updateWhenZooming: false,
-    keepBuffer: 2,
-  });
+  // No L.tileLayer() on purpose. The map background is CSS and all
+  // geographic context is local vector data committed with this site.
+  L.control.attribution({ prefix: false }).addTo(state.map);
+}
 
-  state.tileLayer.on("tileerror", (ev) => {
-    state.tileErrors += 1;
-    const tile = ev.tile;
-    const coords = ev.coords;
-    if (!tile || !coords) return;
-
-    const currentIndex = Number(tile.dataset.providerIndex || 0);
-    const nextIndex = currentIndex + 1;
-    if (nextIndex < TILE_PROVIDERS.length) {
-      tile.dataset.providerIndex = String(nextIndex);
-      tile.src = tileUrl(TILE_PROVIDERS[nextIndex], coords);
-      return;
-    }
-
-    // Keep a neutral background if all providers fail. Do not show a broken icon.
-    tile.style.visibility = "hidden";
-  });
-
-  state.tileLayer.addTo(state.map);
+async function loadWorld() {
+  try {
+    const data = await loadJson(WORLD_GEOJSON_URL);
+    state.worldLayer = L.geoJSON(data, {
+      interactive: false,
+      style: (feature) => {
+        const p = feature?.properties || {};
+        const iso = String(p.ISO_A3 || p.ADM0_A3 || p["ISO3166-1-Alpha-3"] || "").toUpperCase();
+        const isRussia = iso === "RUS";
+        return {
+          color: isRussia ? "#28495d" : "#172b38",
+          weight: isRussia ? 0.9 : 0.55,
+          opacity: isRussia ? 0.7 : 0.42,
+          fillColor: isRussia ? "#08151f" : "#050d13",
+          fillOpacity: isRussia ? 0.34 : 0.22,
+        };
+      },
+    }).addTo(state.map);
+  } catch (err) {
+    console.warn("Local world vector map unavailable", err);
+  }
 }
 
 async function fetchRegionGeoJson() {
-  let lastError = null;
-  for (const url of REGION_GEOJSON_URLS) {
-    try {
-      const res = await fetch(url, { cache: "force-cache" });
-      if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
-      const data = await res.json();
-      state.regionGeoJsonSource = url;
-      return data;
-    } catch (err) {
-      lastError = err;
-    }
-  }
-  throw lastError || new Error("No region GeoJSON source available");
+  const data = await loadJson(REGION_GEOJSON_URL);
+  state.regionGeoJsonSource = REGION_GEOJSON_URL;
+  return data;
 }
 
 function regionAliases(region) {
@@ -234,7 +190,10 @@ async function loadRegions() {
     let matchedCount = 0;
     for (const region of state.regions.regions || []) {
       const aliases = regionAliases(region);
-      const matched = featureLayers.find(entry => aliases.some(a => entry.names.has(a)));
+      let matched = featureLayers.find(entry => aliases.some(a => entry.names.has(a)));
+      if (!matched) {
+        matched = featureLayers.find(entry => aliases.some(a => a.length >= 5 && [...entry.names].some(n => n.length >= 5 && (n.includes(a) || a.includes(n)))));
+      }
       if (!matched) continue;
       matchedCount += 1;
       state.regionLayers.set(region.region, matched.layer);
@@ -261,9 +220,9 @@ async function loadRegions() {
 
 function regionStyle(active) {
   return active ? {
-    color: "#39d8ff", weight: 1.7, opacity: .95, fillColor: "#39d8ff", fillOpacity: .13,
+    color: "#49e4ff", weight: 2.0, opacity: 1, fillColor: "#27cfff", fillOpacity: .19,
   } : {
-    color: "#2b485a", weight: .7, opacity: .28, fillColor: "#071018", fillOpacity: 0,
+    color: "#23485c", weight: .8, opacity: .72, fillColor: "#07131c", fillOpacity: .10,
   };
 }
 
