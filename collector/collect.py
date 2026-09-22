@@ -4,7 +4,8 @@
 Sources are deliberately separated into two layers:
   1. High-resolution official local Telegram channels configured in data/sources.json.
   2. A nationwide region-level fallback using the official regional MChS RSS feeds
-     configured in data/regions.json.
+     configured in data/regions.json. RSS is treated as a fallback/diagnostic layer,
+     not as proof that every MChS mobile-app push is mirrored to the website feed.
 
 The collector enforces a minimum 24-hour archive lag. It never acts as a live alert
 monitor. START/END alerts are paired conservatively; if a valid official alert cannot
@@ -50,6 +51,7 @@ START_MARKERS = (
     "угроза атаки бпла",
     "угроза непосредственного удара бпла",
     "тревога в связи с угрозой непосредственного удара бпла",
+    "режим атака бпла",
 )
 END_MARKERS = (
     "отбой опасности атаки бпла",
@@ -58,7 +60,25 @@ END_MARKERS = (
     "отмена непосредственной опасности атаки бпла",
     "отмена непосредственной угрозы",
     "отбой угрозы атаки бпла",
+    "снята угроза атаки беспилотных воздушных средств",
 )
+
+# Regional authorities use many word orders for the same clear message.  These
+# regexes intentionally focus on the UAV-danger phrase and clear verbs, rather
+# than relying on one exact template.
+END_PATTERNS = tuple(re.compile(p) for p in (
+    r"\bотбой\b.{0,80}\b(?:беспилотн\w*|бпла)\b",
+    r"\b(?:снят|снята|снято|сняты|отменен|отменена|отменено|отменены|отмена)\b.{0,100}\bбеспилотн\w*\s+опасност\w*",
+    r"\bбеспилотн\w*\s+опасност\w*.{0,100}\b(?:снят|снята|снято|сняты|отменен|отменена|отменено|отменены)\b",
+    r"\b(?:снят|снята|отменен|отменена)\b.{0,100}\bугроз\w*\s+атак\w*\s+(?:бпла|беспилотн\w*)",
+    r"\bугроз\w*\s+атак\w*\s+(?:бпла|беспилотн\w*).{0,100}\b(?:снят|снята|отменен|отменена)\b",
+))
+START_PATTERNS = tuple(re.compile(p) for p in (
+    r"\b(?:объявлен\w*|введен\w*|действует|сохраняется)\b.{0,90}\bбеспилотн\w*\s+опасност\w*",
+    r"\b(?:опасност\w*|угроз\w*)\s+атак\w*\s+бпла\b",
+    r"\bрежим\s+атака\s+бпла\b",
+    r"\bтревог\w*.{0,60}\bбпла\b",
+))
 REGION_PHRASES = (
     "на всей территории области",
     "на всей территории республики",
@@ -116,7 +136,10 @@ class Post:
 
 
 def normalize(text: str) -> str:
-    return " ".join(str(text).lower().replace("ё", "е").split())
+    value = str(text).lower().replace("ё", "е")
+    # Normalize quote/dash/punctuation variants used by regional alert templates.
+    value = re.sub(r"[«»„“”\"'`…,:;.!?()\[\]{}<>|/\\–—−-]+", " ", value)
+    return " ".join(value.split())
 
 
 def parse_iso(value: str) -> datetime:
@@ -281,11 +304,23 @@ def fetch_mchs_posts_for_window(
 
 def text_kind(text: str) -> str | None:
     n = normalize(text)
-    if any(marker in n for marker in END_MARKERS):
+    if any(marker in n for marker in END_MARKERS) or any(p.search(n) for p in END_PATTERNS):
         return "end"
-    if any(marker in n for marker in START_MARKERS):
+    if any(marker in n for marker in START_MARKERS) or any(p.search(n) for p in START_PATTERNS):
         return "start"
     return None
+
+
+def alert_post_stats(posts: list[Post]) -> dict[str, int]:
+    starts = 0
+    ends = 0
+    for post in posts:
+        kind = text_kind(post.text)
+        if kind == "start":
+            starts += 1
+        elif kind == "end":
+            ends += 1
+    return {"alert_posts": starts + ends, "start_posts": starts, "end_posts": ends}
 
 
 def extract_places(text: str, source: dict[str, Any]) -> list[dict[str, Any]]:
@@ -318,11 +353,14 @@ def is_region_message(text: str, source: dict[str, Any]) -> bool:
     if source.get("default_scope") == "region" and not places:
         return True
     region_label = normalize(source.get("region_label", ""))
+    region_aliases = [normalize(a) for a in source.get("region_aliases", []) if normalize(a)]
     if any(p in n for p in REGION_PHRASES):
         return True
     if "на всей территории" in n and any(w in n for w in ("област", "республик", "кра", "округ", "регион")):
         return True
     if region_label and region_label in n and not places:
+        return True
+    if not places and any(alias in n for alias in region_aliases):
         return True
     return False
 
@@ -349,7 +387,9 @@ def pair_alerts(posts: list[Post], source: dict[str, Any], window_start: datetim
     def open_one(place_name: str, scope: str, post: Post, precision: str = "exact"):
         key = key_for(place_name)
         bucket = open_alerts.setdefault(key, [])
-        if bucket and abs((post.published_at - bucket[-1]["post"].published_at).total_seconds()) < 60:
+        # Official channels frequently repeat "danger remains in effect" while an
+        # alert is open. Treat alerts as state, not as a stack of repeated starts.
+        if bucket:
             return
         bucket.append({"post": post, "scope": scope, "precision": precision})
 
@@ -525,6 +565,7 @@ def mchs_source(region_cfg: dict[str, Any]) -> dict[str, Any]:
         "kind": "mchs_rss",
         "region": region_cfg["region"],
         "region_label": region_cfg["region_label"],
+        "region_aliases": [region_cfg.get("region_label", ""), *(region_cfg.get("geo_aliases") or [])],
         "source_name": f"ГУ МЧС России — {region_cfg['region_label']}",
         "source_url": region_cfg["mchs_operational_url"],
         "default_scope": "region",
@@ -556,11 +597,17 @@ def collect(args) -> dict[str, Any]:
             events, unmatched = pair_alerts(posts, source, window_start, window_end)
             reports = extract_reports(posts, source, window_start, window_end)
             all_events.extend(events); all_reports.extend(reports); all_unmatched.extend(unmatched)
+            alert_stats = alert_post_stats(posts)
             statuses.append({
                 "source_type": "telegram", "source": channel, "region": source["region"], "ok": True,
-                "posts": len(posts), "events": len(events), "reports": len(reports),
+                "posts": len(posts), "events": len(events), "reports": len(reports), **alert_stats,
             })
-            print(f"telegram {channel}: posts={len(posts)} events={len(events)} reports={len(reports)}", file=sys.stderr)
+            print(
+                f"telegram {channel}: posts={len(posts)} alerts={alert_stats['alert_posts']} "
+                f"starts={alert_stats['start_posts']} ends={alert_stats['end_posts']} "
+                f"events={len(events)} reports={len(reports)}",
+                file=sys.stderr,
+            )
         except Exception as exc:
             statuses.append({"source_type": "telegram", "source": channel, "region": source["region"], "ok": False, "error": str(exc)})
             print(f"telegram {channel}: ERROR {exc}", file=sys.stderr)
@@ -584,9 +631,10 @@ def collect(args) -> dict[str, Any]:
             try:
                 _, posts, events, reports, unmatched = future.result()
                 all_events.extend(events); all_reports.extend(reports); all_unmatched.extend(unmatched)
+                alert_stats = alert_post_stats(posts)
                 statuses.append({
                     "source_type": "mchs_rss", "source": region["mchs_rss_url"], "region": region["region"], "ok": True,
-                    "posts": len(posts), "events": len(events), "reports": len(reports),
+                    "posts": len(posts), "events": len(events), "reports": len(reports), **alert_stats,
                 })
             except Exception as exc:
                 statuses.append({
@@ -602,17 +650,28 @@ def collect(args) -> dict[str, Any]:
 
     rss_status = [s for s in statuses if s["source_type"] == "mchs_rss"]
     telegram_status = [s for s in statuses if s["source_type"] == "telegram"]
+    regions_with_events = sorted({e["region"] for e in all_events})
+    regions_with_alert_posts = sorted({s["region"] for s in statuses if s.get("alert_posts", 0) > 0})
+    hi_res_regions_with_events = sorted({e["region"] for e in all_events if e.get("source_kind") == "telegram"})
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "generated_at": now.isoformat(),
         "safety_lag_hours": args.safety_lag_hours,
         "window_start": window_start.isoformat(),
         "window_end": window_end.isoformat(),
         "coverage": {
             "regions_configured": len(enabled_regions),
+            # Legacy HTTP-health metric retained for old frontends.
             "regions_rss_ok": sum(1 for s in rss_status if s.get("ok")),
+            "region_feeds_http_ok": sum(1 for s in rss_status if s.get("ok")),
+            "mchs_regions_with_alert_posts": sum(1 for s in rss_status if s.get("alert_posts", 0) > 0),
+            "regions_with_any_alert_posts": len(regions_with_alert_posts),
+            "regions_with_paired_alerts": len(regions_with_events),
             "high_resolution_sources_configured": len([s for s in source_cfg.get("sources", []) if s.get("enabled", False)]),
             "high_resolution_sources_ok": sum(1 for s in telegram_status if s.get("ok")),
+            "high_resolution_sources_with_alert_posts": sum(1 for s in telegram_status if s.get("alert_posts", 0) > 0),
+            "high_resolution_regions_with_events": len(hi_res_regions_with_events),
+            "unmatched_starts": sum(1 for u in all_unmatched if u.get("type") == "unmatched_start"),
         },
         "events": all_events,
         "reports": all_reports,
@@ -645,7 +704,8 @@ def main():
     tmp.replace(out)
     print(
         f"wrote {out}: {len(data['events'])} paired alerts, {len(data['reports'])} reports; "
-        f"regional RSS {data['coverage']['regions_rss_ok']}/{data['coverage']['regions_configured']}",
+        f"regions-with-events {data['coverage']['regions_with_paired_alerts']}/{data['coverage']['regions_configured']}; "
+        f"MChS HTTP {data['coverage']['region_feeds_http_ok']}/{data['coverage']['regions_configured']}",
         file=sys.stderr,
     )
 

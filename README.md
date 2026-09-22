@@ -1,98 +1,127 @@
-# Deepstrike Alert Archive
+# Deepstrike Alert Archive — v5
 
-A responsive GitHub Pages site for browsing **delayed historical** regional UAV-alert records from official local sources.
+Responsive GitHub Pages archive for **delayed historical** regional UAV-alert records from official local sources.
 
-## What is included
+## What v5 changes
 
-- Dark military / high-tech map UI for desktop and mobile.
-- City/municipality lamps: active alert = illuminated red point, otherwise dim.
-- Region-level alert: the ADM1 region is highlighted; city lamps can be active at the same time.
-- Start/end date controls, generated timeline ticks, two draggable range handles, scrubber, and autoplay.
-- Moscow / Kyiv / Beijing time conversion in the UI.
-- Official-source links on each archived event/report.
-- Static GitHub Pages frontend (`index.html`, `css/`, `js/`).
-- Python collector run by GitHub Actions. The browser never scrapes Telegram directly.
-- **24-hour minimum archive lag**; the default collector window is the 48 hours before that lag.
-- Conservative parser: only paired START + END alerts are shown. Missing clears stay in `unmatched` diagnostics instead of being guessed.
-- Local counts are optional. Posts attributed/forwarded from the Russian Ministry of Defence are excluded from count extraction.
+### Rich vector map
 
-## Current seed data
+The frontend now uses **MapLibre GL JS + OpenFreeMap** instead of raster PNG/JPEG tiles or an empty boundary-only map.
 
-`data/events.json` includes a real recent seed snapshot from the official Belgorod regional operations HQ (`@operativno31`) for **21 September 2026**, including:
+The base map therefore contains normal map context — roads, cities, rivers, borders and labels — while the alert overlay remains ours:
 
-- Belgorod / Belgorodsky District UAV alert at 05:04 MSK.
-- Belgorod Oblast region-wide UAV alert at 05:25 MSK.
-- Region-wide clear at 14:44 MSK.
-- A later Belgorodsky District alert 16:12–16:52 MSK.
-- A local official report that Belgorod was attacked by 2 UAVs that morning.
+- city / municipality alert → red luminous point;
+- region alert → region polygon highlighted cyan;
+- both can be active at once;
+- local `data/russia.geojson` is used only as the administrative alert overlay, not as the entire basemap.
 
-The first successful `Update delayed archive data` workflow run replaces the seed with a fresh 24h-delayed archive snapshot from configured official sources.
+Primary style:
 
-## Deploy
+```text
+https://tiles.openfreemap.org/styles/dark
+```
 
-1. Create an empty GitHub repository.
-2. Upload/push this entire folder to the `main` branch.
-3. In **Settings → Pages**, choose **GitHub Actions** as the source if GitHub has not selected it automatically.
-4. Open **Actions → Deploy GitHub Pages → Run workflow** once if needed.
-5. Open **Actions → Update delayed archive data → Run workflow** to perform the first real source collection immediately.
-6. After that, the collector runs once per day automatically. A changed `data/events.json` is committed by the Actions bot and Pages redeploys.
+A Liberty style is kept as a style-load fallback. OpenFreeMap uses OpenStreetMap-derived vector data and does not require an API key for its public instance.
 
-No API token or Telegram account is required for the current public-page collector.
+### Better START/END pairing
+
+Older builds missed common official clear messages such as:
+
+```text
+режим «Беспилотная опасность» снят
+отменен режим «Беспилотная опасность»
+ОТБОЙ беспилотной и ракетной опасности
+снята угроза атаки беспилотных воздушных средств
+```
+
+Those variants are now recognized. Repeated “danger remains in effect” messages do not create duplicate open alerts.
+
+### Coverage status now means something
+
+`81/89 REGION FEEDS` in the older UI only meant that 81 RSS URLs returned HTTP successfully. It did **not** mean that 81 regions had UAV-alert posts.
+
+v5 reports separate metrics:
+
+- `REGIONS WITH EVENTS` — regions with a successfully paired START/END event in the current archive window;
+- `RSS ALERT-CAPABLE` — MChS RSS feeds that actually contained UAV START/END posts in the window;
+- `HIGH-RES ALERT-CAPABLE` — configured local Telegram sources that actually contained UAV START/END posts;
+- `UNMATCHED` — START messages for which no clear was found in the collected context.
+
+The raw HTTP health metric is still retained in `data/events.json` for diagnostics, but is no longer presented as alert coverage.
+
+## Source layers
+
+### High-resolution official local sources
+
+`data/sources.json` currently contains nine official sources:
+
+1. Belgorod Oblast — `@operativno31`
+2. Kursk Oblast — `@gubernator_46`
+3. Voronezh Oblast — `@gusev_36`
+4. Lipetsk Oblast — `@igor_artamonov48`
+5. Tula Oblast — `@regionbez71`
+6. Republic of Tatarstan — `@nashtatarstan_official`
+7. Penza Oblast — `@omelnichenko`
+8. Republic of Bashkortostan — `@mchsrb01`
+9. Samara Oblast — `@fedorishchev_official`
+
+These feeds can resolve city / municipality names when they are explicitly present in the official post. If a valid alert cannot be resolved below the region, it falls back to region precision and records that provenance.
+
+### Nationwide fallback
+
+`data/regions.json` still contains all 89 configured regional MChS websites/RSS feeds. This is a **fallback and diagnostic layer**, not a guarantee that the website RSS mirrors every MChS mobile-app push.
+
+The collector never treats “RSS URL returned HTTP 200” as evidence that the region had an alert.
+
+### RSChS MAX channels
+
+MChS has created regional RSChS MAX channels which are useful first-party alert sources. They are not automatically ingested by this project yet because the documented MAX channel-history API requires authorization and, for `chat_id` history access, bot administrator access to the channel. The public channel metadata endpoint is not a historical-post API.
+
+So v5 does **not** pretend to have nationwide MAX history collection. Expansion is done with verified public official feeds that can be archived reproducibly.
 
 ## Data flow
 
 ```text
-Official public Telegram channels
-        ↓
-GitHub Actions / collector/collect.py
-        ↓
-START/END pairing + local count extraction
-        ↓
-data/events.json
-        ↓
-GitHub Pages
-        ↓
-Map + timeline playback
+Official local Telegram sources ──────┐
+                                      ├─ collector/collect.py
+Official regional MChS RSS fallback ─┘
+                    │
+                    ├─ START/END classification
+                    ├─ city / municipality / region resolution
+                    ├─ conservative pairing
+                    ├─ local UAV-count extraction (optional)
+                    └─ MOD-derived count exclusion
+                    │
+                    ▼
+              data/events.json
+                    │
+                    ▼
+        GitHub Pages / MapLibre playback UI
 ```
 
-GitHub Pages itself is static. This is why source collection happens in Actions instead of JavaScript in the browser: public Telegram pages generally should not be relied on for cross-origin browser fetching, and server-side collection gives us stable raw timestamps and post IDs.
+The collector enforces a minimum **24-hour archive lag**.
 
-## Source configuration
+## Deploy / update
 
-Edit `data/sources.json` to add sources. Each source contains:
+From the project directory:
 
-- `region`: must match the region `name_latin` in the Russian ADM1 GeoJSON when possible.
-- `channel`: public Telegram channel handle.
-- `source_name` / `source_url`.
-- `places`: city or municipality coordinates plus Russian name/inflection aliases.
+```powershell
+git add .
+git commit -m "v5 vector map and alert parser expansion"
+git pull --rebase origin main
+git push
+```
 
-The starter config contains verified source definitions for:
+Then in GitHub:
 
-- Belgorod Oblast — `@operativno31`
-- Kursk Oblast — `@gubernator_46`
-- Voronezh Oblast — `@gusev_36`
-- Lipetsk Oblast — `@igor_artamonov48`
+1. **Actions → Deploy GitHub Pages** — wait for green.
+2. **Actions → Update delayed archive data → Run workflow** — run one collection with the new parser/source list.
+3. Wait for the data commit to trigger Pages deployment again.
+4. Hard-refresh the site (`Ctrl+F5`).
 
-The architecture is source-list driven, so expanding coverage does not require changing the frontend.
+The data Action defaults to a 48-hour collection window ending at least 24 hours before the current time.
 
-## Parser behavior
-
-Alert START phrases currently include forms such as:
-
-- `опасность атаки БПЛА`
-- `беспилотная опасность`
-- `угроза атаки БПЛА`
-- `тревога в связи с угрозой непосредственного удара БПЛА`
-
-Alert END phrases include:
-
-- `отбой опасности атаки БПЛА`
-- `отбой беспилотной опасности`
-- `отмена непосредственной опасности атаки БПЛА`
-
-A region-wide clear can close local alerts nested inside that same active regional period. This is recorded with `end_match: regional_clear` so the provenance is visible rather than hidden.
-
-## Files
+## Project files
 
 ```text
 .
@@ -102,45 +131,26 @@ A region-wide clear can close local alerts nested inside that same active region
 ├── js/
 │   └── app.js
 ├── data/
-│   ├── events.json
-│   └── sources.json
+│   ├── events.json       # generated archive snapshot (do not replace in patches)
+│   ├── sources.json      # high-resolution official sources
+│   ├── regions.json      # 89-region MChS fallback registry
+│   └── russia.geojson    # local region overlay, installed by the v4 map installer
 ├── collector/
 │   ├── __init__.py
 │   └── collect.py
 ├── tests/
-│   ├── fixtures/telegram_sample.html
+│   ├── fixtures/
 │   └── test_collector.py
-├── .github/workflows/
-│   ├── pages.yml
-│   └── update-data.yml
-├── requirements.txt
-└── README.md
+└── .github/workflows/
+    ├── pages.yml
+    └── update-data.yml
 ```
-
-## Map boundaries
-
-The frontend loads Russian ADM1 GeoJSON from the public `codeforgermany/click_that_hood` dataset. If that external GeoJSON fails, configured regions fall back to approximate circles so the UI remains usable.
 
 ## Important limitations
 
-- Telegram public HTML is not a formal API and its markup may change; `source_status` in `events.json` exposes collection failures.
-- Different regions use different alert wording. Unknown scopes are retained in diagnostics rather than assigned to a city by guesswork.
-- A local government saying `attacked`, `detected`, `destroyed`, `shot down`, or `suppressed` are not treated as interchangeable categories.
-- The starter source list is not yet nationwide. Add/verify more official local feeds in `data/sources.json`; the UI and collector are already designed for that expansion.
-
-## v2: tile reliability + nationwide regional fallback
-
-The v2 frontend uses CARTO Dark Matter as the primary raster basemap and retries an individual failed tile from the standard OpenStreetMap endpoint. Leaflet's `tileerror` event is handled explicitly, so one failed network tile no longer remains as a permanent black square.
-
-`data/regions.json` contains 89 regional entries following the regional directory exposed by the Russian MChS website. Each entry has an official regional MChS operational-events RSS URL. The daily GitHub Action now tries all of these feeds as a **region-level public fallback**, while `data/sources.json` remains the higher-resolution source registry for official governor / operational-headquarters Telegram feeds.
-
-Resolution precedence is:
-
-1. city (when the official post resolves to a configured city),
-2. municipality / district,
-3. region,
-4. parent-region fallback when the alert wording is valid but the smaller place cannot be resolved.
-
-Fallbacks are tagged with `precision: parent_region_fallback` so the UI can distinguish them from an explicit region-wide alert. Nothing is silently promoted without keeping that provenance.
-
-Important: the public MChS regional RSS feeds do not necessarily mirror every push notification sent through the MChS mobile app. The nationwide registry therefore guarantees that every region has an official public fallback source configured, **not** that every regional START/END push will appear in RSS. High-resolution local official channels should continue to be added to `data/sources.json` as they are verified.
+- Public Telegram HTML is not a formal archival API; its markup can change.
+- MChS website RSS does not necessarily contain every push sent by the MChS app / RSChS system.
+- Local authorities use many templates and grammatical forms; unpaired starts are exposed rather than silently guessed.
+- `attacked`, `detected`, `destroyed`, `shot down`, and `suppressed` UAV counts are kept as different categories.
+- Posts explicitly attributed/forwarded from the Russian Ministry of Defence are excluded from local-count extraction.
+- OpenFreeMap's public instance is convenient and keyless but does not offer an SLA. The alert overlay and archive data remain independent of the basemap service.

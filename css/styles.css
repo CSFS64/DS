@@ -33,48 +33,35 @@ button, input, select { font: inherit; }
 }
 
 .map-panel { position: relative; min-height: 0; overflow: hidden; }
-#map {
-  position: absolute; inset: 0;
-  background:
-    radial-gradient(circle at 45% 42%, rgba(18,55,75,.28), transparent 42%),
-    linear-gradient(180deg, #061019 0%, #02070b 100%);
-}
-.leaflet-container { background: transparent; font-family: inherit; }
-.leaflet-tile-pane { display: none !important; }
-.leaflet-overlay-pane, .leaflet-marker-pane { filter: none; }
-.leaflet-control-zoom a {
+#map { position: absolute; inset: 0; background: #050a0f; }
+.maplibregl-map { background: #050a0f; font-family: inherit; }
+.maplibregl-canvas { outline: none; }
+.maplibregl-ctrl-group {
   background: rgba(6, 15, 23, .92) !important;
-  color: var(--cyan) !important;
-  border-color: #173249 !important;
+  border: 1px solid #173249 !important;
+  box-shadow: 0 8px 20px rgba(0,0,0,.28) !important;
 }
-.leaflet-control-attribution {
-  background: rgba(3, 8, 13, .78) !important;
+.maplibregl-ctrl-group button { background-color: transparent !important; }
+.maplibregl-ctrl-group button + button { border-top-color: #173249 !important; }
+.maplibregl-ctrl-group button .maplibregl-ctrl-icon { filter: invert(.82) sepia(.2) saturate(1.4) hue-rotate(145deg); }
+.maplibregl-ctrl-attrib {
+  background: rgba(3, 8, 13, .76) !important;
   color: #5f7888 !important;
   font-size: 9px !important;
 }
-.leaflet-control-attribution a { color: #7aa3b7 !important; }
-
-.region-tooltip {
-  background: rgba(4, 13, 20, .94) !important;
-  color: #bfeeff !important;
-  border: 1px solid #21506a !important;
-  border-radius: 2px !important;
-  box-shadow: 0 0 14px rgba(0, 190, 255, .12) !important;
-  font: 700 10px/1.25 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
-  letter-spacing: .04em;
-}
-.region-tooltip:before { display: none !important; }
+.maplibregl-ctrl-attrib a { color: #7aa3b7 !important; }
+.maplibregl-ctrl-bottom-right { bottom: 58px; right: 8px; }
 
 .map-grid {
   position: absolute;
   inset: 0;
   z-index: 400;
   pointer-events: none;
-  opacity: .34;
+  opacity: .25;
   background-image:
     linear-gradient(rgba(64, 176, 220, .10) 1px, transparent 1px),
     linear-gradient(90deg, rgba(64, 176, 220, .10) 1px, transparent 1px);
-  background-size: 48px 48px;
+  background-size: 42px 42px;
   mask-image: linear-gradient(to bottom, rgba(0,0,0,.8), rgba(0,0,0,.1));
 }
 
@@ -160,31 +147,7 @@ button, input, select { font: inherit; }
   position: absolute; right: 8px; top: 6px; border: 0; background: transparent; color: #7594a5; font-size: 22px; cursor: pointer;
 }
 
-/* City lamps */
-.city-lamp-wrap { display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -50%); }
-.city-lamp {
-  width: 13px; height: 13px; border-radius: 50%;
-  border: 2px solid #6c8390;
-  background: radial-gradient(circle at 35% 30%, #52636e, #25343e 56%, #101a21 75%);
-  box-shadow: 0 2px 4px rgba(0,0,0,.6), inset 0 0 4px rgba(0,0,0,.8);
-  transition: .15s ease;
-}
-.city-lamp.is-active {
-  border-color: #ffd3d8;
-  background: radial-gradient(circle at 35% 30%, #fff2f3, #ff4258 30%, #c4142d 65%, #560717 78%);
-  box-shadow: 0 0 7px rgba(255,66,88,.95), 0 0 19px rgba(255,66,88,.5);
-}
-.city-lamp-label {
-  margin-top: 3px;
-  padding: 1px 3px;
-  color: #c7d9e3;
-  background: rgba(3, 10, 15, .68);
-  border-radius: 2px;
-  font-size: 9px;
-  font-weight: 650;
-  white-space: nowrap;
-  text-shadow: 0 1px 2px #000;
-}
+/* Alert points and labels are rendered as native MapLibre vector layers. */
 
 .control-panel {
   position: relative;

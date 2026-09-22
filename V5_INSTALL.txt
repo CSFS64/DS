@@ -1,0 +1,24 @@
+Deepstrike Alert Archive v5 patch
+
+1. Extract this ZIP.
+2. Copy its contents over your existing repository root:
+   C:\Users\20060\Downloads\deepstrike-github-pages
+3. Do NOT delete or replace data\events.json.
+4. Keep data\russia.geojson from v4 if it is already present; v5 uses it as the alert-region overlay.
+
+PowerShell:
+
+cd "C:\Users\20060\Downloads\deepstrike-github-pages"
+git status
+git add .
+git commit -m "v5 vector map and alert parser expansion"
+git pull --rebase origin main
+git push
+
+Then GitHub:
+- wait for Deploy GitHub Pages to finish;
+- run Actions -> Update delayed archive data once;
+- wait for the data commit and the following Pages deployment;
+- Ctrl+F5 the site.
+
+The collector still enforces a minimum 24-hour archive lag.

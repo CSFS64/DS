@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "sources": [
     {
       "region": "Belgorod Oblast",
@@ -99,7 +99,11 @@
         }
       ],
       "kind": "telegram",
-      "fallback_to_region_on_unresolved": true
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "белгородская область",
+        "белгородской области"
+      ]
     },
     {
       "region": "Kursk Oblast",
@@ -152,7 +156,11 @@
         }
       ],
       "kind": "telegram",
-      "fallback_to_region_on_unresolved": true
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "курская область",
+        "курской области"
+      ]
     },
     {
       "region": "Voronezh Oblast",
@@ -252,7 +260,11 @@
         }
       ],
       "kind": "telegram",
-      "fallback_to_region_on_unresolved": true
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "воронежская область",
+        "воронежской области"
+      ]
     },
     {
       "region": "Lipetsk Oblast",
@@ -295,11 +307,381 @@
         }
       ],
       "kind": "telegram",
-      "fallback_to_region_on_unresolved": true
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "липецкая область",
+        "липецкой области"
+      ]
+    },
+    {
+      "region": "Tula Oblast",
+      "region_label": "Тульская область",
+      "region_aliases": [
+        "тульская область",
+        "тульской области"
+      ],
+      "region_center": [
+        54.2,
+        37.62
+      ],
+      "channel": "regionbez71",
+      "source_name": "Министерство по региональной безопасности Тульской области",
+      "source_url": "https://t.me/regionbez71",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "places": [
+        {
+          "name": "Tula",
+          "label": "Тула",
+          "type": "city",
+          "lat": 54.193,
+          "lon": 37.6178,
+          "aliases": [
+            "тула",
+            "в туле",
+            "г. тула"
+          ]
+        },
+        {
+          "name": "Novomoskovsk",
+          "label": "Новомосковск",
+          "type": "city",
+          "lat": 54.0105,
+          "lon": 38.2846,
+          "aliases": [
+            "новомосковск",
+            "новомосковске"
+          ]
+        }
+      ]
+    },
+    {
+      "region": "Republic of Tatarstan",
+      "region_label": "Республика Татарстан",
+      "region_aliases": [
+        "республика татарстан",
+        "татарстан",
+        "татарстане"
+      ],
+      "region_center": [
+        55.35,
+        50.75
+      ],
+      "channel": "nashtatarstan_official",
+      "source_name": "Республика Татарстан — официальный канал",
+      "source_url": "https://t.me/nashtatarstan_official",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "places": [
+        {
+          "name": "Kazan",
+          "label": "Казань",
+          "type": "city",
+          "lat": 55.7963,
+          "lon": 49.1088,
+          "aliases": [
+            "казань",
+            "казани",
+            "в казани"
+          ]
+        },
+        {
+          "name": "Nizhnekamsk",
+          "label": "Нижнекамск",
+          "type": "city",
+          "lat": 55.6366,
+          "lon": 51.8245,
+          "aliases": [
+            "нижнекамск",
+            "нижнекамске"
+          ]
+        },
+        {
+          "name": "Yelabuga",
+          "label": "Елабуга",
+          "type": "city",
+          "lat": 55.7567,
+          "lon": 52.0545,
+          "aliases": [
+            "елабуга",
+            "елабуге",
+            "елабужском"
+          ]
+        },
+        {
+          "name": "Naberezhnye Chelny",
+          "label": "Набережные Челны",
+          "type": "city",
+          "lat": 55.7436,
+          "lon": 52.3958,
+          "aliases": [
+            "набережные челны",
+            "набережных челнах"
+          ]
+        },
+        {
+          "name": "Almetyevsk",
+          "label": "Альметьевск",
+          "type": "city",
+          "lat": 54.9014,
+          "lon": 52.2971,
+          "aliases": [
+            "альметьевск",
+            "альметьевске",
+            "альметьевском"
+          ]
+        },
+        {
+          "name": "Bugulma",
+          "label": "Бугульма",
+          "type": "city",
+          "lat": 54.5363,
+          "lon": 52.7894,
+          "aliases": [
+            "бугульма",
+            "бугульме",
+            "бугульминском"
+          ]
+        },
+        {
+          "name": "Zainsk",
+          "label": "Заинск",
+          "type": "city",
+          "lat": 55.3195,
+          "lon": 52.0694,
+          "aliases": [
+            "заинск",
+            "заинске",
+            "заинском"
+          ]
+        },
+        {
+          "name": "Zelenodolsk",
+          "label": "Зеленодольск",
+          "type": "city",
+          "lat": 55.8457,
+          "lon": 48.5011,
+          "aliases": [
+            "зеленодольск",
+            "зеленодольске",
+            "зеленодольском"
+          ]
+        },
+        {
+          "name": "Leninogorsk",
+          "label": "Лениногорск",
+          "type": "city",
+          "lat": 54.5988,
+          "lon": 52.46,
+          "aliases": [
+            "лениногорск",
+            "лениногорске",
+            "лениногорском"
+          ]
+        },
+        {
+          "name": "Chistopol",
+          "label": "Чистополь",
+          "type": "city",
+          "lat": 55.3649,
+          "lon": 50.6424,
+          "aliases": [
+            "чистополь",
+            "чистополе",
+            "чистопольском"
+          ]
+        }
+      ]
+    },
+    {
+      "region": "Penza Oblast",
+      "region_label": "Пензенская область",
+      "region_aliases": [
+        "пензенская область",
+        "пензенской области"
+      ],
+      "region_center": [
+        53.1,
+        44.75
+      ],
+      "channel": "omelnichenko",
+      "source_name": "Олег Мельниченко — губернатор Пензенской области",
+      "source_url": "https://t.me/omelnichenko",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "places": [
+        {
+          "name": "Penza",
+          "label": "Пенза",
+          "type": "city",
+          "lat": 53.195,
+          "lon": 45.0183,
+          "aliases": [
+            "пенза",
+            "пензе",
+            "город пенза"
+          ]
+        },
+        {
+          "name": "Kuznetsk",
+          "label": "Кузнецк",
+          "type": "city",
+          "lat": 53.1132,
+          "lon": 46.605,
+          "aliases": [
+            "кузнецк",
+            "кузнецке"
+          ]
+        },
+        {
+          "name": "Zarechny",
+          "label": "Заречный",
+          "type": "city",
+          "lat": 53.1961,
+          "lon": 45.1692,
+          "aliases": [
+            "заречный",
+            "заречном"
+          ]
+        }
+      ]
+    },
+    {
+      "region": "Republic of Bashkortostan",
+      "region_label": "Республика Башкортостан",
+      "region_aliases": [
+        "республика башкортостан",
+        "башкортостан",
+        "башкортостане"
+      ],
+      "region_center": [
+        54.47,
+        56.27
+      ],
+      "channel": "mchsrb01",
+      "source_name": "МЧС Башкортостана",
+      "source_url": "https://t.me/mchsrb01",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "places": [
+        {
+          "name": "Ufa",
+          "label": "Уфа",
+          "type": "city",
+          "lat": 54.7388,
+          "lon": 55.9721,
+          "aliases": [
+            "уфа",
+            "уфе",
+            "город уфа"
+          ]
+        },
+        {
+          "name": "Sterlitamak",
+          "label": "Стерлитамак",
+          "type": "city",
+          "lat": 53.6304,
+          "lon": 55.9308,
+          "aliases": [
+            "стерлитамак",
+            "стерлитамаке"
+          ]
+        }
+      ]
+    },
+    {
+      "region": "Samara Oblast",
+      "region_label": "Самарская область",
+      "region_aliases": [
+        "самарская область",
+        "самарской области"
+      ],
+      "region_center": [
+        53.45,
+        50.45
+      ],
+      "channel": "fedorishchev_official",
+      "source_name": "Вячеслав Федорищев — губернатор Самарской области",
+      "source_url": "https://t.me/fedorishchev_official",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "places": [
+        {
+          "name": "Samara",
+          "label": "Самара",
+          "type": "city",
+          "lat": 53.1959,
+          "lon": 50.1002,
+          "aliases": [
+            "самара",
+            "самаре",
+            "город самара"
+          ]
+        },
+        {
+          "name": "Tolyatti",
+          "label": "Тольятти",
+          "type": "city",
+          "lat": 53.5078,
+          "lon": 49.4204,
+          "aliases": [
+            "тольятти",
+            "в тольятти"
+          ]
+        },
+        {
+          "name": "Novokuybyshevsk",
+          "label": "Новокуйбышевск",
+          "type": "city",
+          "lat": 53.0995,
+          "lon": 49.9478,
+          "aliases": [
+            "новокуйбышевск",
+            "новокуйбышевске"
+          ]
+        },
+        {
+          "name": "Syzran",
+          "label": "Сызрань",
+          "type": "city",
+          "lat": 53.1558,
+          "lon": 48.4745,
+          "aliases": [
+            "сызрань",
+            "сызрани"
+          ]
+        }
+      ]
     }
   ],
   "notes": [
     "High-resolution official local sources. Nationwide regional fallback sources are in data/regions.json.",
-    "When a valid UAV alert cannot be resolved to a configured city/municipality, the collector retains it at parent-region precision instead of dropping it."
+    "City/municipality matches take precedence. Valid UAV alerts that cannot be resolved locally fall back to the parent region.",
+    "MAX RSChS channels are tracked separately as provenance where verified; the collector does not use the authenticated MAX Bot API for channels it does not administer."
   ]
 }

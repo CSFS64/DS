@@ -1,21 +1,24 @@
-const REGION_GEOJSON_URL = "data/russia.geojson";
-const WORLD_GEOJSON_URL = "data/world.geojson";
-
-// v4 intentionally uses no raster tile provider. The basemap is rendered
-// entirely from GeoJSON committed with the repository, eliminating missing
-// tiles, provider rate limits, API keys, and mixed-provider seams.
 const MOSCOW_OFFSET = "+03:00";
+const OPENFREEMAP_DARK = "https://tiles.openfreemap.org/styles/dark";
+const OPENFREEMAP_FALLBACK = "https://tiles.openfreemap.org/styles/liberty";
+const REGION_GEOJSON_URLS = [
+  "data/russia.geojson",
+  "https://raw.githubusercontent.com/codeforgermany/click_that_hood/48ba05ad4c6969e3b3c25735492169227ae411f1/public/data/russia.geojson",
+];
 
 const state = {
   archive: null,
   sources: null,
   regions: null,
   map: null,
-  worldLayer: null,
-  regionLayers: new Map(),
+  mapReady: false,
+  baseStyleFallbackUsed: false,
+  regionGeoJson: null,
+  regionFeatureIds: new Map(),
+  placeFeatureIds: new Map(),
   regionMatchedCount: 0,
-  regionGeoJsonSource: null,
-  cityMarkers: new Map(),
+  previousActiveRegionIds: new Set(),
+  previousActivePlaceIds: new Set(),
   currentMs: 0,
   timelineStartMs: 0,
   timelineEndMs: 0,
@@ -73,16 +76,34 @@ function sourcePlaceIndex() {
   for (const source of state.sources.sources || []) {
     for (const place of source.places || []) {
       const key = `${source.region}::${place.name}`;
-      if (!map.has(key)) map.set(key, place);
+      if (!map.has(key)) map.set(key, { ...place, region: source.region, key });
     }
   }
   return map;
 }
 
-async function loadJson(path) {
-  const res = await fetch(path, { cache: "no-store" });
+function regionAliases(region) {
+  return [region.region, region.region_label, ...(region.geo_aliases || [])]
+    .map(normalizeAdminName)
+    .filter(Boolean);
+}
+
+async function loadJson(path, cache = "no-store") {
+  const res = await fetch(path, { cache });
   if (!res.ok) throw new Error(`${path}: HTTP ${res.status}`);
   return res.json();
+}
+
+async function fetchFirstJson(urls) {
+  let lastError = null;
+  for (const url of urls) {
+    try {
+      return await loadJson(url, url.startsWith("data/") ? "no-store" : "force-cache");
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError || new Error("No GeoJSON source available");
 }
 
 async function init() {
@@ -98,162 +119,274 @@ async function init() {
     return;
   }
 
-  initMap();
-  await loadWorld();
-  await loadRegions();
-  createCityLamps();
   initializeDates();
   wireControls();
   rebuildTimeline();
-  render();
   updateDataStatus();
+
+  try {
+    state.regionGeoJson = await fetchFirstJson(REGION_GEOJSON_URLS);
+  } catch (err) {
+    console.warn("Admin overlay unavailable; base vector map will still render", err);
+  }
+
+  initMap();
+}
+
+function coverageNumber(key, fallback = null) {
+  const value = state.archive?.coverage?.[key];
+  return Number.isFinite(value) ? value : fallback;
 }
 
 function updateDataStatus() {
   const generated = state.archive.generated_at ? formatTime(Date.parse(state.archive.generated_at), "Europe/Moscow") : "—";
-  const c = state.archive.coverage || {};
-  const configured = c.regions_configured ?? state.regions.regions?.length ?? 0;
-  const rssOk = c.regions_rss_ok;
-  const hiRes = c.high_resolution_sources_configured ?? state.sources.sources?.filter(s => s.enabled).length ?? 0;
-  const mapRegions = state.regionMatchedCount || 0;
-  const coverageText = configured
-    ? `${Number.isInteger(rssOk) ? `${rssOk}/${configured}` : `PENDING/${configured}`} REGION FEEDS · ${mapRegions}/${configured} MAP REGIONS · ${hiRes} HIGH-RES`
-    : `${hiRes} HIGH-RES`;
-  els.dataStatus.textContent = `${state.archive.events.length} PAIRED ALERTS · ${coverageText} · UPDATED ${generated} MSK · ${state.archive.safety_lag_hours ?? 24}H ARCHIVE LAG`;
+  const configured = coverageNumber("regions_configured", state.regions.regions?.length ?? 0);
+  const regionsWithEvents = coverageNumber(
+    "regions_with_paired_alerts",
+    new Set((state.archive.events || []).map(e => e.region)).size,
+  );
+  const rssAlertCapable = coverageNumber(
+    "mchs_regions_with_alert_posts",
+    (state.archive.source_status || []).filter(s => s.source_type === "mchs_rss" && (s.alert_posts || 0) > 0).length,
+  );
+  const hiCfg = coverageNumber("high_resolution_sources_configured", (state.sources.sources || []).filter(s => s.enabled).length);
+  const hiAlertCapable = coverageNumber(
+    "high_resolution_sources_with_alert_posts",
+    (state.archive.source_status || []).filter(s => s.source_type === "telegram" && (s.alert_posts || 0) > 0).length,
+  );
+  const unmatched = coverageNumber(
+    "unmatched_starts",
+    (state.archive.unmatched || []).filter(u => u.type === "unmatched_start").length,
+  );
+
+  els.dataStatus.textContent = [
+    `${state.archive.events.length} PAIRED`,
+    `${regionsWithEvents}/${configured} REGIONS WITH EVENTS`,
+    `${rssAlertCapable}/${configured} RSS ALERT-CAPABLE`,
+    `${hiAlertCapable}/${hiCfg} HIGH-RES ALERT-CAPABLE`,
+    `${unmatched} UNMATCHED`,
+    `UPDATED ${generated} MSK`,
+    `${state.archive.safety_lag_hours ?? 24}H ARCHIVE LAG`,
+  ].join(" · ");
 }
 
 function initMap() {
-  state.map = L.map("map", {
-    zoomControl: true,
-    attributionControl: true,
-    minZoom: 2,
-    maxZoom: 10,
-    preferCanvas: true,
-    worldCopyJump: true,
-  }).setView([54.0, 55.0], 4);
-
-  // No L.tileLayer() on purpose. The map background is CSS and all
-  // geographic context is local vector data committed with this site.
-  L.control.attribution({ prefix: false }).addTo(state.map);
-}
-
-async function loadWorld() {
-  try {
-    const data = await loadJson(WORLD_GEOJSON_URL);
-    state.worldLayer = L.geoJSON(data, {
-      interactive: false,
-      style: (feature) => {
-        const p = feature?.properties || {};
-        const iso = String(p.ISO_A3 || p.ADM0_A3 || p["ISO3166-1-Alpha-3"] || "").toUpperCase();
-        const isRussia = iso === "RUS";
-        return {
-          color: isRussia ? "#28495d" : "#172b38",
-          weight: isRussia ? 0.9 : 0.55,
-          opacity: isRussia ? 0.7 : 0.42,
-          fillColor: isRussia ? "#08151f" : "#050d13",
-          fillOpacity: isRussia ? 0.34 : 0.22,
-        };
-      },
-    }).addTo(state.map);
-  } catch (err) {
-    console.warn("Local world vector map unavailable", err);
+  const MapLibre = window.maplibregl;
+  if (!MapLibre) {
+    els.dataStatus.textContent += " · MAPLIBRE LOAD FAILED";
+    return;
   }
+
+  state.map = new MapLibre.Map({
+    container: "map",
+    style: OPENFREEMAP_DARK,
+    center: [45, 55],
+    zoom: 3.35,
+    minZoom: 2,
+    maxZoom: 13,
+    attributionControl: true,
+    cooperativeGestures: false,
+    renderWorldCopies: false,
+  });
+
+  state.map.addControl(new MapLibre.NavigationControl({ showCompass: false }), "bottom-right");
+
+  const styleTimeout = window.setTimeout(() => {
+    if (!state.mapReady && !state.baseStyleFallbackUsed) {
+      state.baseStyleFallbackUsed = true;
+      console.warn("OpenFreeMap dark style did not finish loading; trying Liberty fallback");
+      state.map.setStyle(OPENFREEMAP_FALLBACK);
+    }
+  }, 12000);
+
+  state.map.on("load", () => {
+    window.clearTimeout(styleTimeout);
+    state.mapReady = true;
+    installArchiveLayers();
+    render();
+  });
+
+  state.map.on("style.load", () => {
+    if (!state.mapReady) return;
+    installArchiveLayers();
+    render();
+  });
+
+  state.map.on("error", (ev) => {
+    const message = ev?.error?.message || String(ev?.error || "map error");
+    console.warn("MapLibre:", message);
+  });
+
+  state.map.on("click", (ev) => handleMapClick(ev));
 }
 
-async function fetchRegionGeoJson() {
-  const data = await loadJson(REGION_GEOJSON_URL);
-  state.regionGeoJsonSource = REGION_GEOJSON_URL;
-  return data;
+function firstSymbolLayerId() {
+  const layers = state.map?.getStyle()?.layers || [];
+  return layers.find(l => l.type === "symbol")?.id;
 }
 
-function regionAliases(region) {
-  return [region.region, region.region_label, ...(region.geo_aliases || [])]
-    .map(normalizeAdminName)
-    .filter(Boolean);
-}
+function prepareRegionGeoJson() {
+  if (!state.regionGeoJson?.features) return null;
+  state.regionFeatureIds.clear();
+  let nextId = 1;
+  let matched = 0;
 
-async function loadRegions() {
-  try {
-    const data = await fetchRegionGeoJson();
-    const featureLayers = [];
-    L.geoJSON(data, {
-      style: () => regionStyle(false),
-      onEachFeature: (feature, layer) => {
-        const names = new Set();
-        for (const value of Object.values(feature.properties || {})) {
-          if (typeof value === "string" && value.length < 160) names.add(normalizeAdminName(value));
-        }
-        featureLayers.push({ layer, names, feature });
-      },
-    }).addTo(state.map);
-
-    let matchedCount = 0;
+  const featureRows = state.regionGeoJson.features.map(feature => {
+    const clone = { ...feature, properties: { ...(feature.properties || {}) } };
+    const names = new Set(
+      Object.values(clone.properties)
+        .filter(v => typeof v === "string" && v.length < 180)
+        .map(normalizeAdminName)
+        .filter(Boolean),
+    );
+    let canonical = null;
     for (const region of state.regions.regions || []) {
       const aliases = regionAliases(region);
-      let matched = featureLayers.find(entry => aliases.some(a => entry.names.has(a)));
-      if (!matched) {
-        matched = featureLayers.find(entry => aliases.some(a => a.length >= 5 && [...entry.names].some(n => n.length >= 5 && (n.includes(a) || a.includes(n)))));
-      }
-      if (!matched) continue;
-      matchedCount += 1;
-      state.regionLayers.set(region.region, matched.layer);
-      matched.layer.bindTooltip(region.region_label || region.region, {
-        sticky: true,
-        direction: "auto",
-        className: "region-tooltip",
-      });
-      matched.layer.on("click", () => showRegionDetail(region.region));
-    }
-    state.regionMatchedCount = matchedCount;
-
-    // Preserve compatibility with event names that are already exact GeoJSON values.
-    for (const entry of featureLayers) {
-      for (const name of entry.names) {
-        if (!state.regionLayers.has(name)) state.regionLayers.set(name, entry.layer);
+      const exact = aliases.some(a => names.has(a));
+      const fuzzy = !exact && aliases.some(a => a.length >= 5 && [...names].some(n => n.length >= 5 && (n.includes(a) || a.includes(n))));
+      if (exact || fuzzy) {
+        canonical = region.region;
+        break;
       }
     }
-  } catch (err) {
-    console.warn("Region GeoJSON unavailable; region highlighting is limited", err);
-    state.regionMatchedCount = 0;
-  }
-}
-
-function regionStyle(active) {
-  return active ? {
-    color: "#49e4ff", weight: 2.0, opacity: 1, fillColor: "#27cfff", fillOpacity: .19,
-  } : {
-    color: "#23485c", weight: .8, opacity: .72, fillColor: "#07131c", fillOpacity: .10,
-  };
-}
-
-function getRegionLayer(regionName) {
-  if (state.regionLayers.has(regionName)) return state.regionLayers.get(regionName);
-  const region = (state.regions.regions || []).find(r => r.region === regionName);
-  if (region) {
-    for (const alias of regionAliases(region)) {
-      if (state.regionLayers.has(alias)) return state.regionLayers.get(alias);
+    clone.id = nextId++;
+    clone.properties.archive_region = canonical || "";
+    if (canonical && !state.regionFeatureIds.has(canonical)) {
+      state.regionFeatureIds.set(canonical, clone.id);
+      matched += 1;
     }
-  }
-  return null;
+    return clone;
+  });
+  state.regionMatchedCount = matched;
+  return { type: "FeatureCollection", features: featureRows };
 }
 
-function createCityLamps() {
-  const index = sourcePlaceIndex();
-  for (const [key, place] of index) {
+function preparePlacesGeoJson() {
+  state.placeFeatureIds.clear();
+  let nextId = 1;
+  const features = [];
+  for (const [key, place] of sourcePlaceIndex()) {
     if (place.lat == null || place.lon == null) continue;
-    const icon = L.divIcon({
-      className: "city-lamp-icon",
-      html: `<div class="city-lamp-wrap"><div class="city-lamp"></div><div class="city-lamp-label">${escapeHtml(place.label || place.name)}</div></div>`,
-      iconSize: [96, 34], iconAnchor: [48, 8],
+    const id = nextId++;
+    state.placeFeatureIds.set(key, id);
+    features.push({
+      type: "Feature",
+      id,
+      geometry: { type: "Point", coordinates: [Number(place.lon), Number(place.lat)] },
+      properties: {
+        key,
+        region: place.region,
+        place: place.name,
+        label: place.label || place.name,
+        place_type: place.type || "municipality",
+      },
     });
-    const marker = L.marker([place.lat, place.lon], { icon, keyboard: true }).addTo(state.map);
-    marker.on("click", () => showPlaceDetail(key));
-    state.cityMarkers.set(key, marker);
   }
+  return { type: "FeatureCollection", features };
+}
+
+function installArchiveLayers() {
+  if (!state.map?.isStyleLoaded()) return;
+
+  if (state.map.getLayer("archive-region-fill")) state.map.removeLayer("archive-region-fill");
+  if (state.map.getLayer("archive-region-line")) state.map.removeLayer("archive-region-line");
+  if (state.map.getLayer("archive-place-glow")) state.map.removeLayer("archive-place-glow");
+  if (state.map.getLayer("archive-place-dot")) state.map.removeLayer("archive-place-dot");
+  if (state.map.getLayer("archive-place-label")) state.map.removeLayer("archive-place-label");
+  if (state.map.getSource("archive-regions")) state.map.removeSource("archive-regions");
+  if (state.map.getSource("archive-places")) state.map.removeSource("archive-places");
+
+  const beforeId = firstSymbolLayerId();
+  const regionData = prepareRegionGeoJson();
+  if (regionData) {
+    state.map.addSource("archive-regions", { type: "geojson", data: regionData });
+    state.map.addLayer({
+      id: "archive-region-fill",
+      type: "fill",
+      source: "archive-regions",
+      paint: {
+        "fill-color": "#39d8ff",
+        "fill-opacity": ["case", ["boolean", ["feature-state", "active"], false], 0.17, 0.0],
+      },
+    }, beforeId);
+    state.map.addLayer({
+      id: "archive-region-line",
+      type: "line",
+      source: "archive-regions",
+      paint: {
+        "line-color": ["case", ["boolean", ["feature-state", "active"], false], "#62e2ff", "#31566a"],
+        "line-width": ["case", ["boolean", ["feature-state", "active"], false], 2.2, 0.65],
+        "line-opacity": ["case", ["boolean", ["feature-state", "active"], false], 0.95, 0.25],
+      },
+    }, beforeId);
+  }
+
+  state.map.addSource("archive-places", { type: "geojson", data: preparePlacesGeoJson() });
+  state.map.addLayer({
+    id: "archive-place-glow",
+    type: "circle",
+    source: "archive-places",
+    paint: {
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 8, 7, 15, 11, 20],
+      "circle-color": "#ff4258",
+      "circle-opacity": ["case", ["boolean", ["feature-state", "active"], false], 0.28, 0],
+      "circle-blur": 0.7,
+    },
+  });
+  state.map.addLayer({
+    id: "archive-place-dot",
+    type: "circle",
+    source: "archive-places",
+    paint: {
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 2.4, 7, 4.2, 11, 5.5],
+      "circle-color": ["case", ["boolean", ["feature-state", "active"], false], "#ff4258", "#506571"],
+      "circle-stroke-color": ["case", ["boolean", ["feature-state", "active"], false], "#ffd8dc", "#99aeb9"],
+      "circle-stroke-width": ["case", ["boolean", ["feature-state", "active"], false], 1.6, 0.8],
+      "circle-opacity": ["case", ["boolean", ["feature-state", "active"], false], 1, 0.68],
+    },
+  });
+  state.map.addLayer({
+    id: "archive-place-label",
+    type: "symbol",
+    source: "archive-places",
+    minzoom: 4.2,
+    layout: {
+      "text-field": ["get", "label"],
+      "text-font": ["Noto Sans Regular"],
+      "text-size": ["interpolate", ["linear"], ["zoom"], 4, 9, 8, 11, 12, 13],
+      "text-offset": [0, 1.05],
+      "text-anchor": "top",
+      "text-allow-overlap": false,
+    },
+    paint: {
+      "text-color": "#b9ccd5",
+      "text-halo-color": "#071018",
+      "text-halo-width": 1.5,
+      "text-halo-blur": 0.6,
+    },
+  });
+}
+
+function handleMapClick(ev) {
+  if (!state.mapReady) return;
+  const placeFeatures = state.map.queryRenderedFeatures(ev.point, { layers: ["archive-place-dot", "archive-place-glow"] });
+  if (placeFeatures.length) {
+    showPlaceDetail(placeFeatures[0].properties.key);
+    return;
+  }
+  const regionFeatures = state.map.getLayer("archive-region-fill")
+    ? state.map.queryRenderedFeatures(ev.point, { layers: ["archive-region-fill"] })
+    : [];
+  const regionName = regionFeatures.find(f => f.properties?.archive_region)?.properties?.archive_region;
+  if (regionName) {
+    showRegionDetail(regionName);
+    return;
+  }
+  els.detailPanel.hidden = true;
 }
 
 function initializeDates() {
-  const events = state.archive.events;
+  const events = state.archive.events || [];
   const fallbackNow = Date.now() - 24 * 3600 * 1000;
   const minMs = events.length ? Math.min(...events.map(e => Date.parse(e.start))) : Date.parse(state.archive.window_start || fallbackNow);
   const maxMs = events.length ? Math.max(...events.map(e => Date.parse(e.end))) : Date.parse(state.archive.window_end || fallbackNow);
@@ -330,7 +463,7 @@ function buildTicks() {
 
 function buildEventBars() {
   els.eventBars.innerHTML = "";
-  for (const event of state.archive.events) {
+  for (const event of state.archive.events || []) {
     const start = Date.parse(event.start), end = Date.parse(event.end);
     if (end < state.timelineStartMs || start > state.timelineEndMs) continue;
     const left = Math.max(0, pctInTimeline(Math.max(start, state.timelineStartMs)));
@@ -358,7 +491,7 @@ function buildReportDots() {
 }
 
 function activeEvents() {
-  return state.archive.events.filter(e => state.currentMs >= Date.parse(e.start) && state.currentMs <= Date.parse(e.end));
+  return (state.archive.events || []).filter(e => state.currentMs >= Date.parse(e.start) && state.currentMs <= Date.parse(e.end));
 }
 
 function render() {
@@ -368,27 +501,42 @@ function render() {
   renderScrubber();
 }
 
+function setFeatureActive(source, id, active) {
+  if (!state.mapReady || !state.map.getSource(source) || id == null) return;
+  try { state.map.setFeatureState({ source, id }, { active }); } catch (_) {}
+}
+
 function renderMap(active) {
-  // Reset all known region polygons once, then activate by canonical region id.
-  const resetLayers = new Set();
-  for (const region of state.regions.regions || []) {
-    const layer = getRegionLayer(region.region);
-    if (layer && !resetLayers.has(layer)) {
-      layer.setStyle?.(regionStyle(false));
-      resetLayers.add(layer);
+  if (state.mapReady) {
+    for (const id of state.previousActiveRegionIds) setFeatureActive("archive-regions", id, false);
+    for (const id of state.previousActivePlaceIds) setFeatureActive("archive-places", id, false);
+    state.previousActiveRegionIds.clear();
+    state.previousActivePlaceIds.clear();
+
+    for (const event of active) {
+      if (event.scope === "region") {
+        const id = state.regionFeatureIds.get(event.region);
+        if (id != null) {
+          setFeatureActive("archive-regions", id, true);
+          state.previousActiveRegionIds.add(id);
+        }
+      } else {
+        const key = `${event.region}::${event.place}`;
+        const id = state.placeFeatureIds.get(key);
+        if (id != null) {
+          setFeatureActive("archive-places", id, true);
+          state.previousActivePlaceIds.add(id);
+        } else {
+          // If the event is more precise than region but its coordinates are not
+          // configured yet, retain visibility by highlighting the parent region.
+          const rid = state.regionFeatureIds.get(event.region);
+          if (rid != null) {
+            setFeatureActive("archive-regions", rid, true);
+            state.previousActiveRegionIds.add(rid);
+          }
+        }
+      }
     }
-  }
-
-  const activeRegions = new Set(active.filter(e => e.scope === "region").map(e => e.region));
-  for (const regionName of activeRegions) {
-    const layer = getRegionLayer(regionName);
-    layer?.setStyle?.(regionStyle(true));
-  }
-
-  const activePlaces = new Set(active.filter(e => e.scope !== "region").map(e => `${e.region}::${e.place}`));
-  for (const [key, marker] of state.cityMarkers) {
-    const el = marker.getElement()?.querySelector(".city-lamp");
-    if (el) el.classList.toggle("is-active", activePlaces.has(key));
   }
   els.archiveLamp.classList.toggle("on", active.length > 0);
 }
@@ -424,44 +572,33 @@ function stopPlayback() {
   els.playButton.classList.remove("is-playing"); els.playButton.textContent = "▶ PLAY";
 }
 
-function showRegionDetail(regionName) {
-  const cfg = (state.regions.regions || []).find(r => r.region === regionName);
-  const statuses = (state.archive.source_status || []).filter(s => s.region === regionName);
-  const events = state.archive.events.filter(e => e.region === regionName);
-  const active = events.filter(e => state.currentMs >= Date.parse(e.start) && state.currentMs <= Date.parse(e.end));
-  const regionActive = active.filter(e => e.scope === "region");
-  const localActive = active.filter(e => e.scope !== "region");
-
-  const statusLines = statuses.length
-    ? statuses.map(s => `${s.ok ? "✓" : "×"} ${s.source_type || "source"}${s.posts != null ? ` · ${s.posts} posts` : ""}${s.error ? ` · ${s.error}` : ""}`)
-    : ["No collector status recorded for this archive window"];
-
-  els.detailEyebrow.textContent = active.length ? "ACTIVE AT PLAYBACK TIME" : "REGION / SOURCE STATUS";
-  els.detailTitle.textContent = cfg?.region_label || regionName;
-
-  const lines = [];
-  if (regionActive.length) lines.push(`Region-level alert active: ${regionActive.length}`);
-  if (localActive.length) lines.push(`More precise city/municipality alerts active: ${localActive.length}`);
-  if (!active.length) lines.push("No active alert at the current playback time");
-  lines.push("", "Collector sources:", ...statusLines);
-  if (events.length) lines.push("", `Paired alerts in loaded archive: ${events.length}`);
-  els.detailBody.textContent = lines.join("\n");
-
-  const nearest = active[0] || events
-    .slice()
-    .sort((a,b) => Math.abs(Date.parse(a.start) - state.currentMs) - Math.abs(Date.parse(b.start) - state.currentMs))[0];
-  els.detailSource.href = nearest?.start_url || nearest?.source_url || cfg?.mchs_operational_url || "#";
-  els.detailSource.textContent = nearest ? "官方事件来源 ↗" : "地区 МЧС 官方页 ↗";
-  els.detailPanel.hidden = false;
+function sourceStatusText(region) {
+  const rows = (state.archive.source_status || []).filter(s => s.region === region);
+  if (!rows.length) return "Collector status: no status row in this snapshot";
+  return rows.map(s => {
+    const kind = s.source_type === "telegram" ? "HIGH-RES" : "MChS RSS";
+    if (!s.ok) return `${kind}: ERROR`;
+    return `${kind}: ${s.alert_posts ?? "?"} alert posts · ${s.events ?? 0} paired`;
+  }).join("\n");
 }
 
 function showPlaceDetail(key) {
-  const [region, place] = key.split("::");
-  const candidates = state.archive.events.filter(e => e.region === region && e.place === place);
+  const split = key.indexOf("::");
+  const region = split >= 0 ? key.slice(0, split) : "";
+  const place = split >= 0 ? key.slice(split + 2) : key;
+  const candidates = (state.archive.events || []).filter(e => e.region === region && e.place === place);
   const current = candidates.find(e => state.currentMs >= Date.parse(e.start) && state.currentMs <= Date.parse(e.end));
-  const nearest = current || candidates.sort((a,b) => Math.abs(Date.parse(a.start) - state.currentMs) - Math.abs(Date.parse(b.start) - state.currentMs))[0];
+  const nearest = current || [...candidates].sort((a,b) => Math.abs(Date.parse(a.start) - state.currentMs) - Math.abs(Date.parse(b.start) - state.currentMs))[0];
   const reports = (state.archive.reports || []).filter(r => r.region === region && (r.place === place || r.place === region));
-  if (!nearest && !reports.length) return;
+  if (!nearest && !reports.length) {
+    els.detailEyebrow.textContent = "CONFIGURED HIGH-RES PLACE";
+    els.detailTitle.textContent = place;
+    els.detailBody.textContent = sourceStatusText(region);
+    const src = (state.sources.sources || []).find(s => s.region === region);
+    els.detailSource.href = src?.source_url || "#";
+    els.detailPanel.hidden = false;
+    return;
+  }
 
   els.detailEyebrow.textContent = current ? "ACTIVE AT PLAYBACK TIME" : "ARCHIVED EVENT";
   els.detailTitle.textContent = place;
@@ -469,14 +606,35 @@ function showPlaceDetail(key) {
     const s = Date.parse(nearest.start), e = Date.parse(nearest.end);
     const related = reports.filter(r => Date.parse(r.at) >= s - 2 * 3600000 && Date.parse(r.at) <= e + 6 * 3600000);
     let text = `${formatTime(s, "Europe/Moscow")} → ${formatTime(e, "Europe/Moscow")} MSK\nDuration ${formatDuration(s,e)}`;
-    if (nearest.precision === "parent_region_fallback") text += "\nPrecision: mapped to parent region (local place not resolved)";
+    if (nearest.precision === "parent_region_fallback") text += "\nPrecision: parent-region fallback";
     if (related.length) text += `\n\nLocal reports:\n${related.map(r => `• ${r.count ?? "—"} ${r.count_type || "reported"}`).join("\n")}`;
+    text += `\n\n${sourceStatusText(region)}`;
     els.detailBody.textContent = text;
     els.detailSource.href = nearest.start_url || nearest.source_url;
   } else {
-    els.detailBody.textContent = reports[0].text || `${reports[0].count ?? "—"} ${reports[0].count_type || "reported"}`;
+    els.detailBody.textContent = `${reports[0].text || `${reports[0].count ?? "—"} ${reports[0].count_type || "reported"}`}\n\n${sourceStatusText(region)}`;
     els.detailSource.href = reports[0].url;
   }
+  els.detailPanel.hidden = false;
+}
+
+function showRegionDetail(regionName) {
+  const regionCfg = (state.regions.regions || []).find(r => r.region === regionName);
+  const candidates = (state.archive.events || []).filter(e => e.region === regionName && e.scope === "region");
+  const current = candidates.find(e => state.currentMs >= Date.parse(e.start) && state.currentMs <= Date.parse(e.end));
+  const nearest = current || [...candidates].sort((a,b) => Math.abs(Date.parse(a.start) - state.currentMs) - Math.abs(Date.parse(b.start) - state.currentMs))[0];
+  const localActive = activeEvents().filter(e => e.region === regionName && e.scope !== "region");
+
+  els.detailEyebrow.textContent = current ? "REGION ALERT ACTIVE" : "REGION ARCHIVE";
+  els.detailTitle.textContent = regionCfg?.region_label || regionName;
+  let body = sourceStatusText(regionName);
+  if (nearest) {
+    const s = Date.parse(nearest.start), e = Date.parse(nearest.end);
+    body = `${formatTime(s, "Europe/Moscow")} → ${formatTime(e, "Europe/Moscow")} MSK\nDuration ${formatDuration(s,e)}\n\n${body}`;
+  }
+  if (localActive.length) body += `\n\nLocal alerts now:\n${localActive.map(e => `• ${e.place}`).join("\n")}`;
+  els.detailBody.textContent = body;
+  els.detailSource.href = nearest?.start_url || regionCfg?.mchs_operational_url || "#";
   els.detailPanel.hidden = false;
 }
 
@@ -486,10 +644,6 @@ function showReportDetail(report) {
   els.detailBody.textContent = `${formatTime(Date.parse(report.at), "Europe/Moscow")} MSK\n${report.text || `${report.count ?? "—"} ${report.count_type || "reported"}`}`;
   els.detailSource.href = report.url;
   els.detailPanel.hidden = false;
-}
-
-function escapeHtml(str) {
-  return String(str).replace(/[&<>'"]/g, ch => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", "'":"&#39;", '"':"&quot;" }[ch]));
 }
 
 window.addEventListener("resize", () => { if (state.archive) buildTicks(); });
