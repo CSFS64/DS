@@ -1,9 +1,29 @@
 const REGION_GEOJSON_URLS = [
   "data/russia.geojson",
+  "https://raw.githubusercontent.com/rnekrasov-msk/geojson/master/regions.geojson",
   "https://raw.githubusercontent.com/codeforgermany/click_that_hood/main/public/data/russia.geojson",
 ];
-const PRIMARY_TILE_URL = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
-const OSM_FALLBACK_TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+
+// No-key raster stack. CARTO Dark Matter now requires an API key, so it is
+// intentionally not used here. Failed individual tiles cascade across these
+// public OSM-derived providers while preserving the same z/x/y coordinate.
+const TILE_PROVIDERS = [
+  {
+    name: "OpenStreetMap Standard",
+    url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+    subdomains: "",
+  },
+  {
+    name: "OSM Humanitarian",
+    url: "https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
+    subdomains: "abc",
+  },
+  {
+    name: "OSM France",
+    url: "https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png",
+    subdomains: "abc",
+  },
+];
 const MOSCOW_OFFSET = "+03:00";
 
 const state = {
@@ -14,6 +34,8 @@ const state = {
   tileLayer: null,
   tileErrors: 0,
   regionLayers: new Map(),
+  regionMatchedCount: 0,
+  regionGeoJsonSource: null,
   cityMarkers: new Map(),
   currentMs: 0,
   timelineStartMs: 0,
@@ -110,10 +132,24 @@ function updateDataStatus() {
   const configured = c.regions_configured ?? state.regions.regions?.length ?? 0;
   const rssOk = c.regions_rss_ok;
   const hiRes = c.high_resolution_sources_configured ?? state.sources.sources?.filter(s => s.enabled).length ?? 0;
+  const mapRegions = state.regionMatchedCount || 0;
   const coverageText = configured
-    ? `${Number.isInteger(rssOk) ? `${rssOk}/${configured}` : `PENDING/${configured}`} REGION FEEDS · ${hiRes} HIGH-RES`
+    ? `${Number.isInteger(rssOk) ? `${rssOk}/${configured}` : `PENDING/${configured}`} REGION FEEDS · ${mapRegions}/${configured} MAP REGIONS · ${hiRes} HIGH-RES`
     : `${hiRes} HIGH-RES`;
   els.dataStatus.textContent = `${state.archive.events.length} PAIRED ALERTS · ${coverageText} · UPDATED ${generated} MSK · ${state.archive.safety_lag_hours ?? 24}H ARCHIVE LAG`;
+}
+
+function tileUrl(provider, coords) {
+  let url = provider.url;
+  if (url.includes("{s}")) {
+    const subs = provider.subdomains || "abc";
+    const sub = subs[(Math.abs(coords.x) + Math.abs(coords.y)) % subs.length] || "a";
+    url = url.replace("{s}", sub);
+  }
+  return url
+    .replace("{z}", String(coords.z))
+    .replace("{x}", String(coords.x))
+    .replace("{y}", String(coords.y));
 }
 
 function initMap() {
@@ -125,14 +161,14 @@ function initMap() {
     preferCanvas: true,
   }).setView([53.2, 39.0], 5);
 
-  state.tileLayer = L.tileLayer(PRIMARY_TILE_URL, {
-    subdomains: "abcd",
-    maxZoom: 20,
-    maxNativeZoom: 20,
-    attribution: "© OpenStreetMap contributors © CARTO",
+  const primary = TILE_PROVIDERS[0];
+  state.tileLayer = L.tileLayer(primary.url, {
+    maxZoom: 19,
+    maxNativeZoom: 19,
+    attribution: "© OpenStreetMap contributors · fallback tiles: HOT / OSM France",
     updateWhenIdle: true,
     updateWhenZooming: false,
-    keepBuffer: 4,
+    keepBuffer: 2,
   });
 
   state.tileLayer.on("tileerror", (ev) => {
@@ -141,18 +177,15 @@ function initMap() {
     const coords = ev.coords;
     if (!tile || !coords) return;
 
-    // One coordinate-preserving fallback attempt. The previous build had no
-    // tileerror handler, so a single failed raster request remained a black square.
-    if (tile.dataset.fallbackProvider !== "osm") {
-      tile.dataset.fallbackProvider = "osm";
-      tile.src = OSM_FALLBACK_TILE_URL
-        .replace("{z}", String(coords.z))
-        .replace("{x}", String(coords.x))
-        .replace("{y}", String(coords.y));
+    const currentIndex = Number(tile.dataset.providerIndex || 0);
+    const nextIndex = currentIndex + 1;
+    if (nextIndex < TILE_PROVIDERS.length) {
+      tile.dataset.providerIndex = String(nextIndex);
+      tile.src = tileUrl(TILE_PROVIDERS[nextIndex], coords);
       return;
     }
 
-    // If both providers fail, keep the map usable without a broken-image icon.
+    // Keep a neutral background if all providers fail. Do not show a broken icon.
     tile.style.visibility = "hidden";
   });
 
@@ -165,7 +198,9 @@ async function fetchRegionGeoJson() {
     try {
       const res = await fetch(url, { cache: "force-cache" });
       if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
-      return await res.json();
+      const data = await res.json();
+      state.regionGeoJsonSource = url;
+      return data;
     } catch (err) {
       lastError = err;
     }
@@ -194,11 +229,21 @@ async function loadRegions() {
       },
     }).addTo(state.map);
 
+    let matchedCount = 0;
     for (const region of state.regions.regions || []) {
       const aliases = regionAliases(region);
       const matched = featureLayers.find(entry => aliases.some(a => entry.names.has(a)));
-      if (matched) state.regionLayers.set(region.region, matched.layer);
+      if (!matched) continue;
+      matchedCount += 1;
+      state.regionLayers.set(region.region, matched.layer);
+      matched.layer.bindTooltip(region.region_label || region.region, {
+        sticky: true,
+        direction: "auto",
+        className: "region-tooltip",
+      });
+      matched.layer.on("click", () => showRegionDetail(region.region));
     }
+    state.regionMatchedCount = matchedCount;
 
     // Preserve compatibility with event names that are already exact GeoJSON values.
     for (const entry of featureLayers) {
@@ -207,12 +252,8 @@ async function loadRegions() {
       }
     }
   } catch (err) {
-    console.warn("Region GeoJSON unavailable; region highlighting limited to configured center fallbacks", err);
-    for (const source of state.sources.sources || []) {
-      if (!source.region_center || state.regionLayers.has(source.region)) continue;
-      const layer = L.circle(source.region_center, { radius: 120000, ...regionStyle(false) }).addTo(state.map);
-      state.regionLayers.set(source.region, layer);
-    }
+    console.warn("Region GeoJSON unavailable; region highlighting is limited", err);
+    state.regionMatchedCount = 0;
   }
 }
 
@@ -420,6 +461,37 @@ function togglePlayback() {
 function stopPlayback() {
   clearInterval(state.timer); state.timer = null;
   els.playButton.classList.remove("is-playing"); els.playButton.textContent = "▶ PLAY";
+}
+
+function showRegionDetail(regionName) {
+  const cfg = (state.regions.regions || []).find(r => r.region === regionName);
+  const statuses = (state.archive.source_status || []).filter(s => s.region === regionName);
+  const events = state.archive.events.filter(e => e.region === regionName);
+  const active = events.filter(e => state.currentMs >= Date.parse(e.start) && state.currentMs <= Date.parse(e.end));
+  const regionActive = active.filter(e => e.scope === "region");
+  const localActive = active.filter(e => e.scope !== "region");
+
+  const statusLines = statuses.length
+    ? statuses.map(s => `${s.ok ? "✓" : "×"} ${s.source_type || "source"}${s.posts != null ? ` · ${s.posts} posts` : ""}${s.error ? ` · ${s.error}` : ""}`)
+    : ["No collector status recorded for this archive window"];
+
+  els.detailEyebrow.textContent = active.length ? "ACTIVE AT PLAYBACK TIME" : "REGION / SOURCE STATUS";
+  els.detailTitle.textContent = cfg?.region_label || regionName;
+
+  const lines = [];
+  if (regionActive.length) lines.push(`Region-level alert active: ${regionActive.length}`);
+  if (localActive.length) lines.push(`More precise city/municipality alerts active: ${localActive.length}`);
+  if (!active.length) lines.push("No active alert at the current playback time");
+  lines.push("", "Collector sources:", ...statusLines);
+  if (events.length) lines.push("", `Paired alerts in loaded archive: ${events.length}`);
+  els.detailBody.textContent = lines.join("\n");
+
+  const nearest = active[0] || events
+    .slice()
+    .sort((a,b) => Math.abs(Date.parse(a.start) - state.currentMs) - Math.abs(Date.parse(b.start) - state.currentMs))[0];
+  els.detailSource.href = nearest?.start_url || nearest?.source_url || cfg?.mchs_operational_url || "#";
+  els.detailSource.textContent = nearest ? "官方事件来源 ↗" : "地区 МЧС 官方页 ↗";
+  els.detailPanel.hidden = false;
 }
 
 function showPlaceDetail(key) {

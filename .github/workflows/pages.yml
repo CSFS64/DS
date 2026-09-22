@@ -22,6 +22,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # Vendor one ADM1 GeoJSON into the Pages artifact. The browser therefore
+      # does not depend on a cross-origin GeoJSON request at runtime.
+      - name: Fetch regional boundaries
+        shell: bash
+        run: |
+          set -e
+          mkdir -p data
+          if ! curl -L --fail --retry 3 --connect-timeout 12 \
+            "https://raw.githubusercontent.com/rnekrasov-msk/geojson/master/regions.geojson" \
+            -o data/russia.geojson; then
+            curl -L --fail --retry 3 --connect-timeout 12 \
+              "https://raw.githubusercontent.com/codeforgermany/click_that_hood/48ba05ad4c6969e3b3c25735492169227ae411f1/public/data/russia.geojson" \
+              -o data/russia.geojson
+          fi
+          python - <<'PY'
+          import json
+          with open('data/russia.geojson', encoding='utf-8') as f:
+              d = json.load(f)
+          assert d.get('type') == 'FeatureCollection'
+          assert len(d.get('features', [])) >= 70
+          print('region features:', len(d['features']))
+          PY
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

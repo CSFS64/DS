@@ -35,7 +35,11 @@ button, input, select { font: inherit; }
 .map-panel { position: relative; min-height: 0; overflow: hidden; }
 #map { position: absolute; inset: 0; background: #050a0f; }
 .leaflet-container { background: #050a0f; font-family: inherit; }
-.leaflet-tile-pane { filter: grayscale(.75) saturate(.72) brightness(.78) contrast(1.12); }
+.leaflet-tile-pane {
+  filter: grayscale(.95) invert(.88) sepia(.10) saturate(.62) hue-rotate(155deg) brightness(.72) contrast(1.18);
+  opacity: .93;
+}
+.leaflet-overlay-pane { filter: none; }
 .leaflet-control-zoom a {
   background: rgba(6, 15, 23, .92) !important;
   color: var(--cyan) !important;
@@ -47,6 +51,17 @@ button, input, select { font: inherit; }
   font-size: 9px !important;
 }
 .leaflet-control-attribution a { color: #7aa3b7 !important; }
+
+.region-tooltip {
+  background: rgba(4, 13, 20, .94) !important;
+  color: #bfeeff !important;
+  border: 1px solid #21506a !important;
+  border-radius: 2px !important;
+  box-shadow: 0 0 14px rgba(0, 190, 255, .12) !important;
+  font: 700 10px/1.25 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
+  letter-spacing: .04em;
+}
+.region-tooltip:before { display: none !important; }
 
 .map-grid {
   position: absolute;
