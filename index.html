@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#071018">
+  <title>Deepstrike Alert Archive</title>
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="preconnect" href="https://tile.openstreetmap.org">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIINfQ3yn2LecgQN47JbR9QqtcYw7PeMZ1o=" crossorigin="">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <section class="map-panel">
+      <div id="map" aria-label="历史无人机警报地图"></div>
+      <div class="map-grid" aria-hidden="true"></div>
+
+      <header class="hud-header">
+        <div>
+          <h1>DEEPSTRIKE / ALERT ARCHIVE</h1>
+          <div id="dataStatus" class="hud-sub">LOADING ARCHIVE…</div>
+        </div>
+        <div id="archiveLamp" class="archive-lamp" title="当前回放时刻存在警报"></div>
+      </header>
+
+      <div class="map-legend" aria-hidden="true">
+        <span><i class="legend-dot city"></i>城市/市镇警报</span>
+        <span><i class="legend-region"></i>州级警报</span>
+      </div>
+
+      <aside id="detailPanel" class="detail-panel" hidden>
+        <button id="detailClose" class="icon-button" type="button" aria-label="关闭">×</button>
+        <div id="detailEyebrow" class="detail-eyebrow"></div>
+        <h2 id="detailTitle"></h2>
+        <div id="detailBody" class="detail-body"></div>
+        <a id="detailSource" class="source-link" href="#" target="_blank" rel="noopener">官方原文 ↗</a>
+      </aside>
+    </section>
+
+    <section class="control-panel">
+      <div class="timeline-layout">
+        <label class="date-control start-date">
+          <span>START</span>
+          <input id="dateStart" type="date">
+        </label>
+
+        <div class="timeline-stack">
+          <div id="tickLayer" class="tick-layer"></div>
+          <div id="eventBars" class="event-bars"></div>
+          <div id="selectionBand" class="selection-band"></div>
+          <div id="reportDots" class="report-dots"></div>
+          <div class="dual-range">
+            <input id="rangeStart" class="range range-start" type="range" min="0" max="1000" value="0" step="1" aria-label="回放开始时间">
+            <input id="rangeEnd" class="range range-end" type="range" min="0" max="1000" value="1000" step="1" aria-label="回放结束时间">
+          </div>
+          <div id="handleStart" class="handle-label handle-start"></div>
+          <div id="handleEnd" class="handle-label handle-end"></div>
+        </div>
+
+        <label class="date-control end-date">
+          <span>END</span>
+          <input id="dateEnd" type="date">
+        </label>
+      </div>
+
+      <div class="playback-row">
+        <button id="playButton" class="play-button" type="button">▶ PLAY</button>
+        <div class="scrub-area">
+          <input id="scrubber" type="range" min="0" max="1000" value="0" step="1" aria-label="当前回放时间">
+          <div id="currentTimeLabel" class="current-time-label"></div>
+        </div>
+        <select id="speedSelect" class="speed-select" aria-label="回放速度">
+          <option value="15">15 min/s</option>
+          <option value="30" selected>30 min/s</option>
+          <option value="60">60 min/s</option>
+          <option value="180">180 min/s</option>
+        </select>
+      </div>
+
+      <div class="clock-row">
+        <div class="clock"><span>МОСКВА</span><strong id="clockMoscow">—</strong></div>
+        <div class="clock"><span>КИЇВ</span><strong id="clockKyiv">—</strong></div>
+        <div class="clock"><span>北京</span><strong id="clockBeijing">—</strong></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

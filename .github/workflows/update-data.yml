@@ -1,0 +1,44 @@
+name: Update delayed archive data
+
+on:
+  workflow_dispatch:
+    inputs:
+      lookback_hours:
+        description: "Archive window before the 24h safety lag"
+        required: false
+        default: "48"
+  schedule:
+    - cron: "17 10 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install collector dependencies
+        run: pip install -r requirements.txt
+      - name: Run parser tests
+        run: python -m unittest discover -s tests -v
+      - name: Collect official delayed records
+        env:
+          LOOKBACK_HOURS: ${{ github.event.inputs.lookback_hours || '48' }}
+          SAFETY_LAG_HOURS: "24"
+        run: python collector/collect.py
+      - name: Commit data snapshot
+        run: |
+          if git diff --quiet -- data/events.json; then
+            echo "No archive changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/events.json
+          git commit -m "data: refresh delayed archive"
+          git push

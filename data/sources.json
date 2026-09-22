@@ -1,0 +1,293 @@
+{
+  "version": 1,
+  "sources": [
+    {
+      "region": "Belgorod Oblast",
+      "region_label": "Белгородская область",
+      "region_center": [
+        50.85,
+        37.2
+      ],
+      "channel": "operativno31",
+      "source_name": "Оперштаб Белгородской области",
+      "source_url": "https://t.me/operativno31",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Belgorod",
+          "label": "Белгород",
+          "type": "city",
+          "lat": 50.5954,
+          "lon": 36.5873,
+          "aliases": [
+            "белгороде",
+            "город белгород",
+            "г. белгород",
+            "белгород"
+          ]
+        },
+        {
+          "name": "Belgorodsky District",
+          "label": "Белгородский р-н",
+          "type": "municipality",
+          "lat": 50.73,
+          "lon": 36.55,
+          "aliases": [
+            "белгородском районе",
+            "белгородский район"
+          ]
+        },
+        {
+          "name": "Shebekino",
+          "label": "Шебекино",
+          "type": "city",
+          "lat": 50.4097,
+          "lon": 36.9136,
+          "aliases": [
+            "шебекино",
+            "шебекинском округе",
+            "шебекинский округ"
+          ]
+        },
+        {
+          "name": "Stary Oskol",
+          "label": "Старый Оскол",
+          "type": "city",
+          "lat": 51.2967,
+          "lon": 37.8417,
+          "aliases": [
+            "старый оскол",
+            "старооскольском"
+          ]
+        },
+        {
+          "name": "Gubkin",
+          "label": "Губкин",
+          "type": "city",
+          "lat": 51.2817,
+          "lon": 37.5458,
+          "aliases": [
+            "губкин",
+            "губкинском"
+          ]
+        },
+        {
+          "name": "Grayvoron",
+          "label": "Грайворон",
+          "type": "city",
+          "lat": 50.4767,
+          "lon": 35.6773,
+          "aliases": [
+            "грайворон",
+            "грайворонском"
+          ]
+        },
+        {
+          "name": "Valuyki",
+          "label": "Валуйки",
+          "type": "city",
+          "lat": 50.2118,
+          "lon": 38.0996,
+          "aliases": [
+            "валуйки",
+            "валуйском"
+          ]
+        }
+      ]
+    },
+    {
+      "region": "Kursk Oblast",
+      "region_label": "Курская область",
+      "region_center": [
+        51.7,
+        36.2
+      ],
+      "channel": "gubernator_46",
+      "source_name": "Оперштаб Курской области",
+      "source_url": "https://t.me/gubernator_46",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Kursk",
+          "label": "Курск",
+          "type": "city",
+          "lat": 51.7304,
+          "lon": 36.1926,
+          "aliases": [
+            "курск",
+            "в курске"
+          ]
+        },
+        {
+          "name": "Zheleznogorsk",
+          "label": "Железногорск",
+          "type": "city",
+          "lat": 52.3392,
+          "lon": 35.3517,
+          "aliases": [
+            "железногорск",
+            "железногорском"
+          ]
+        },
+        {
+          "name": "Kurchatov",
+          "label": "Курчатов",
+          "type": "city",
+          "lat": 51.6606,
+          "lon": 35.6574,
+          "aliases": [
+            "курчатов",
+            "курчатове"
+          ]
+        }
+      ]
+    },
+    {
+      "region": "Voronezh Oblast",
+      "region_label": "Воронежская область",
+      "region_center": [
+        51.65,
+        39.2
+      ],
+      "channel": "gusev_36",
+      "source_name": "Губернатор Воронежской области Александр Гусев",
+      "source_url": "https://t.me/gusev_36",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Voronezh",
+          "label": "Воронеж",
+          "type": "city",
+          "lat": 51.6608,
+          "lon": 39.2003,
+          "aliases": [
+            "воронеж",
+            "воронеже",
+            "воронежской агломерации"
+          ]
+        },
+        {
+          "name": "Novovoronezh",
+          "label": "Нововоронеж",
+          "type": "city",
+          "lat": 51.3091,
+          "lon": 39.2164,
+          "aliases": [
+            "нововоронеж",
+            "нововоронеже"
+          ]
+        },
+        {
+          "name": "Borisoglebsk",
+          "label": "Борисоглебск",
+          "type": "city",
+          "lat": 51.3677,
+          "lon": 42.0749,
+          "aliases": [
+            "борисоглебск",
+            "борисоглебске"
+          ]
+        },
+        {
+          "name": "Liski",
+          "label": "Лиски",
+          "type": "city",
+          "lat": 50.9841,
+          "lon": 39.5155,
+          "aliases": [
+            "лиски",
+            "лисках",
+            "лискинском"
+          ]
+        },
+        {
+          "name": "Ostrogozhsk",
+          "label": "Острогожск",
+          "type": "city",
+          "lat": 50.8664,
+          "lon": 39.0756,
+          "aliases": [
+            "острогожск",
+            "острогожске",
+            "острогожском"
+          ]
+        },
+        {
+          "name": "Buturlinovka",
+          "label": "Бутурлиновка",
+          "type": "city",
+          "lat": 50.8239,
+          "lon": 40.6092,
+          "aliases": [
+            "бутурлиновка",
+            "бутурлиновском"
+          ]
+        },
+        {
+          "name": "Kalach",
+          "label": "Калач",
+          "type": "city",
+          "lat": 50.4258,
+          "lon": 41.0156,
+          "aliases": [
+            "калач",
+            "калачеевском"
+          ]
+        }
+      ]
+    },
+    {
+      "region": "Lipetsk Oblast",
+      "region_label": "Липецкая область",
+      "region_center": [
+        52.61,
+        39.6
+      ],
+      "channel": "igor_artamonov48",
+      "source_name": "Игорь Артамонов",
+      "source_url": "https://t.me/igor_artamonov48",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Lipetsk",
+          "label": "Липецк",
+          "type": "city",
+          "lat": 52.6122,
+          "lon": 39.5981,
+          "aliases": [
+            "липецк",
+            "липецке"
+          ]
+        },
+        {
+          "name": "Yelets",
+          "label": "Елец",
+          "type": "city",
+          "lat": 52.6237,
+          "lon": 38.5017,
+          "aliases": [
+            "елец",
+            "ельце",
+            "г. елец"
+          ]
+        }
+      ]
+    }
+  ]
+}

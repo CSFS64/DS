@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-09-22T07:45:00Z",
+  "safety_lag_hours": 24,
+  "window_start": "2026-09-21T00:00:00+03:00",
+  "window_end": "2026-09-22T00:00:00+03:00",
+  "events": [
+    {
+      "id": "operativno31-8428-8433-region",
+      "region": "Belgorod Oblast",
+      "place": "Belgorod Oblast",
+      "scope": "region",
+      "alert_type": "uav_alert",
+      "start": "2026-09-21T05:25:00+03:00",
+      "end": "2026-09-21T14:44:00+03:00",
+      "source_name": "Оперштаб Белгородской области",
+      "source_url": "https://t.me/operativno31",
+      "start_url": "https://t.me/operativno31/8428",
+      "end_url": "https://t.me/operativno31/8433",
+      "start_text": "На всей территории области объявлена опасность атаки БПЛА",
+      "end_text": "На всей территории Белгородской области отбой опасности БПЛА"
+    },
+    {
+      "id": "operativno31-8427-8433-belgorod",
+      "region": "Belgorod Oblast",
+      "place": "Belgorod",
+      "scope": "city",
+      "alert_type": "uav_alert",
+      "start": "2026-09-21T05:04:00+03:00",
+      "end": "2026-09-21T14:44:00+03:00",
+      "source_name": "Оперштаб Белгородской области",
+      "source_url": "https://t.me/operativno31",
+      "start_url": "https://t.me/operativno31/8427",
+      "end_url": "https://t.me/operativno31/8433",
+      "start_text": "В Белгороде и Белгородском районе объявлена опасность атаки БПЛА",
+      "end_text": "На всей территории Белгородской области отбой опасности БПЛА",
+      "end_match": "regional_clear"
+    },
+    {
+      "id": "operativno31-8427-8433-belgorod-district",
+      "region": "Belgorod Oblast",
+      "place": "Belgorodsky District",
+      "scope": "municipality",
+      "alert_type": "uav_alert",
+      "start": "2026-09-21T05:04:00+03:00",
+      "end": "2026-09-21T14:44:00+03:00",
+      "source_name": "Оперштаб Белгородской области",
+      "source_url": "https://t.me/operativno31",
+      "start_url": "https://t.me/operativno31/8427",
+      "end_url": "https://t.me/operativno31/8433",
+      "start_text": "В Белгороде и Белгородском районе объявлена опасность атаки БПЛА",
+      "end_text": "На всей территории Белгородской области отбой опасности БПЛА",
+      "end_match": "regional_clear"
+    },
+    {
+      "id": "operativno31-8435-8436-belgorod-district",
+      "region": "Belgorod Oblast",
+      "place": "Belgorodsky District",
+      "scope": "municipality",
+      "alert_type": "uav_alert",
+      "start": "2026-09-21T16:12:00+03:00",
+      "end": "2026-09-21T16:52:00+03:00",
+      "source_name": "Оперштаб Белгородской области",
+      "source_url": "https://t.me/operativno31",
+      "start_url": "https://t.me/operativno31/8435",
+      "end_url": "https://t.me/operativno31/8436",
+      "start_text": "В Белгородском районе объявлена опасность атаки БПЛА",
+      "end_text": "В Белгороде и Белгородском районе отбой опасности БПЛА"
+    }
+  ],
+  "reports": [
+    {
+      "id": "operativno31-8429-belgorod-2-attacked",
+      "region": "Belgorod Oblast",
+      "place": "Belgorod",
+      "scope": "city",
+      "at": "2026-09-21T05:28:00+03:00",
+      "count": 2,
+      "count_type": "attacked",
+      "text": "Сегодня утром Белгород атакован 2 беспилотниками.",
+      "source_name": "Оперштаб Белгородской области",
+      "url": "https://t.me/operativno31/8429"
+    },
+    {
+      "id": "operativno31-8429-belgorod-district-19-attacked",
+      "region": "Belgorod Oblast",
+      "place": "Belgorodsky District",
+      "scope": "municipality",
+      "at": "2026-09-21T05:28:00+03:00",
+      "count": 19,
+      "count_type": "attacked",
+      "secondary_count": 11,
+      "secondary_type": "shot_down",
+      "text": "В Белгородском районе ... совершены атаки 19 БПЛА, из которых 11 сбиты.",
+      "source_name": "Оперштаб Белгородской области",
+      "url": "https://t.me/operativno31/8429"
+    }
+  ],
+  "unmatched": [],
+  "source_status": [
+    {
+      "channel": "operativno31",
+      "ok": true,
+      "note": "seed snapshot"
+    },
+    {
+      "channel": "gubernator_46",
+      "ok": false,
+      "note": "populated by first GitHub Actions collector run"
+    },
+    {
+      "channel": "gusev_36",
+      "ok": false,
+      "note": "populated by first GitHub Actions collector run"
+    },
+    {
+      "channel": "igor_artamonov48",
+      "ok": false,
+      "note": "populated by first GitHub Actions collector run"
+    }
+  ]
+}
