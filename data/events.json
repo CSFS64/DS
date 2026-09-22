@@ -1,9 +1,9 @@
 {
   "schema_version": 3,
-  "generated_at": "2026-09-22T20:37:42.592316+00:00",
+  "generated_at": "2026-09-22T20:56:27.795793+00:00",
   "safety_lag_hours": 24,
-  "window_start": "2026-09-19T20:37:42.592316+00:00",
-  "window_end": "2026-09-21T20:37:42.592316+00:00",
+  "window_start": "2026-09-19T20:56:27.795793+00:00",
+  "window_end": "2026-09-21T20:56:27.795793+00:00",
   "coverage": {
     "regions_configured": 89,
     "regions_rss_ok": 81,
@@ -15,7 +15,7 @@
     "high_resolution_sources_ok": 9,
     "high_resolution_sources_with_alert_posts": 8,
     "high_resolution_regions_with_events": 5,
-    "unmatched_starts": 10
+    "unmatched_starts": 11
   },
   "events": [
     {
@@ -705,6 +705,14 @@
       "text": "Внимание! Воронежская агломерация и Нововоронеж — тревога в связи с угрозой непосредственного удара БПЛА. Работают системы оповещения. Зайдите в помещение, отойдите от окон. Если увидели БПЛА — сразу уходите из зоны его видимости и позвоните по телефону 112."
     },
     {
+      "type": "unmatched_start",
+      "region": "Voronezh Oblast",
+      "place": "Borisoglebsk",
+      "start": "2026-09-21T20:48:21+00:00",
+      "url": "https://t.me/gusev_36/7370",
+      "text": "Внимание! Борисоглебск — тревога в связи с угрозой непосредственного удара БПЛА. Работают системы оповещения. Зайдите в помещение, отойдите от окон. Если увидели БПЛА — сразу уходите из зоны его видимости и позвоните по телефону 112."
+    },
+    {
       "type": "start_scope_fell_back_to_region",
       "region": "Tula Oblast",
       "url": "https://t.me/regionbez71/2915",
@@ -1001,7 +1009,7 @@
       "source": "https://42.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
       "region": "Kemerovo Oblast",
       "ok": true,
-      "posts": 5,
+      "posts": 4,
       "events": 0,
       "reports": 0,
       "alert_posts": 0,
@@ -1567,7 +1575,7 @@
       "source": "https://78.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
       "region": "Saint Petersburg",
       "ok": true,
-      "posts": 4,
+      "posts": 5,
       "events": 0,
       "reports": 0,
       "alert_posts": 0,
@@ -1838,11 +1846,11 @@
       "source": "gusev_36",
       "region": "Voronezh Oblast",
       "ok": true,
-      "posts": 17,
+      "posts": 18,
       "events": 4,
       "reports": 1,
-      "alert_posts": 17,
-      "start_posts": 13,
+      "alert_posts": 18,
+      "start_posts": 14,
       "end_posts": 4
     },
     {
