@@ -24,6 +24,16 @@ jobs:
           cache: pip
       - name: Install collector dependencies
         run: pip install -r requirements.txt
+      - name: Build / refresh Russian city catalog
+        shell: bash
+        run: |
+          if python scripts/build_city_catalog.py; then
+            echo "City catalog refreshed"
+          elif [ -f data/cities.json ]; then
+            echo "::warning::GeoNames refresh failed; keeping existing data/cities.json"
+          else
+            echo "::warning::GeoNames refresh failed and no city catalog exists; collector will use source-specific places only"
+          fi
       - name: Run parser tests
         run: python -m unittest discover -s tests -v
       - name: Collect official delayed records
@@ -33,12 +43,13 @@ jobs:
         run: python collector/collect.py
       - name: Commit data snapshot
         run: |
-          if git diff --quiet -- data/events.json; then
-            echo "No archive changes"
+          if git diff --quiet -- data/events.json data/cities.json 2>/dev/null; then
+            echo "No archive/catalog changes"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/events.json
+          if [ -f data/cities.json ]; then git add data/cities.json; fi
           git commit -m "data: refresh delayed archive"
           git push

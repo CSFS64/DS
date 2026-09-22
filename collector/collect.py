@@ -38,6 +38,7 @@ from bs4 import BeautifulSoup
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SOURCES = ROOT / "data" / "sources.json"
 DEFAULT_REGIONS = ROOT / "data" / "regions.json"
+DEFAULT_CITIES = ROOT / "data" / "cities.json"
 DEFAULT_OUTPUT = ROOT / "data" / "events.json"
 
 USER_AGENT = (
@@ -52,6 +53,8 @@ START_MARKERS = (
     "угроза непосредственного удара бпла",
     "тревога в связи с угрозой непосредственного удара бпла",
     "режим атака бпла",
+    "угроза беспилотной атаки",
+    "опасность бпла",
 )
 END_MARKERS = (
     "отбой опасности атаки бпла",
@@ -61,6 +64,9 @@ END_MARKERS = (
     "отмена непосредственной угрозы",
     "отбой угрозы атаки бпла",
     "снята угроза атаки беспилотных воздушных средств",
+    "отмена сигнала опасность атаки бпла",
+    "отменен сигнал опасность атаки бпла",
+    "отменена опасность атаки бпла",
 )
 
 # Regional authorities use many word orders for the same clear message.  These
@@ -71,11 +77,14 @@ END_PATTERNS = tuple(re.compile(p) for p in (
     r"\b(?:снят|снята|снято|сняты|отменен|отменена|отменено|отменены|отмена)\b.{0,100}\bбеспилотн\w*\s+опасност\w*",
     r"\bбеспилотн\w*\s+опасност\w*.{0,100}\b(?:снят|снята|снято|сняты|отменен|отменена|отменено|отменены)\b",
     r"\b(?:снят|снята|отменен|отменена)\b.{0,100}\bугроз\w*\s+атак\w*\s+(?:бпла|беспилотн\w*)",
+    r"\bотмен\w*\b.{0,70}\bсигнал\w*.{0,50}\bопасност\w*\s+атак\w*\s+бпла\b",
     r"\bугроз\w*\s+атак\w*\s+(?:бпла|беспилотн\w*).{0,100}\b(?:снят|снята|отменен|отменена)\b",
 ))
 START_PATTERNS = tuple(re.compile(p) for p in (
     r"\b(?:объявлен\w*|введен\w*|действует|сохраняется)\b.{0,90}\bбеспилотн\w*\s+опасност\w*",
     r"\b(?:опасност\w*|угроз\w*)\s+атак\w*\s+бпла\b",
+    r"\bугроз\w*\s+беспилотн\w*\s+атак\w*\b",
+    r"\bопасност\w*\s+бпла\b",
     r"\bрежим\s+атака\s+бпла\b",
     r"\bтревог\w*.{0,60}\bбпла\b",
 ))
@@ -232,7 +241,7 @@ def fetch_posts_for_window(
         if before == min_id:
             break
         before = min_id
-        time.sleep(0.35)
+        time.sleep(0.15)
 
     return sorted(
         (p for p in all_posts.values() if context_start <= p.published_at <= end_utc),
@@ -326,7 +335,7 @@ def alert_post_stats(posts: list[Post]) -> dict[str, int]:
 def extract_places(text: str, source: dict[str, Any]) -> list[dict[str, Any]]:
     n = normalize(text)
     matches = []
-    for place in source.get("places", []):
+    for place in [*(source.get("places", []) or []), *(source.get("_catalog_places", []) or [])]:
         aliases = [normalize(a) for a in place.get("aliases", [])]
 
         def alias_present(alias: str) -> bool:
@@ -384,14 +393,14 @@ def pair_alerts(posts: list[Post], source: dict[str, Any], window_start: datetim
     def key_for(place_name: str) -> str:
         return f"{source['region']}::{place_name}"
 
-    def open_one(place_name: str, scope: str, post: Post, precision: str = "exact"):
+    def open_one(place_name: str, scope: str, post: Post, precision: str = "exact", place_meta: dict[str, Any] | None = None):
         key = key_for(place_name)
         bucket = open_alerts.setdefault(key, [])
         # Official channels frequently repeat "danger remains in effect" while an
         # alert is open. Treat alerts as state, not as a stack of repeated starts.
         if bucket:
             return
-        bucket.append({"post": post, "scope": scope, "precision": precision})
+        bucket.append({"post": post, "scope": scope, "precision": precision, "place_meta": place_meta or {}})
 
     def close_one(place_name: str, end_post: Post, reason: str = "direct"):
         key = key_for(place_name)
@@ -421,6 +430,8 @@ def pair_alerts(posts: list[Post], source: dict[str, Any], window_start: datetim
             "end_text": end_post.text,
             "end_match": reason,
             "source_kind": source.get("kind", "official"),
+            "lat": start_item.get("place_meta", {}).get("lat"),
+            "lon": start_item.get("place_meta", {}).get("lon"),
         })
 
     for post in posts:
@@ -435,7 +446,7 @@ def pair_alerts(posts: list[Post], source: dict[str, Any], window_start: datetim
             if region_message:
                 open_one(source["region"], "region", post, "exact_region")
             for place in places:
-                open_one(place["name"], alert_scope(place), post, "exact_local")
+                open_one(place["name"], alert_scope(place), post, "exact_local", place)
             if not region_message and not places:
                 if source.get("fallback_to_region_on_unresolved", False):
                     open_one(source["region"], "region", post, "parent_region_fallback")
@@ -490,41 +501,51 @@ def sentence_split(text: str) -> list[str]:
     return [s.strip() for s in re.split(r"(?<=[.!?])\s+|\n+", text) if s.strip()]
 
 
-def classify_count_sentence(sentence: str) -> list[tuple[int, str, int | None, str | None]]:
+def classify_count_sentence(sentence: str) -> list[tuple[int, str, int | None, str | None, str | None]]:
     n = normalize(sentence)
     out = []
 
-    m = re.search(r"(?:атаки|атакован[а-я]*|атаковали|нанесены удары)\D{0,28}(\d+)\s*(?:бпла|беспилотник\w*)", n)
+    def q(prefix: str | None) -> str | None:
+        if not prefix:
+            return None
+        prefix = normalize(prefix)
+        if "более" in prefix or "свыше" in prefix: return "at_least"
+        if "около" in prefix or "примерно" in prefix or "порядка" in prefix: return "approx"
+        return None
+
+    m = re.search(r"(?:атаки|атакован[а-я]*|атаковали|нанесены удары)\D{0,28}(?:(более|свыше|около|примерно|порядка)\s+)?(\d+)\s*(?:бпла|беспилотник\w*)", n)
     if m:
-        primary = int(m.group(1))
+        primary = int(m.group(2))
         sec = re.search(r"из которых\s+(\d+)\s+(?:подавлен\w*\s+и\s+)?сбит\w*", n)
-        out.append((primary, "attacked", int(sec.group(1)) if sec else None, "shot_down" if sec else None))
+        out.append((primary, "attacked", int(sec.group(1)) if sec else None, "shot_down" if sec else None, q(m.group(1))))
         return out
 
-    m = re.search(r"обнаружен\w*\s+и\s+уничтожен\w*\D{0,12}(\d+)\s+(?:беспилот\w*|бпла)", n)
+    m = re.search(r"обнаружен\w*\s+и\s+уничтожен\w*\D{0,12}(?:(более|свыше|около|примерно|порядка)\s+)?(\d+)\s+(?:беспилот\w*|бпла)", n)
     if m:
-        out.append((int(m.group(1)), "detected_and_destroyed", None, None))
+        out.append((int(m.group(2)), "detected_and_destroyed", None, None, q(m.group(1))))
         return out
 
-    m = re.search(r"(?:сбит\w*|уничтожен\w*|подавлен\w*|обезврежен\w*)\D{0,12}(\d+)\s*(?:бпла|беспилотник\w*)", n)
+    # Common governor phrasing: "сбили и подавили 249 БПЛА", "уничтожены 13 БПЛА".
+    m = re.search(r"(?:сбил\w*|уничтожен\w*|подавил\w*|подавлен\w*|обезврежен\w*|нейтрализован\w*)(?:\s+и\s+(?:сбил\w*|уничтожен\w*|подавил\w*|подавлен\w*))?\D{0,16}(?:(более|свыше|около|примерно|порядка)\s+)?(\d+)\s*(?:бпла|беспилотник\w*)", n)
     if m:
-        out.append((int(m.group(1)), "destroyed_or_suppressed", None, None))
+        out.append((int(m.group(2)), "destroyed_or_suppressed", None, None, q(m.group(1))))
         return out
 
-    m = re.search(r"атакован\w*\D{0,20}(\d+)\s+беспилотник\w*", n)
+    m = re.search(r"(?:летел\w*|направлял\w*|двигал\w*)\D{0,18}(?:(более|свыше|около|примерно|порядка)\s+)?(\d+)\s*(?:бпла|беспилотник\w*)", n)
     if m:
-        out.append((int(m.group(1)), "attacked", None, None))
+        out.append((int(m.group(2)), "incoming_reported", None, None, q(m.group(1))))
+        return out
+
+    m = re.search(r"атакован\w*\D{0,20}(?:(более|свыше|около|примерно|порядка)\s+)?(\d+)\s+беспилотник\w*", n)
+    if m:
+        out.append((int(m.group(2)), "attacked", None, None, q(m.group(1))))
         return out
 
     return out
 
-
-def infer_report_place(sentence: str, source: dict[str, Any]) -> tuple[str, str]:
+def infer_report_places(sentence: str, source: dict[str, Any]) -> list[dict[str, Any]]:
     places = extract_places(sentence, source)
-    if places:
-        p = places[0]
-        return p["name"], alert_scope(p)
-    return source["region"], "region"
+    return places
 
 
 def extract_reports(posts: list[Post], source: dict[str, Any], window_start: datetime, window_end: datetime):
@@ -537,8 +558,19 @@ def extract_reports(posts: list[Post], source: dict[str, Any], window_start: dat
         if not any(token in normalize(post.text) for token in ("бпла", "беспилот")):
             continue
         for sentence in sentence_split(post.text):
-            for count, ctype, secondary_count, secondary_type in classify_count_sentence(sentence):
-                place, scope = infer_report_place(sentence, source)
+            counts = classify_count_sentence(sentence)
+            if not counts:
+                continue
+            mentioned = infer_report_places(sentence, source)
+            primary_place = mentioned[0] if mentioned else None
+            place = primary_place["name"] if primary_place else source["region"]
+            scope = alert_scope(primary_place) if primary_place else "region"
+            mentioned_places = [
+                {"name": p["name"], "label": p.get("label", p["name"]), "type": p.get("type", "city"),
+                 "lat": p.get("lat"), "lon": p.get("lon")}
+                for p in mentioned[:80]
+            ]
+            for count, ctype, secondary_count, secondary_type, qualifier in counts:
                 reports.append({
                     "id": stable_id(source.get("channel", source.get("source_id", "source")), str(post.post_id), place, ctype, str(count)),
                     "region": source["region"],
@@ -547,16 +579,19 @@ def extract_reports(posts: list[Post], source: dict[str, Any], window_start: dat
                     "at": post.published_at.isoformat(),
                     "count": count,
                     "count_type": ctype,
+                    "count_qualifier": qualifier,
                     "secondary_count": secondary_count,
                     "secondary_type": secondary_type,
                     "text": sentence,
                     "source_name": source["source_name"],
                     "url": post.url,
                     "source_kind": source.get("kind", "official"),
+                    "lat": primary_place.get("lat") if primary_place else None,
+                    "lon": primary_place.get("lon") if primary_place else None,
+                    "mentioned_places": mentioned_places,
                 })
     unique = {r["id"]: r for r in reports}
     return sorted(unique.values(), key=lambda r: r["at"])
-
 
 def mchs_source(region_cfg: dict[str, Any]) -> dict[str, Any]:
     return {
@@ -577,6 +612,15 @@ def mchs_source(region_cfg: dict[str, Any]) -> dict[str, Any]:
 def collect(args) -> dict[str, Any]:
     source_cfg = json.loads(Path(args.sources).read_text(encoding="utf-8"))
     region_cfg = json.loads(Path(args.regions).read_text(encoding="utf-8"))
+    city_path = Path(args.cities)
+    city_cfg = json.loads(city_path.read_text(encoding="utf-8")) if city_path.exists() else {"cities": []}
+    cities_by_region: dict[str, list[dict[str, Any]]] = {}
+    for city in city_cfg.get("cities", []):
+        cities_by_region.setdefault(city.get("region", ""), []).append({
+            "name": city.get("name"), "label": city.get("label") or city.get("name"), "type": "city",
+            "lat": city.get("lat"), "lon": city.get("lon"), "population": city.get("population", 0),
+            "aliases": city.get("aliases") or [city.get("label") or city.get("name")],
+        })
     now = datetime.now(timezone.utc)
     window_end = now - timedelta(hours=args.safety_lag_hours)
     window_start = window_end - timedelta(hours=args.lookback_hours)
@@ -588,9 +632,11 @@ def collect(args) -> dict[str, Any]:
 
     # High-resolution Telegram feeds first.
     session = make_session()
-    for source in source_cfg.get("sources", []):
-        if not source.get("enabled", False):
+    for source0 in source_cfg.get("sources", []):
+        if not source0.get("enabled", False):
             continue
+        source = dict(source0)
+        source["_catalog_places"] = cities_by_region.get(source.get("region", ""), [])
         channel = source["channel"]
         try:
             posts = fetch_posts_for_window(session, channel, window_start, window_end, max_pages=args.max_pages)
@@ -619,6 +665,7 @@ def collect(args) -> dict[str, Any]:
     def collect_region(region: dict[str, Any]):
         local_session = make_session()
         source = mchs_source(region)
+        source["_catalog_places"] = cities_by_region.get(region.get("region", ""), [])
         posts = fetch_mchs_posts_for_window(local_session, region, window_start, window_end)
         events, unmatched = pair_alerts(posts, source, window_start, window_end)
         reports = extract_reports(posts, source, window_start, window_end)
@@ -671,6 +718,7 @@ def collect(args) -> dict[str, Any]:
             "high_resolution_sources_ok": sum(1 for s in telegram_status if s.get("ok")),
             "high_resolution_sources_with_alert_posts": sum(1 for s in telegram_status if s.get("alert_posts", 0) > 0),
             "high_resolution_regions_with_events": len(hi_res_regions_with_events),
+            "city_catalog_count": len(city_cfg.get("cities", [])),
             "unmatched_starts": sum(1 for u in all_unmatched if u.get("type") == "unmatched_start"),
         },
         "events": all_events,
@@ -684,10 +732,11 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--sources", default=str(DEFAULT_SOURCES))
     p.add_argument("--regions", default=str(DEFAULT_REGIONS))
+    p.add_argument("--cities", default=str(DEFAULT_CITIES))
     p.add_argument("--output", default=str(DEFAULT_OUTPUT))
     p.add_argument("--lookback-hours", type=int, default=int(os.getenv("LOOKBACK_HOURS", "48")))
     p.add_argument("--safety-lag-hours", type=int, default=int(os.getenv("SAFETY_LAG_HOURS", "24")))
-    p.add_argument("--max-pages", type=int, default=18)
+    p.add_argument("--max-pages", type=int, default=int(os.getenv("TELEGRAM_MAX_PAGES", "40")))
     p.add_argument("--mchs-workers", type=int, default=int(os.getenv("MCHS_WORKERS", "8")))
     args = p.parse_args()
     args.safety_lag_hours = max(24, args.safety_lag_hours)

@@ -123,7 +123,9 @@ button, input, select { font: inherit; }
 }
 .map-legend span { display: flex; align-items: center; gap: 7px; }
 .legend-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--off); display: inline-block; }
+.legend-dot.catalog { background: #617580; border: 1px solid #9cb0b9; }
 .legend-dot.city { background: var(--red); box-shadow: 0 0 8px rgba(255,66,88,.75); }
+.legend-dot.report { background: #ffb347; box-shadow: 0 0 8px rgba(255,179,71,.72); }
 .legend-region { width: 14px; height: 9px; border: 1px solid var(--cyan); background: rgba(57,216,255,.12); display: inline-block; }
 
 .detail-panel {

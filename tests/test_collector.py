@@ -5,6 +5,8 @@ from pathlib import Path
 
 from collector.collect import (
     Post,
+    classify_count_sentence,
+    extract_places,
     extract_reports,
     mchs_source,
     pair_alerts,
@@ -80,7 +82,8 @@ class CollectorTests(unittest.TestCase):
         cfg = json.loads((ROOT / 'data' / 'sources.json').read_text(encoding='utf-8'))
         channels = {s['channel'] for s in cfg['sources'] if s.get('enabled')}
         self.assertTrue({'regionbez71', 'nashtatarstan_official', 'omelnichenko', 'mchsrb01', 'fedorishchev_official'} <= channels)
-        self.assertGreaterEqual(len(channels), 9)
+        self.assertTrue({'mos_sobyanin','vorobiev_live','avbogomaz','evraevmikhail','nn52signal','Shapsha_VV'} <= channels)
+        self.assertGreaterEqual(len(channels), 18)
 
 
     def test_samara_city_then_regional_clear_pairs_city(self):
@@ -120,6 +123,22 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0]['place'], 'Republic of Tatarstan')
         self.assertEqual(events[0]['precision'], 'exact_region')
+
+    def test_v6_nizhny_clear_and_report_count(self):
+        self.assertEqual(text_kind('Отмена сигнала "ОПАСНОСТЬ АТАКИ БПЛА".'), 'end')
+        rows = classify_count_sentence('С 03:00 до 05:00 силы ПВО и РЭБ сбили и подавили 249 БПЛА в 17 округах.')
+        self.assertTrue(rows)
+        self.assertEqual(rows[0][0], 249)
+        self.assertEqual(rows[0][1], 'destroyed_or_suppressed')
+
+    def test_v6_catalog_place_can_resolve_without_hardcoding(self):
+        source = dict(self.source)
+        source['_catalog_places'] = [{
+            'name':'Sample City','label':'Тестоград','type':'city','lat':55.0,'lon':40.0,
+            'aliases':['Тестоград']
+        }]
+        matches = extract_places('В Тестограде пока спокойно. Тестоград: опасность БПЛА.', source)
+        self.assertTrue(any(p['name']=='Sample City' for p in matches))
 
     def test_regions_registry_is_nationwide(self):
         regions = json.loads((ROOT / "data" / "regions.json").read_text(encoding="utf-8"))

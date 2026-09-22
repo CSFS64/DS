@@ -19,6 +19,8 @@ const state = {
   regionMatchedCount: 0,
   previousActiveRegionIds: new Set(),
   previousActivePlaceIds: new Set(),
+  previousReportRegionIds: new Set(),
+  previousReportPlaceIds: new Set(),
   currentMs: 0,
   timelineStartMs: 0,
   timelineEndMs: 0,
@@ -73,11 +75,28 @@ function normalizeAdminName(value) {
 
 function sourcePlaceIndex() {
   const map = new Map();
+  const add = (region, place) => {
+    if (!region || !place?.name || place.lat == null || place.lon == null) return;
+    const key = `${region}::${place.name}`;
+    if (!map.has(key)) map.set(key, { ...place, region, key });
+  };
   for (const source of state.sources.sources || []) {
-    for (const place of source.places || []) {
-      const key = `${source.region}::${place.name}`;
-      if (!map.has(key)) map.set(key, { ...place, region: source.region, key });
-    }
+    for (const place of source.places || []) add(source.region, place);
+  }
+  // v6: dynamically collected cities/municipalities are not required to be
+  // hard-coded in sources.json. Coordinates stored by the collector are enough.
+  for (const event of state.archive.events || []) {
+    if (event.scope !== "region") add(event.region, {
+      name: event.place, label: event.place_label || event.place,
+      type: event.scope || "city", lat: event.lat, lon: event.lon,
+    });
+  }
+  for (const report of state.archive.reports || []) {
+    if (report.scope !== "region") add(report.region, {
+      name: report.place, label: report.place_label || report.place,
+      type: report.scope || "city", lat: report.lat, lon: report.lon,
+    });
+    for (const place of report.mentioned_places || []) add(report.region, place);
   }
   return map;
 }
@@ -149,7 +168,7 @@ function updateDataStatus() {
     "mchs_regions_with_alert_posts",
     (state.archive.source_status || []).filter(s => s.source_type === "mchs_rss" && (s.alert_posts || 0) > 0).length,
   );
-  const hiCfg = coverageNumber("high_resolution_sources_configured", (state.sources.sources || []).filter(s => s.enabled).length);
+  const hiCfg = (state.sources.sources || []).filter(s => s.enabled).length;
   const hiAlertCapable = coverageNumber(
     "high_resolution_sources_with_alert_posts",
     (state.archive.source_status || []).filter(s => s.source_type === "telegram" && (s.alert_posts || 0) > 0).length,
@@ -164,6 +183,7 @@ function updateDataStatus() {
     `${regionsWithEvents}/${configured} REGIONS WITH EVENTS`,
     `${rssAlertCapable}/${configured} RSS ALERT-CAPABLE`,
     `${hiAlertCapable}/${hiCfg} HIGH-RES ALERT-CAPABLE`,
+    `${coverageNumber("city_catalog_count", 0)} CITY CATALOG`,
     `${unmatched} UNMATCHED`,
     `UPDATED ${generated} MSK`,
     `${state.archive.safety_lag_hours ?? 24}H ARCHIVE LAG`,
@@ -297,6 +317,28 @@ function installArchiveLayers() {
   if (state.map.getSource("archive-places")) state.map.removeSource("archive-places");
 
   const beforeId = firstSymbolLayerId();
+
+  // Dim lamp for every mapped populated place in OpenFreeMap/OpenMapTiles.
+  // This is independent of our source registry: cities are visible even before
+  // we have a high-resolution official feed for them.
+  if (state.map.getSource("openmaptiles") && !state.map.getLayer("archive-all-city-lamps")) {
+    state.map.addLayer({
+      id: "archive-all-city-lamps",
+      type: "circle",
+      source: "openmaptiles",
+      "source-layer": "place",
+      minzoom: 3,
+      filter: ["in", ["get", "class"], ["literal", ["city", "town", "village"]]],
+      paint: {
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 1.35, 6, 1.8, 9, 2.35, 12, 2.8],
+        "circle-color": "#617580",
+        "circle-stroke-color": "#9cb0b9",
+        "circle-stroke-width": 0.45,
+        "circle-opacity": ["interpolate", ["linear"], ["zoom"], 3, 0.35, 5, 0.55, 8, 0.72],
+      },
+    }, beforeId);
+  }
+
   const regionData = prepareRegionGeoJson();
   if (regionData) {
     state.map.addSource("archive-regions", { type: "geojson", data: regionData });
@@ -305,8 +347,8 @@ function installArchiveLayers() {
       type: "fill",
       source: "archive-regions",
       paint: {
-        "fill-color": "#39d8ff",
-        "fill-opacity": ["case", ["boolean", ["feature-state", "active"], false], 0.17, 0.0],
+        "fill-color": ["case", ["boolean", ["feature-state", "active"], false], "#39d8ff", ["boolean", ["feature-state", "report"], false], "#ffb347", "#39d8ff"],
+        "fill-opacity": ["case", ["boolean", ["feature-state", "active"], false], 0.17, ["boolean", ["feature-state", "report"], false], 0.09, 0.0],
       },
     }, beforeId);
     state.map.addLayer({
@@ -314,9 +356,9 @@ function installArchiveLayers() {
       type: "line",
       source: "archive-regions",
       paint: {
-        "line-color": ["case", ["boolean", ["feature-state", "active"], false], "#62e2ff", "#31566a"],
-        "line-width": ["case", ["boolean", ["feature-state", "active"], false], 2.2, 0.65],
-        "line-opacity": ["case", ["boolean", ["feature-state", "active"], false], 0.95, 0.25],
+        "line-color": ["case", ["boolean", ["feature-state", "active"], false], "#62e2ff", ["boolean", ["feature-state", "report"], false], "#ffc15a", "#31566a"],
+        "line-width": ["case", ["boolean", ["feature-state", "active"], false], 2.2, ["boolean", ["feature-state", "report"], false], 1.6, 0.65],
+        "line-opacity": ["case", ["boolean", ["feature-state", "active"], false], 0.95, ["boolean", ["feature-state", "report"], false], 0.85, 0.25],
       },
     }, beforeId);
   }
@@ -328,8 +370,8 @@ function installArchiveLayers() {
     source: "archive-places",
     paint: {
       "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 8, 7, 15, 11, 20],
-      "circle-color": "#ff4258",
-      "circle-opacity": ["case", ["boolean", ["feature-state", "active"], false], 0.28, 0],
+      "circle-color": ["case", ["boolean", ["feature-state", "active"], false], "#ff4258", "#ffb347"],
+      "circle-opacity": ["case", ["boolean", ["feature-state", "active"], false], 0.28, ["boolean", ["feature-state", "report"], false], 0.22, 0],
       "circle-blur": 0.7,
     },
   });
@@ -339,10 +381,10 @@ function installArchiveLayers() {
     source: "archive-places",
     paint: {
       "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 2.4, 7, 4.2, 11, 5.5],
-      "circle-color": ["case", ["boolean", ["feature-state", "active"], false], "#ff4258", "#506571"],
-      "circle-stroke-color": ["case", ["boolean", ["feature-state", "active"], false], "#ffd8dc", "#99aeb9"],
-      "circle-stroke-width": ["case", ["boolean", ["feature-state", "active"], false], 1.6, 0.8],
-      "circle-opacity": ["case", ["boolean", ["feature-state", "active"], false], 1, 0.68],
+      "circle-color": ["case", ["boolean", ["feature-state", "active"], false], "#ff4258", ["boolean", ["feature-state", "report"], false], "#ffb347", "#506571"],
+      "circle-stroke-color": ["case", ["boolean", ["feature-state", "active"], false], "#ffd8dc", ["boolean", ["feature-state", "report"], false], "#ffe0a8", "#99aeb9"],
+      "circle-stroke-width": ["case", ["boolean", ["feature-state", "active"], false], 1.6, ["boolean", ["feature-state", "report"], false], 1.3, 0.8],
+      "circle-opacity": ["case", ["boolean", ["feature-state", "active"], false], 1, ["boolean", ["feature-state", "report"], false], 0.95, 0.68],
     },
   });
   state.map.addLayer({
@@ -494,9 +536,15 @@ function activeEvents() {
   return (state.archive.events || []).filter(e => state.currentMs >= Date.parse(e.start) && state.currentMs <= Date.parse(e.end));
 }
 
+function activeReports() {
+  const span = 45 * 60 * 1000;
+  return (state.archive.reports || []).filter(r => Math.abs(state.currentMs - Date.parse(r.at)) <= span);
+}
+
 function render() {
   const active = activeEvents();
-  renderMap(active);
+  const reports = activeReports();
+  renderMap(active, reports);
   renderClocks(active);
   renderScrubber();
 }
@@ -506,46 +554,68 @@ function setFeatureActive(source, id, active) {
   try { state.map.setFeatureState({ source, id }, { active }); } catch (_) {}
 }
 
-function renderMap(active) {
+function renderMap(active, reports = []) {
   if (state.mapReady) {
     for (const id of state.previousActiveRegionIds) setFeatureActive("archive-regions", id, false);
     for (const id of state.previousActivePlaceIds) setFeatureActive("archive-places", id, false);
+    for (const id of state.previousReportRegionIds) {
+      try { state.map.setFeatureState({ source: "archive-regions", id }, { report: false }); } catch (_) {}
+    }
+    for (const id of state.previousReportPlaceIds) {
+      try { state.map.setFeatureState({ source: "archive-places", id }, { report: false }); } catch (_) {}
+    }
     state.previousActiveRegionIds.clear();
     state.previousActivePlaceIds.clear();
+    state.previousReportRegionIds.clear();
+    state.previousReportPlaceIds.clear();
 
+    // Hierarchy rule: a local alert necessarily means its parent region is active.
+    // The city/municipality dot gives precision; the region fill gives containment.
     for (const event of active) {
-      if (event.scope === "region") {
-        const id = state.regionFeatureIds.get(event.region);
-        if (id != null) {
-          setFeatureActive("archive-regions", id, true);
-          state.previousActiveRegionIds.add(id);
-        }
-      } else {
+      const rid = state.regionFeatureIds.get(event.region);
+      if (rid != null) {
+        setFeatureActive("archive-regions", rid, true);
+        state.previousActiveRegionIds.add(rid);
+      }
+      if (event.scope !== "region") {
         const key = `${event.region}::${event.place}`;
         const id = state.placeFeatureIds.get(key);
         if (id != null) {
           setFeatureActive("archive-places", id, true);
           state.previousActivePlaceIds.add(id);
-        } else {
-          // If the event is more precise than region but its coordinates are not
-          // configured yet, retain visibility by highlighting the parent region.
-          const rid = state.regionFeatureIds.get(event.region);
-          if (rid != null) {
-            setFeatureActive("archive-regions", rid, true);
-            state.previousActiveRegionIds.add(rid);
-          }
+        }
+      }
+    }
+
+    // Official local reports are shown as amber activity, not mislabelled as a
+    // formal alert. This makes Moscow-style governor/mayor incident reporting
+    // visible even when no explicit START/END warning was published.
+    for (const report of reports) {
+      const rid = state.regionFeatureIds.get(report.region);
+      if (rid != null && !state.previousActiveRegionIds.has(rid)) {
+        try { state.map.setFeatureState({ source: "archive-regions", id: rid }, { report: true }); } catch (_) {}
+        state.previousReportRegionIds.add(rid);
+      }
+      const mentioned = (report.mentioned_places?.length ? report.mentioned_places : [report]);
+      for (const place of mentioned) {
+        const key = `${report.region}::${place.name || report.place}`;
+        const id = state.placeFeatureIds.get(key);
+        if (id != null && !state.previousActivePlaceIds.has(id)) {
+          try { state.map.setFeatureState({ source: "archive-places", id }, { report: true }); } catch (_) {}
+          state.previousReportPlaceIds.add(id);
         }
       }
     }
   }
-  els.archiveLamp.classList.toggle("on", active.length > 0);
+  els.archiveLamp.classList.toggle("on", active.length > 0 || reports.length > 0);
 }
 
 function renderClocks(active) {
   els.clockMoscow.textContent = formatTime(state.currentMs, "Europe/Moscow");
   els.clockKyiv.textContent = formatTime(state.currentMs, "Europe/Kyiv");
   els.clockBeijing.textContent = formatTime(state.currentMs, "Asia/Shanghai");
-  els.currentTimeLabel.textContent = `${formatTime(state.currentMs, "Europe/Moscow")} MSK · ${active.length} ACTIVE`;
+  const reportCount = activeReports().length;
+  els.currentTimeLabel.textContent = `${formatTime(state.currentMs, "Europe/Moscow")} MSK · ${active.length} ALERT${active.length === 1 ? "" : "S"} · ${reportCount} REPORT${reportCount === 1 ? "" : "S"}`;
 }
 
 function renderScrubber() {

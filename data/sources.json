@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "sources": [
     {
       "region": "Belgorod Oblast",
@@ -676,6 +676,465 @@
             "сызрани"
           ]
         }
+      ]
+    },
+    {
+      "region": "Moscow",
+      "region_label": "г. Москва",
+      "region_center": [
+        55.7558,
+        37.6173
+      ],
+      "channel": "mos_sobyanin",
+      "source_name": "Мэр Москвы Сергей Собянин",
+      "source_url": "https://t.me/mos_sobyanin",
+      "roles": [
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Moscow",
+          "label": "Москва",
+          "type": "city",
+          "lat": 55.7558,
+          "lon": 37.6173,
+          "aliases": [
+            "москва",
+            "москве",
+            "москву",
+            "на москву",
+            "город москва"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": false,
+      "region_aliases": [
+        "москва",
+        "город москва"
+      ]
+    },
+    {
+      "region": "Moscow Oblast",
+      "region_label": "Московская область",
+      "region_center": [
+        55.5,
+        38.0
+      ],
+      "channel": "vorobiev_live",
+      "source_name": "Андрей Воробьёв — губернатор Московской области",
+      "source_url": "https://t.me/vorobiev_live",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Ramenskoye",
+          "label": "Раменское",
+          "type": "city",
+          "lat": 55.5669,
+          "lon": 38.2303,
+          "aliases": [
+            "раменское",
+            "раменском",
+            "раменский",
+            "раменского"
+          ]
+        },
+        {
+          "name": "Domodedovo",
+          "label": "Домодедово",
+          "type": "city",
+          "lat": 55.4364,
+          "lon": 37.7666,
+          "aliases": [
+            "домодедово"
+          ]
+        },
+        {
+          "name": "Podolsk",
+          "label": "Подольск",
+          "type": "city",
+          "lat": 55.4312,
+          "lon": 37.5456,
+          "aliases": [
+            "подольск",
+            "подольске"
+          ]
+        },
+        {
+          "name": "Kolomna",
+          "label": "Коломна",
+          "type": "city",
+          "lat": 55.0794,
+          "lon": 38.7783,
+          "aliases": [
+            "коломна",
+            "коломне",
+            "коломны"
+          ]
+        },
+        {
+          "name": "Serpukhov",
+          "label": "Серпухов",
+          "type": "city",
+          "lat": 54.9158,
+          "lon": 37.4111,
+          "aliases": [
+            "серпухов",
+            "серпухове"
+          ]
+        },
+        {
+          "name": "Voskresensk",
+          "label": "Воскресенск",
+          "type": "city",
+          "lat": 55.3225,
+          "lon": 38.6819,
+          "aliases": [
+            "воскресенск",
+            "воскресенске"
+          ]
+        },
+        {
+          "name": "Lukhovitsy",
+          "label": "Луховицы",
+          "type": "city",
+          "lat": 54.9766,
+          "lon": 39.0444,
+          "aliases": [
+            "луховицы",
+            "луховицах",
+            "луховиц"
+          ]
+        },
+        {
+          "name": "Bronnitsy",
+          "label": "Бронницы",
+          "type": "city",
+          "lat": 55.421,
+          "lon": 38.2619,
+          "aliases": [
+            "бронницы",
+            "бронницах",
+            "бронниц"
+          ]
+        },
+        {
+          "name": "Vidnoye",
+          "label": "Видное",
+          "type": "city",
+          "lat": 55.5518,
+          "lon": 37.7069,
+          "aliases": [
+            "видное",
+            "видном"
+          ]
+        },
+        {
+          "name": "Krasnogorsk",
+          "label": "Красногорск",
+          "type": "city",
+          "lat": 55.8311,
+          "lon": 37.3302,
+          "aliases": [
+            "красногорск",
+            "красногорске"
+          ]
+        },
+        {
+          "name": "Elektrostal",
+          "label": "Электросталь",
+          "type": "city",
+          "lat": 55.7896,
+          "lon": 38.4467,
+          "aliases": [
+            "электросталь",
+            "электростали"
+          ]
+        },
+        {
+          "name": "Kotelniki",
+          "label": "Котельники",
+          "type": "city",
+          "lat": 55.6598,
+          "lon": 37.8636,
+          "aliases": [
+            "котельники",
+            "котельниках"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "московская область",
+        "московской области",
+        "подмосковье",
+        "московском регионе"
+      ]
+    },
+    {
+      "region": "Bryansk Oblast",
+      "region_label": "Брянская область",
+      "region_center": [
+        52.95,
+        33.4
+      ],
+      "channel": "avbogomaz",
+      "source_name": "Александр Богомаз — официальный канал",
+      "source_url": "https://t.me/avbogomaz",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Bryansk",
+          "label": "Брянск",
+          "type": "city",
+          "lat": 53.2434,
+          "lon": 34.3637,
+          "aliases": [
+            "брянск",
+            "брянске"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "брянская область",
+        "брянской области"
+      ]
+    },
+    {
+      "region": "Yaroslavl Oblast",
+      "region_label": "Ярославская область",
+      "region_center": [
+        57.63,
+        39.87
+      ],
+      "channel": "evraevmikhail",
+      "source_name": "Михаил Евраев — губернатор Ярославской области",
+      "source_url": "https://t.me/evraevmikhail",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Yaroslavl",
+          "label": "Ярославль",
+          "type": "city",
+          "lat": 57.6261,
+          "lon": 39.8845,
+          "aliases": [
+            "ярославль",
+            "ярославле"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "ярославская область",
+        "ярославской области"
+      ]
+    },
+    {
+      "region": "Nizhny Novgorod Oblast",
+      "region_label": "Нижегородская область",
+      "region_center": [
+        56.3,
+        44.0
+      ],
+      "channel": "nn52signal",
+      "source_name": "ОПОВЕЩЕНИЕ 52",
+      "source_url": "https://t.me/nn52signal",
+      "roles": [
+        "alerts"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Nizhny Novgorod",
+          "label": "Нижний Новгород",
+          "type": "city",
+          "lat": 56.2965,
+          "lon": 43.9361,
+          "aliases": [
+            "нижний новгород",
+            "нижнем новгороде"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "нижегородская область",
+        "нижегородской области"
+      ]
+    },
+    {
+      "region": "Ryazan Oblast",
+      "region_label": "Рязанская область",
+      "region_center": [
+        54.63,
+        39.69
+      ],
+      "channel": "ryazanoblast_official",
+      "source_name": "Опергруппа Рязанской области",
+      "source_url": "https://t.me/ryazanoblast_official",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Ryazan",
+          "label": "Рязань",
+          "type": "city",
+          "lat": 54.6269,
+          "lon": 39.6916,
+          "aliases": [
+            "рязань",
+            "рязани"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "рязанская область",
+        "рязанской области"
+      ]
+    },
+    {
+      "region": "Vladimir Oblast",
+      "region_label": "Владимирская область",
+      "region_center": [
+        56.13,
+        40.41
+      ],
+      "channel": "region33vladimir",
+      "source_name": "Правительство Владимирской области",
+      "source_url": "https://t.me/region33vladimir",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Vladimir",
+          "label": "Владимир",
+          "type": "city",
+          "lat": 56.129,
+          "lon": 40.407,
+          "aliases": [
+            "владимир",
+            "владимире",
+            "города владимира"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "владимирская область",
+        "владимирской области"
+      ]
+    },
+    {
+      "region": "Oryol Oblast",
+      "region_label": "Орловская область",
+      "region_center": [
+        52.97,
+        36.07
+      ],
+      "channel": "Klychkov_Andrey",
+      "source_name": "Андрей Клычков — губернатор Орловской области",
+      "source_url": "https://t.me/Klychkov_Andrey",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Oryol",
+          "label": "Орёл",
+          "type": "city",
+          "lat": 52.9685,
+          "lon": 36.0692,
+          "aliases": [
+            "орел",
+            "орёл",
+            "орле",
+            "городе орле"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "орловская область",
+        "орловской области"
+      ]
+    },
+    {
+      "region": "Kaluga Oblast",
+      "region_label": "Калужская область",
+      "region_center": [
+        54.51,
+        36.26
+      ],
+      "channel": "Shapsha_VV",
+      "source_name": "Владислав Шапша — губернатор Калужской области",
+      "source_url": "https://t.me/Shapsha_VV",
+      "roles": [
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Kaluga",
+          "label": "Калуга",
+          "type": "city",
+          "lat": 54.5138,
+          "lon": 36.2612,
+          "aliases": [
+            "калуга",
+            "калуге",
+            "калуги",
+            "город калуга",
+            "города калуги"
+          ]
+        },
+        {
+          "name": "Obninsk",
+          "label": "Обнинск",
+          "type": "city",
+          "lat": 55.0968,
+          "lon": 36.6101,
+          "aliases": [
+            "обнинск",
+            "обнинске"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": false,
+      "region_aliases": [
+        "калужская область",
+        "калужской области"
       ]
     }
   ],
