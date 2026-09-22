@@ -82,8 +82,10 @@ class CollectorTests(unittest.TestCase):
         cfg = json.loads((ROOT / 'data' / 'sources.json').read_text(encoding='utf-8'))
         channels = {s['channel'] for s in cfg['sources'] if s.get('enabled')}
         self.assertTrue({'regionbez71', 'nashtatarstan_official', 'omelnichenko', 'mchsrb01', 'fedorishchev_official'} <= channels)
-        self.assertTrue({'mos_sobyanin','vorobiev_live','avbogomaz','evraevmikhail','nn52signal','Shapsha_VV'} <= channels)
-        self.assertGreaterEqual(len(channels), 18)
+        self.assertTrue({'mos_sobyanin','vorobiev_live','avbogomaz','evraevmikhail','glebnikitin_nn','Shapsha_VV'} <= channels)
+        self.assertTrue({'ivanovoobl','anohin67','busargin_r','officialmordovia','ulgovru','RostovRegion','kondratyevvi','chuvashia_region','rgn_34'} <= channels)
+        self.assertNotIn('nn52signal', channels)
+        self.assertGreaterEqual(len(channels), 27)
 
 
     def test_samara_city_then_regional_clear_pairs_city(self):
@@ -144,6 +146,22 @@ class CollectorTests(unittest.TestCase):
         regions = json.loads((ROOT / "data" / "regions.json").read_text(encoding="utf-8"))
         self.assertEqual(len(regions["regions"]), 89)
         self.assertTrue(all(r.get("mchs_rss_url") for r in regions["regions"]))
+
+    def test_v7_generic_threat_clear_and_inflected_city_alias(self):
+        self.assertEqual(text_kind('Над территорией области обнаружены БПЛА. Угроза снята.'), 'end')
+        cfg = json.loads((ROOT / 'data' / 'sources.json').read_text(encoding='utf-8'))
+        source = next(s for s in cfg['sources'] if s['channel'] == 'ivanovoobl')
+        matches = extract_places('В Шуе сохраняется режим опасности атаки БПЛА.', source)
+        self.assertTrue(any(p['name'] == 'Shuya' for p in matches))
+
+    def test_v7_official_local_report_not_rejected_for_mentioning_mod(self):
+        from collector.collect import mod_derived
+        local = Post('gov', 1, datetime(2026,9,20,1,0,tzinfo=timezone.utc),
+                     'Силами ПВО Министерства обороны уничтожены 13 БПЛА над городом Калуга.', 'https://t.me/gov/1')
+        copied = Post('gov', 2, datetime(2026,9,20,2,0,tzinfo=timezone.utc),
+                      'По данным Минобороны России уничтожены 13 БПЛА.', 'https://t.me/gov/2')
+        self.assertFalse(mod_derived(local))
+        self.assertTrue(mod_derived(copied))
 
 
 if __name__ == "__main__":

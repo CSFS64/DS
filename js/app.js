@@ -10,6 +10,7 @@ const state = {
   archive: null,
   sources: null,
   regions: null,
+  cities: { cities: [], municipalities: [], count: 0 },
   map: null,
   mapReady: false,
   baseStyleFallbackUsed: false,
@@ -80,6 +81,13 @@ function sourcePlaceIndex() {
     const key = `${region}::${place.name}`;
     if (!map.has(key)) map.set(key, { ...place, region, key });
   };
+  // Nationwide city/municipality catalog built by GitHub Actions.  These
+  // points exist independently of whether we already have a dedicated source
+  // for that city, so every catalogued city can become active when an official
+  // regional source names it.
+  for (const place of [...(state.cities.cities || []), ...(state.cities.municipalities || [])]) {
+    add(place.region, { ...place, type: place.type || "city" });
+  }
   for (const source of state.sources.sources || []) {
     for (const place of source.places || []) add(source.region, place);
   }
@@ -113,6 +121,10 @@ async function loadJson(path, cache = "no-store") {
   return res.json();
 }
 
+async function loadOptionalJson(path, fallback) {
+  try { return await loadJson(path); } catch (_) { return fallback; }
+}
+
 async function fetchFirstJson(urls) {
   let lastError = null;
   for (const url of urls) {
@@ -127,10 +139,11 @@ async function fetchFirstJson(urls) {
 
 async function init() {
   try {
-    [state.archive, state.sources, state.regions] = await Promise.all([
+    [state.archive, state.sources, state.regions, state.cities] = await Promise.all([
       loadJson("data/events.json"),
       loadJson("data/sources.json"),
       loadJson("data/regions.json"),
+      loadOptionalJson("data/cities.json", { cities: [], municipalities: [], count: 0 }),
     ]);
   } catch (err) {
     console.error(err);
@@ -183,7 +196,8 @@ function updateDataStatus() {
     `${regionsWithEvents}/${configured} REGIONS WITH EVENTS`,
     `${rssAlertCapable}/${configured} RSS ALERT-CAPABLE`,
     `${hiAlertCapable}/${hiCfg} HIGH-RES ALERT-CAPABLE`,
-    `${coverageNumber("city_catalog_count", 0)} CITY CATALOG`,
+    `${coverageNumber("city_catalog_count", state.cities?.cities?.length || 0)} CITIES`,
+    `${coverageNumber("municipality_catalog_count", state.cities?.municipalities?.length || 0)} DISTRICTS`,
     `${unmatched} UNMATCHED`,
     `UPDATED ${generated} MSK`,
     `${state.archive.safety_lag_hours ?? 24}H ARCHIVE LAG`,
@@ -428,10 +442,11 @@ function handleMapClick(ev) {
 }
 
 function initializeDates() {
-  const events = state.archive.events || [];
   const fallbackNow = Date.now() - 24 * 3600 * 1000;
-  const minMs = events.length ? Math.min(...events.map(e => Date.parse(e.start))) : Date.parse(state.archive.window_start || fallbackNow);
-  const maxMs = events.length ? Math.max(...events.map(e => Date.parse(e.end))) : Date.parse(state.archive.window_end || fallbackNow);
+  // events.json is cumulative from v7 onward, but the default view should remain
+  // the newest delayed collection window rather than expanding across history.
+  const minMs = Date.parse(state.archive.window_start || fallbackNow);
+  const maxMs = Date.parse(state.archive.window_end || fallbackNow);
   els.dateStart.value = isoDateInZone(minMs);
   els.dateEnd.value = isoDateInZone(maxMs);
 }

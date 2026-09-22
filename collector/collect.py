@@ -79,6 +79,8 @@ END_PATTERNS = tuple(re.compile(p) for p in (
     r"\b(?:снят|снята|отменен|отменена)\b.{0,100}\bугроз\w*\s+атак\w*\s+(?:бпла|беспилотн\w*)",
     r"\bотмен\w*\b.{0,70}\bсигнал\w*.{0,50}\bопасност\w*\s+атак\w*\s+бпла\b",
     r"\bугроз\w*\s+атак\w*\s+(?:бпла|беспилотн\w*).{0,100}\b(?:снят|снята|отменен|отменена)\b",
+    r"\bугроз\w*\s+(?:снят|снята|снято|отменен|отменена|отменено)\b",
+    r"\b(?:снят|снята|снято|отменен|отменена|отменено)\b.{0,50}\bугроз\w*\b",
 ))
 START_PATTERNS = tuple(re.compile(p) for p in (
     r"\b(?:объявлен\w*|введен\w*|действует|сохраняется)\b.{0,90}\bбеспилотн\w*\s+опасност\w*",
@@ -104,11 +106,11 @@ CLOSE_ALL_LOCAL_PHRASES = (
     "во всех муниципальных образованиях",
 )
 MOD_DERIVED_MARKERS = (
-    "минобороны россии",
-    "министерство обороны",
     "по данным минобороны",
     "сообщило минобороны",
-    "forwarded from минобороны",
+    "минобороны россии сообщает",
+    "министерство обороны сообщает",
+    "официальное сообщение минобороны",
 )
 
 
@@ -224,7 +226,7 @@ def fetch_posts_for_window(
     end_utc: datetime,
     max_pages: int = 18,
 ) -> list[Post]:
-    context_start = start_utc - timedelta(hours=24)
+    context_start = start_utc - timedelta(hours=48)
     all_posts: dict[int, Post] = {}
     before: int | None = None
 
@@ -297,7 +299,7 @@ def fetch_mchs_posts_for_window(
     start_utc: datetime,
     end_utc: datetime,
 ) -> list[Post]:
-    context_start = start_utc - timedelta(hours=24)
+    context_start = start_utc - timedelta(hours=48)
     r = session.get(region_cfg["mchs_rss_url"], timeout=18)
     r.raise_for_status()
     posts = parse_mchs_rss(r.text, region_cfg)
@@ -493,8 +495,14 @@ def pair_alerts(posts: list[Post], source: dict[str, Any], window_start: datetim
 
 
 def mod_derived(post: Post) -> bool:
-    combined = normalize(post.text + " " + (post.forwarded_from or ""))
-    return any(marker in combined for marker in MOD_DERIVED_MARKERS)
+    # Reject numbers that are merely copied/forwarded from the federal MOD, but
+    # do not reject a governor's own local report just because it says local PVO
+    # or MOD forces performed the interception.
+    forwarded = normalize(post.forwarded_from or "")
+    if "минобороны" in forwarded or "министерство обороны" in forwarded:
+        return True
+    text = normalize(post.text)
+    return any(marker in text for marker in MOD_DERIVED_MARKERS)
 
 
 def sentence_split(text: str) -> list[str]:
@@ -562,6 +570,12 @@ def extract_reports(posts: list[Post], source: dict[str, Any], window_start: dat
             if not counts:
                 continue
             mentioned = infer_report_places(sentence, source)
+            if not mentioned:
+                # Local authorities often put the total in one sentence and list
+                # affected cities/municipalities on subsequent lines. Preserve
+                # those named places as activity markers rather than losing the
+                # geographic detail.
+                mentioned = infer_report_places(post.text, source)
             primary_place = mentioned[0] if mentioned else None
             place = primary_place["name"] if primary_place else source["region"]
             scope = alert_scope(primary_place) if primary_place else "region"
@@ -613,11 +627,11 @@ def collect(args) -> dict[str, Any]:
     source_cfg = json.loads(Path(args.sources).read_text(encoding="utf-8"))
     region_cfg = json.loads(Path(args.regions).read_text(encoding="utf-8"))
     city_path = Path(args.cities)
-    city_cfg = json.loads(city_path.read_text(encoding="utf-8")) if city_path.exists() else {"cities": []}
+    city_cfg = json.loads(city_path.read_text(encoding="utf-8")) if city_path.exists() else {"cities": [], "municipalities": []}
     cities_by_region: dict[str, list[dict[str, Any]]] = {}
-    for city in city_cfg.get("cities", []):
+    for city in [*(city_cfg.get("cities", []) or []), *(city_cfg.get("municipalities", []) or [])]:
         cities_by_region.setdefault(city.get("region", ""), []).append({
-            "name": city.get("name"), "label": city.get("label") or city.get("name"), "type": "city",
+            "name": city.get("name"), "label": city.get("label") or city.get("name"), "type": city.get("type", "city"),
             "lat": city.get("lat"), "lon": city.get("lon"), "population": city.get("population", 0),
             "aliases": city.get("aliases") or [city.get("label") or city.get("name")],
         })
@@ -719,6 +733,7 @@ def collect(args) -> dict[str, Any]:
             "high_resolution_sources_with_alert_posts": sum(1 for s in telegram_status if s.get("alert_posts", 0) > 0),
             "high_resolution_regions_with_events": len(hi_res_regions_with_events),
             "city_catalog_count": len(city_cfg.get("cities", [])),
+            "municipality_catalog_count": len(city_cfg.get("municipalities", [])),
             "unmatched_starts": sum(1 for u in all_unmatched if u.get("type") == "unmatched_start"),
         },
         "events": all_events,
@@ -727,6 +742,52 @@ def collect(args) -> dict[str, Any]:
         "source_status": sorted(statuses, key=lambda s: (s.get("region", ""), s.get("source_type", ""))),
     }
 
+
+
+def merge_existing_archive(data: dict[str, Any], output_path: Path) -> dict[str, Any]:
+    """Keep older historical records while regenerating the current window.
+
+    The collector used to replace events.json with only the newest lookback
+    window.  That is unsuitable for an archive.  Records before the current
+    window are retained; the overlapping window is regenerated from sources so
+    parser fixes can correct recent history.
+    """
+    if not output_path.exists():
+        data["coverage"]["archive_events_total"] = len(data.get("events", []))
+        data["coverage"]["archive_reports_total"] = len(data.get("reports", []))
+        return data
+    try:
+        old = json.loads(output_path.read_text(encoding="utf-8"))
+        cutoff = parse_iso(data["window_start"])
+    except Exception:
+        return data
+
+    keep_events = []
+    for e in old.get("events", []):
+        try:
+            if parse_iso(e.get("end") or e.get("start")) < cutoff:
+                keep_events.append(e)
+        except Exception:
+            pass
+    keep_reports = []
+    for r in old.get("reports", []):
+        try:
+            if parse_iso(r.get("at")) < cutoff:
+                keep_reports.append(r)
+        except Exception:
+            pass
+
+    data["events"] = sorted(
+        {e["id"]: e for e in [*keep_events, *data.get("events", [])]}.values(),
+        key=lambda e: (e.get("start", ""), e.get("region", ""), e.get("place", "")),
+    )
+    data["reports"] = sorted(
+        {r["id"]: r for r in [*keep_reports, *data.get("reports", [])]}.values(),
+        key=lambda r: (r.get("at", ""), r.get("region", ""), r.get("place", "")),
+    )
+    data["coverage"]["archive_events_total"] = len(data["events"])
+    data["coverage"]["archive_reports_total"] = len(data["reports"])
+    return data
 
 def main():
     p = argparse.ArgumentParser()

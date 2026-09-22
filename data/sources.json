@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "sources": [
     {
       "region": "Belgorod Oblast",
@@ -103,7 +103,8 @@
       "region_aliases": [
         "белгородская область",
         "белгородской области"
-      ]
+      ],
+      "verified_official": true
     },
     {
       "region": "Kursk Oblast",
@@ -160,7 +161,8 @@
       "region_aliases": [
         "курская область",
         "курской области"
-      ]
+      ],
+      "verified_official": true
     },
     {
       "region": "Voronezh Oblast",
@@ -264,7 +266,8 @@
       "region_aliases": [
         "воронежская область",
         "воронежской области"
-      ]
+      ],
+      "verified_official": true
     },
     {
       "region": "Lipetsk Oblast",
@@ -311,7 +314,8 @@
       "region_aliases": [
         "липецкая область",
         "липецкой области"
-      ]
+      ],
+      "verified_official": true
     },
     {
       "region": "Tula Oblast",
@@ -358,7 +362,8 @@
             "новомосковске"
           ]
         }
-      ]
+      ],
+      "verified_official": true
     },
     {
       "region": "Republic of Tatarstan",
@@ -501,7 +506,8 @@
             "чистопольском"
           ]
         }
-      ]
+      ],
+      "verified_official": true
     },
     {
       "region": "Penza Oblast",
@@ -559,7 +565,8 @@
             "заречном"
           ]
         }
-      ]
+      ],
+      "verified_official": true
     },
     {
       "region": "Republic of Bashkortostan",
@@ -607,7 +614,8 @@
             "стерлитамаке"
           ]
         }
-      ]
+      ],
+      "verified_official": true
     },
     {
       "region": "Samara Oblast",
@@ -676,7 +684,8 @@
             "сызрани"
           ]
         }
-      ]
+      ],
+      "verified_official": true
     },
     {
       "region": "Moscow",
@@ -713,7 +722,8 @@
       "region_aliases": [
         "москва",
         "город москва"
-      ]
+      ],
+      "verified_official": true
     },
     {
       "region": "Moscow Oblast",
@@ -875,7 +885,8 @@
         "московской области",
         "подмосковье",
         "московском регионе"
-      ]
+      ],
+      "verified_official": true
     },
     {
       "region": "Bryansk Oblast",
@@ -910,7 +921,8 @@
       "region_aliases": [
         "брянская область",
         "брянской области"
-      ]
+      ],
+      "verified_official": true
     },
     {
       "region": "Yaroslavl Oblast",
@@ -945,41 +957,8 @@
       "region_aliases": [
         "ярославская область",
         "ярославской области"
-      ]
-    },
-    {
-      "region": "Nizhny Novgorod Oblast",
-      "region_label": "Нижегородская область",
-      "region_center": [
-        56.3,
-        44.0
       ],
-      "channel": "nn52signal",
-      "source_name": "ОПОВЕЩЕНИЕ 52",
-      "source_url": "https://t.me/nn52signal",
-      "roles": [
-        "alerts"
-      ],
-      "enabled": true,
-      "places": [
-        {
-          "name": "Nizhny Novgorod",
-          "label": "Нижний Новгород",
-          "type": "city",
-          "lat": 56.2965,
-          "lon": 43.9361,
-          "aliases": [
-            "нижний новгород",
-            "нижнем новгороде"
-          ]
-        }
-      ],
-      "kind": "telegram",
-      "fallback_to_region_on_unresolved": true,
-      "region_aliases": [
-        "нижегородская область",
-        "нижегородской области"
-      ]
+      "verified_official": true
     },
     {
       "region": "Ryazan Oblast",
@@ -1014,7 +993,8 @@
       "region_aliases": [
         "рязанская область",
         "рязанской области"
-      ]
+      ],
+      "verified_official": true
     },
     {
       "region": "Vladimir Oblast",
@@ -1050,7 +1030,8 @@
       "region_aliases": [
         "владимирская область",
         "владимирской области"
-      ]
+      ],
+      "verified_official": true
     },
     {
       "region": "Oryol Oblast",
@@ -1087,7 +1068,8 @@
       "region_aliases": [
         "орловская область",
         "орловской области"
-      ]
+      ],
+      "verified_official": true
     },
     {
       "region": "Kaluga Oblast",
@@ -1135,7 +1117,587 @@
       "region_aliases": [
         "калужская область",
         "калужской области"
-      ]
+      ],
+      "verified_official": true
+    },
+    {
+      "region": "Nizhny Novgorod Oblast",
+      "region_label": "Нижегородская область",
+      "channel": "glebnikitin_nn",
+      "source_name": "Глеб Никитин — губернатор Нижегородской области",
+      "source_url": "https://t.me/glebnikitin_nn",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Nizhny Novgorod",
+          "label": "Нижний Новгород",
+          "type": "city",
+          "lat": 56.3269,
+          "lon": 44.0059,
+          "aliases": [
+            "нижний новгород",
+            "нижнем новгороде",
+            "нижнего новгорода"
+          ]
+        },
+        {
+          "name": "Kstovo",
+          "label": "Кстово",
+          "type": "city",
+          "lat": 56.1473,
+          "lon": 44.1979,
+          "aliases": [
+            "кстово",
+            "кстовском"
+          ]
+        },
+        {
+          "name": "Bor",
+          "label": "Бор",
+          "type": "city",
+          "lat": 56.3565,
+          "lon": 44.0646,
+          "aliases": [
+            "бор",
+            "на бору",
+            "борском"
+          ]
+        },
+        {
+          "name": "Dzerzhinsk",
+          "label": "Дзержинск",
+          "type": "city",
+          "lat": 56.2384,
+          "lon": 43.4616,
+          "aliases": [
+            "дзержинск",
+            "дзержинске"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "нижегородская область",
+        "нижегородской области"
+      ],
+      "verified_official": true
+    },
+    {
+      "region": "Ivanovo Oblast",
+      "region_label": "Ивановская область",
+      "channel": "ivanovoobl",
+      "source_name": "Правительство Ивановской области",
+      "source_url": "https://t.me/ivanovoobl",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Ivanovo",
+          "label": "Иваново",
+          "type": "city",
+          "lat": 56.9972,
+          "lon": 40.9714,
+          "aliases": [
+            "иваново"
+          ]
+        },
+        {
+          "name": "Shuya",
+          "label": "Шуя",
+          "type": "city",
+          "lat": 56.8487,
+          "lon": 41.3883,
+          "aliases": [
+            "шуя",
+            "шуе",
+            "шуи",
+            "шую"
+          ]
+        },
+        {
+          "name": "Kineshma",
+          "label": "Кинешма",
+          "type": "city",
+          "lat": 57.4426,
+          "lon": 42.1289,
+          "aliases": [
+            "кинешма",
+            "кинешме",
+            "кинешмы",
+            "кинешму"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "ивановская область",
+        "ивановской области"
+      ],
+      "verified_official": true
+    },
+    {
+      "region": "Smolensk Oblast",
+      "region_label": "Смоленская область",
+      "channel": "anohin67",
+      "source_name": "Василий Анохин — губернатор Смоленской области",
+      "source_url": "https://t.me/anohin67",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Smolensk",
+          "label": "Смоленск",
+          "type": "city",
+          "lat": 54.7826,
+          "lon": 32.0453,
+          "aliases": [
+            "смоленск",
+            "смоленске"
+          ]
+        },
+        {
+          "name": "Yelnya",
+          "label": "Ельня",
+          "type": "city",
+          "lat": 54.5786,
+          "lon": 33.1837,
+          "aliases": [
+            "ельня",
+            "ельне",
+            "ельню"
+          ]
+        },
+        {
+          "name": "Roslavl",
+          "label": "Рославль",
+          "type": "city",
+          "lat": 53.9528,
+          "lon": 32.8639,
+          "aliases": [
+            "рославль",
+            "рославле"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "смоленская область",
+        "смоленской области"
+      ],
+      "verified_official": true
+    },
+    {
+      "region": "Saratov Oblast",
+      "region_label": "Саратовская область",
+      "channel": "busargin_r",
+      "source_name": "Роман Бусаргин — губернатор Саратовской области",
+      "source_url": "https://t.me/busargin_r",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Saratov",
+          "label": "Саратов",
+          "type": "city",
+          "lat": 51.5336,
+          "lon": 46.0343,
+          "aliases": [
+            "саратов",
+            "саратове"
+          ]
+        },
+        {
+          "name": "Engels",
+          "label": "Энгельс",
+          "type": "city",
+          "lat": 51.5008,
+          "lon": 46.1224,
+          "aliases": [
+            "энгельс",
+            "энгельсе"
+          ]
+        },
+        {
+          "name": "Balakovo",
+          "label": "Балаково",
+          "type": "city",
+          "lat": 52.0278,
+          "lon": 47.8007,
+          "aliases": [
+            "балаково"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "саратовская область",
+        "саратовской области"
+      ],
+      "verified_official": true
+    },
+    {
+      "region": "Tambov Oblast",
+      "region_label": "Тамбовская область",
+      "channel": "tmbcan",
+      "source_name": "Правительство Тамбовской области",
+      "source_url": "https://t.me/tmbcan",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Tambov",
+          "label": "Тамбов",
+          "type": "city",
+          "lat": 52.7212,
+          "lon": 41.4523,
+          "aliases": [
+            "тамбов",
+            "тамбове"
+          ]
+        },
+        {
+          "name": "Michurinsk",
+          "label": "Мичуринск",
+          "type": "city",
+          "lat": 52.8978,
+          "lon": 40.4907,
+          "aliases": [
+            "мичуринск",
+            "мичуринске"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "тамбовская область",
+        "тамбовской области"
+      ],
+      "verified_official": true
+    },
+    {
+      "region": "Republic of Mordovia",
+      "region_label": "Республика Мордовия",
+      "channel": "officialmordovia",
+      "source_name": "Официальный канал Республики Мордовия",
+      "source_url": "https://t.me/officialmordovia",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Saransk",
+          "label": "Саранск",
+          "type": "city",
+          "lat": 54.1874,
+          "lon": 45.1839,
+          "aliases": [
+            "саранск",
+            "саранске"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "республика мордовия",
+        "республике мордовия",
+        "мордовии",
+        "мордовия"
+      ],
+      "verified_official": true
+    },
+    {
+      "region": "Ulyanovsk Oblast",
+      "region_label": "Ульяновская область",
+      "channel": "ulgovru",
+      "source_name": "Правительство Ульяновской области",
+      "source_url": "https://t.me/ulgovru",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Ulyanovsk",
+          "label": "Ульяновск",
+          "type": "city",
+          "lat": 54.3142,
+          "lon": 48.4031,
+          "aliases": [
+            "ульяновск",
+            "ульяновске"
+          ]
+        },
+        {
+          "name": "Dimitrovgrad",
+          "label": "Димитровград",
+          "type": "city",
+          "lat": 54.2139,
+          "lon": 49.6184,
+          "aliases": [
+            "димитровград",
+            "димитровграде"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "ульяновская область",
+        "ульяновской области"
+      ],
+      "verified_official": true
+    },
+    {
+      "region": "Rostov Oblast",
+      "region_label": "Ростовская область",
+      "channel": "RostovRegion",
+      "source_name": "Правительство Ростовской области",
+      "source_url": "https://t.me/RostovRegion",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Rostov-on-Don",
+          "label": "Ростов-на-Дону",
+          "type": "city",
+          "lat": 47.2357,
+          "lon": 39.7015,
+          "aliases": [
+            "ростов на дону",
+            "ростове на дону"
+          ]
+        },
+        {
+          "name": "Kamensk-Shakhtinsky",
+          "label": "Каменск-Шахтинский",
+          "type": "city",
+          "lat": 48.3178,
+          "lon": 40.2595,
+          "aliases": [
+            "каменск шахтинский",
+            "каменске шахтинском"
+          ]
+        },
+        {
+          "name": "Taganrog",
+          "label": "Таганрог",
+          "type": "city",
+          "lat": 47.2362,
+          "lon": 38.8969,
+          "aliases": [
+            "таганрог",
+            "таганроге"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "ростовская область",
+        "ростовской области"
+      ],
+      "verified_official": true
+    },
+    {
+      "region": "Krasnodar Krai",
+      "region_label": "Краснодарский край",
+      "channel": "kondratyevvi",
+      "source_name": "Вениамин Кондратьев — губернатор Краснодарского края",
+      "source_url": "https://t.me/kondratyevvi",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Krasnodar",
+          "label": "Краснодар",
+          "type": "city",
+          "lat": 45.0355,
+          "lon": 38.9753,
+          "aliases": [
+            "краснодар",
+            "краснодаре"
+          ]
+        },
+        {
+          "name": "Novorossiysk",
+          "label": "Новороссийск",
+          "type": "city",
+          "lat": 44.7239,
+          "lon": 37.7689,
+          "aliases": [
+            "новороссийск",
+            "новороссийске"
+          ]
+        },
+        {
+          "name": "Anapa",
+          "label": "Анапа",
+          "type": "city",
+          "lat": 44.895,
+          "lon": 37.3163,
+          "aliases": [
+            "анапа",
+            "анапе"
+          ]
+        },
+        {
+          "name": "Gelendzhik",
+          "label": "Геленджик",
+          "type": "city",
+          "lat": 44.561,
+          "lon": 38.077,
+          "aliases": [
+            "геленджик",
+            "геленджике"
+          ]
+        },
+        {
+          "name": "Sochi",
+          "label": "Сочи",
+          "type": "city",
+          "lat": 43.6028,
+          "lon": 39.7342,
+          "aliases": [
+            "сочи"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "краснодарский край",
+        "краснодарском крае"
+      ],
+      "verified_official": true
+    },
+    {
+      "region": "Chuvash Republic",
+      "region_label": "Чувашская Республика - Чувашии",
+      "channel": "chuvashia_region",
+      "source_name": "Правительство Чувашской Республики",
+      "source_url": "https://t.me/chuvashia_region",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Cheboksary",
+          "label": "Чебоксары",
+          "type": "city",
+          "lat": 56.1322,
+          "lon": 47.2519,
+          "aliases": [
+            "чебоксары",
+            "чебоксарах"
+          ]
+        },
+        {
+          "name": "Novocheboksarsk",
+          "label": "Новочебоксарск",
+          "type": "city",
+          "lat": 56.1109,
+          "lon": 47.4776,
+          "aliases": [
+            "новочебоксарск",
+            "новочебоксарске"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "чувашская республика",
+        "чувашской республике",
+        "чувашии"
+      ],
+      "verified_official": true
+    },
+    {
+      "region": "Volgograd Oblast",
+      "region_label": "Волгоградская область",
+      "channel": "rgn_34",
+      "source_name": "Администрация Волгоградской области",
+      "source_url": "https://t.me/rgn_34",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Volgograd",
+          "label": "Волгоград",
+          "type": "city",
+          "lat": 48.708,
+          "lon": 44.5133,
+          "aliases": [
+            "волгоград",
+            "волгограде"
+          ]
+        },
+        {
+          "name": "Volzhsky",
+          "label": "Волжский",
+          "type": "city",
+          "lat": 48.7858,
+          "lon": 44.7797,
+          "aliases": [
+            "волжский",
+            "волжском"
+          ]
+        },
+        {
+          "name": "Kamyshin",
+          "label": "Камышин",
+          "type": "city",
+          "lat": 50.0983,
+          "lon": 45.416,
+          "aliases": [
+            "камышин",
+            "камышине"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "волгоградская область",
+        "волгоградской области"
+      ],
+      "verified_official": true
     }
   ],
   "notes": [
