@@ -1,23 +1,44 @@
 {
   "schema_version": 3,
-  "generated_at": "2026-09-22T20:56:27.795793+00:00",
+  "generated_at": "2026-09-22T21:02:34.252020+00:00",
   "safety_lag_hours": 24,
-  "window_start": "2026-09-19T20:56:27.795793+00:00",
-  "window_end": "2026-09-21T20:56:27.795793+00:00",
+  "window_start": "2026-09-19T21:02:34.252020+00:00",
+  "window_end": "2026-09-21T21:02:34.252020+00:00",
   "coverage": {
     "regions_configured": 89,
     "regions_rss_ok": 81,
     "region_feeds_http_ok": 81,
     "mchs_regions_with_alert_posts": 0,
-    "regions_with_any_alert_posts": 8,
-    "regions_with_paired_alerts": 5,
-    "high_resolution_sources_configured": 9,
-    "high_resolution_sources_ok": 9,
-    "high_resolution_sources_with_alert_posts": 8,
-    "high_resolution_regions_with_events": 5,
+    "regions_with_any_alert_posts": 9,
+    "regions_with_paired_alerts": 6,
+    "high_resolution_sources_configured": 18,
+    "high_resolution_sources_ok": 18,
+    "high_resolution_sources_with_alert_posts": 9,
+    "high_resolution_regions_with_events": 6,
+    "city_catalog_count": 2567,
     "unmatched_starts": 11
   },
   "events": [
+    {
+      "id": "dc39978de9a677a2",
+      "region": "Nizhny Novgorod Oblast",
+      "place": "Nizhny Novgorod Oblast",
+      "scope": "region",
+      "precision": "exact_region",
+      "alert_type": "uav_alert",
+      "start": "2026-09-18T22:55:31+00:00",
+      "end": "2026-09-20T06:37:11+00:00",
+      "source_name": "ОПОВЕЩЕНИЕ 52",
+      "source_url": "https://t.me/nn52signal",
+      "start_url": "https://t.me/nn52signal/44844",
+      "end_url": "https://t.me/nn52signal/44885",
+      "start_text": "🔴 ВНИМАНИЕ! Нижегородская область ОПАСНОСТЬ АТАКИ БПЛА! Сохраняйте бдительность. @nn52signal",
+      "end_text": "🟢 ВНИМАНИЕ! Нижегородская область Отмена сигнала \"ОПАСНОСТЬ АТАКИ БПЛА\" . @nn52signal",
+      "end_match": "regional_clear",
+      "source_kind": "telegram",
+      "lat": null,
+      "lon": null
+    },
     {
       "id": "10092e3b4596d3b8",
       "region": "Tula Oblast",
@@ -34,7 +55,9 @@
       "start_text": "За прошедшую ночь в небе над Тульской областью подразделениями ПВО Минобороны России уничтожены 11 украинских беспилотников. Пострадавших нет. По предварительным данным, разрушений зданий и инфраструктуры не зафиксировано. ❗️ Уважаемые жители! Напоминаю о правилах безопасности. Упавшие на землю БПЛА, как правило, содержат взрывчатые вещества. Приближаться к ним запрещено! Также нельзя брать в руки элементы от сдетонировавших БПЛА: они могут быть обработаны отравляющими веществами. Будьте внимательны! В случае обнаружения подозрительных предметов незамедлительно сообщайте по телефонам экстренных служб: 01, 101, 112. В регионе сохраняется опасность атаки БПЛА.",
       "end_text": "ОТБОЙ опасности атаки БПЛА на территории Тульской области! Единый номер вызова экстренных служб: 112. Скачать приложение «МЧС России» 👉 vk.cc/cHf0Zz Канал «Всё о безопасности» в МАХ 👉 max.ru/id7107132620_gos",
       "end_match": "regional_clear",
-      "source_kind": "telegram"
+      "source_kind": "telegram",
+      "lat": null,
+      "lon": null
     },
     {
       "id": "e2b1ac7486f7084a",
@@ -52,7 +75,9 @@
       "start_text": "ОПАСНОСТЬ АТАКИ БПЛА в городе Белгороде 18:40. Оставайтесь дома, не подходите к окнам или пройдите в укрытие.",
       "end_text": "ОТБОЙ ОПАСНОСТИ АТАКИ БПЛА в г. Белгороде, Алексеевском, Борисовском, Вейделевском,  Ивнянском, Корочанском, Красненском, Красногвардейском, Новооскольском, Прохоровском, Ракитянском, Ровеньском, Чернянском, Яковлевском МО, Губкинском, Старооскольском ГО  06:32.",
       "end_match": "direct",
-      "source_kind": "telegram"
+      "source_kind": "telegram",
+      "lat": 50.5954,
+      "lon": 36.5873
     },
     {
       "id": "9f43a351f60b805d",
@@ -70,7 +95,9 @@
       "start_text": "Внимание! Уважаемые жители Воронежской области, на территории региона объявлена опасность атаки БПЛА. Воронежская агломерация, Богучарский и Россошанский районы — тревога в связи с угрозой непосредственного удара БПЛА. Работают системы оповещения. Зайдите в помещение, отойдите от окон. Если увидели БПЛА — сразу уходите из зоны его видимости и позвоните по телефону 112.",
       "end_text": "Отбой опасности атаки БПЛА в регионе! Минувшей ночью дежурными силами ПВО в небе над тремя городскими округами и девятью районами Воронежской области были обнаружены и уничтожены 43 беспилотных летательных аппарата. По предварительный информации, два жителя региона получили ранения средней тяжести. Из пригородного района в областную детскую больницу доставлен мальчик 2012 года рождения. В другом муниципалитете под Воронежем госпитализирован мужчина 1989 года рождения. Им оказывается вся необходимая медицинская помощь. В трех пригородных районах в результате падения обломков БПЛА повреждены крыши, остекление и фасады ряда домов, несколько автомобилей. Ещё в одном муниципалитете обломки посекли фасад и кровлю нескольких построек, грузовой транспорт.",
       "end_match": "regional_clear",
-      "source_kind": "telegram"
+      "source_kind": "telegram",
+      "lat": null,
+      "lon": null
     },
     {
       "id": "e062e597bd8fb4e3",
@@ -88,7 +115,9 @@
       "start_text": "Внимание! Нововоронеж — тревога в связи с угрозой непосредственного удара БПЛА. Работают системы оповещения. Зайдите в помещение, отойдите от окон. Если увидели БПЛА — сразу уходите из зоны его видимости и позвоните по телефону 112.",
       "end_text": "Отмена непосредственной опасности атаки БПЛА во всех муниципалитетах Воронежской области. Режим опасности атаки БПЛА сохраняется на всей территории региона!",
       "end_match": "all_local_clear",
-      "source_kind": "telegram"
+      "source_kind": "telegram",
+      "lat": 51.3091,
+      "lon": 39.2164
     },
     {
       "id": "a0dcab03b4ca49c8",
@@ -106,7 +135,9 @@
       "start_text": "Внимание! Борисоглебск — тревога в связи с угрозой непосредственного удара БПЛА. Работают системы оповещения. Зайдите в помещение, отойдите от окон. Если увидели БПЛА — сразу уходите из зоны его видимости и позвоните по телефону 112.",
       "end_text": "Отмена непосредственной опасности атаки БПЛА во всех муниципалитетах Воронежской области. Режим опасности атаки БПЛА сохраняется на всей территории региона!",
       "end_match": "all_local_clear",
-      "source_kind": "telegram"
+      "source_kind": "telegram",
+      "lat": 51.3677,
+      "lon": 42.0749
     },
     {
       "id": "210fa3481bee68ab",
@@ -124,7 +155,9 @@
       "start_text": "На территории Пензенской области введен режим «Беспилотная опасность». В целях безопасности граждан введены временные ограничения работы мобильного интернета. Телефон экстренных служб —112. 🟪 Подпишись — Олег Мельниченко в Mакс",
       "end_text": "На территории Пензенской области отменён план «Ковёр» и режим «Беспилотная опасность». Временный запрет на использование воздушного пространства снят. 🟪 Подпишись — Олег Мельниченко в Mакс",
       "end_match": "regional_clear",
-      "source_kind": "telegram"
+      "source_kind": "telegram",
+      "lat": null,
+      "lon": null
     },
     {
       "id": "f850f8f546ad7435",
@@ -142,7 +175,9 @@
       "start_text": "❗️ Внимание! На территории Самарской области действует режим «БЕСПИЛОТНАЯ ОПАСНОСТЬ». Телефон экстренных служб: 112.",
       "end_text": "✅ ОТБОЙ БЕСПИЛОТНОЙ ОПАСНОСТИ",
       "end_match": "parent_region_fallback_clear",
-      "source_kind": "telegram"
+      "source_kind": "telegram",
+      "lat": null,
+      "lon": null
     },
     {
       "id": "43a19da338fe7b02",
@@ -160,7 +195,9 @@
       "start_text": "Подразделения ПВО Минобороны России уничтожили еще 7 украинских беспилотников. Пострадавших нет. В Туле в одном из многоквартирных домов повреждено остекление. А в частном секторе обнаружены обломки БПЛА, представляющие опасность. Сейчас на месте работают экстренные службы. Для обеспечения безопасности жителям близлежащих частных домов предложено размещение в ПВР. Ситуация на контроле. ❗️ В регионе все еще сохраняется опасность  атаки БПЛА.",
       "end_text": "ОТБОЙ опасности атаки БПЛА на территории Тульской области! Единый номер вызова экстренных служб: 112. Скачать приложение «МЧС России» 👉 vk.cc/cHf0Zz Канал «Всё о безопасности» в МАХ 👉 max.ru/id7107132620_gos",
       "end_match": "regional_clear",
-      "source_kind": "telegram"
+      "source_kind": "telegram",
+      "lat": 54.193,
+      "lon": 37.6178
     },
     {
       "id": "c63179004acb7cc4",
@@ -178,7 +215,9 @@
       "start_text": "Внимание! Уважаемые жители Воронежской области, на территории региона объявлена опасность атаки БПЛА. Прошу сохранять спокойствие. Силы ПВО наготове. Следите за дальнейшими оповещениями от правительства области или от МЧС России.",
       "end_text": "Отбой опасности атаки БПЛА в регионе! Всего вечером 20 сентября дежурными силами ПВО в небе над тремя районами Воронежской области было обнаружено и уничтожено пять беспилотных летательных аппаратов. По предварительным данным, пострадавших и разрушений нет.",
       "end_match": "regional_clear",
-      "source_kind": "telegram"
+      "source_kind": "telegram",
+      "lat": null,
+      "lon": null
     },
     {
       "id": "b80eb82688dcab7b",
@@ -196,7 +235,9 @@
       "start_text": "На территории Пензенской области введен режим «Беспилотная опасность». В целях безопасности граждан введены временные ограничения работы мобильного интернета. Телефон экстренных служб —112. 🟪 Подпишись — Олег Мельниченко в Mакс",
       "end_text": "На территории Пензенской области отменён план «Ковёр» и режим «Беспилотная опасность». Временный запрет на использование воздушного пространства снят. 🟪 Подпишись — Олег Мельниченко в Mакс",
       "end_match": "regional_clear",
-      "source_kind": "telegram"
+      "source_kind": "telegram",
+      "lat": null,
+      "lon": null
     },
     {
       "id": "8afd17129be7d708",
@@ -214,7 +255,9 @@
       "start_text": "ОПАСНОСТЬ АТАКИ БПЛА в Губкинском и Старооскольском ГО, Корочанском МО 00:33. Оставайтесь дома, не подходите к окнам или пройдите в укрытие.",
       "end_text": "ОТБОЙ ОПАСНОСТИ АТАКИ БПЛА в г. Белгороде, Валуйском, Волоконовском, Ракитянском, Новооскольском, Ивнянском, Прохоровском, Яковлевском, Вейделевском, Корочанском МО, Губкинском и Старооскольском ГО  07:00.",
       "end_match": "direct",
-      "source_kind": "telegram"
+      "source_kind": "telegram",
+      "lat": 51.2817,
+      "lon": 37.5458
     },
     {
       "id": "148fd89f4d17787f",
@@ -232,7 +275,9 @@
       "start_text": "ОПАСНОСТЬ АТАКИ БПЛА в Губкинском и Старооскольском ГО, Корочанском МО 00:33. Оставайтесь дома, не подходите к окнам или пройдите в укрытие.",
       "end_text": "ОТБОЙ ОПАСНОСТИ АТАКИ БПЛА в г. Белгороде, Валуйском, Волоконовском, Ракитянском, Новооскольском, Ивнянском, Прохоровском, Яковлевском, Вейделевском, Корочанском МО, Губкинском и Старооскольском ГО  07:00.",
       "end_match": "direct",
-      "source_kind": "telegram"
+      "source_kind": "telegram",
+      "lat": 51.2967,
+      "lon": 37.8417
     },
     {
       "id": "b387797fd9244d88",
@@ -250,7 +295,9 @@
       "start_text": "❗️ Внимание! На территории Самарской области действует режим «БЕСПИЛОТНАЯ ОПАСНОСТЬ». Телефон экстренных служб: 112.",
       "end_text": "✅ ОТБОЙ БЕСПИЛОТНОЙ ОПАСНОСТИ",
       "end_match": "parent_region_fallback_clear",
-      "source_kind": "telegram"
+      "source_kind": "telegram",
+      "lat": null,
+      "lon": null
     },
     {
       "id": "f9730a9c9ce42e79",
@@ -268,7 +315,9 @@
       "start_text": "ОПАСНОСТЬ АТАКИ БПЛА в г. Белгороде 03:55. Оставайтесь дома, не подходите к окнам или пройдите в укрытие.",
       "end_text": "ОТБОЙ ОПАСНОСТИ АТАКИ БПЛА в г. Белгороде, Валуйском, Волоконовском, Ракитянском, Новооскольском, Ивнянском, Прохоровском, Яковлевском, Вейделевском, Корочанском МО, Губкинском и Старооскольском ГО  07:00.",
       "end_match": "direct",
-      "source_kind": "telegram"
+      "source_kind": "telegram",
+      "lat": 50.5954,
+      "lon": 36.5873
     },
     {
       "id": "a097693ca09b8596",
@@ -286,69 +335,87 @@
       "start_text": "ОПАСНОСТЬ АТАКИ БПЛА на территории Тульской области! Будьте бдительны. Единый номер вызова экстренных служб: 112. ❗️ Фото- и видеосъемка действий сил противовоздушной обороны запрещена. Скачать приложение «МЧС России» 👉 vk.cc/cHf0Zz Канал «Всё о безопасности» в МАХ 👉 max.ru/id7107132620_gos",
       "end_text": "ОТБОЙ опасности атаки БПЛА на территории Тульской области! Единый номер вызова экстренных служб: 112. Скачать приложение «МЧС России» 👉 vk.cc/cHf0Zz Канал «Всё о безопасности» в МАХ 👉 max.ru/id7107132620_gos",
       "end_match": "regional_clear",
-      "source_kind": "telegram"
+      "source_kind": "telegram",
+      "lat": null,
+      "lon": null
     }
   ],
   "reports": [
     {
-      "id": "57bf864db2cd0797",
-      "region": "Belgorod Oblast",
-      "place": "Belgorod Oblast",
+      "id": "6320a9a04e3d4a15",
+      "region": "Moscow",
+      "place": "Moscow",
       "scope": "region",
-      "at": "2026-09-20T05:42:40+00:00",
+      "at": "2026-09-20T02:14:01+00:00",
+      "count": 20,
+      "count_type": "destroyed_or_suppressed",
+      "count_qualifier": null,
+      "secondary_count": null,
+      "secondary_type": null,
+      "text": "Уничтожены ещё 20 беспилотников.",
+      "source_name": "Мэр Москвы Сергей Собянин",
+      "url": "https://t.me/mos_sobyanin/21844",
+      "source_kind": "telegram",
+      "lat": null,
+      "lon": null,
+      "mentioned_places": []
+    },
+    {
+      "id": "ad8823600b234674",
+      "region": "Moscow Oblast",
+      "place": "Moscow Oblast",
+      "scope": "region",
+      "at": "2026-09-20T03:13:44+00:00",
+      "count": 249,
+      "count_type": "destroyed_or_suppressed",
+      "count_qualifier": null,
+      "secondary_count": null,
+      "secondary_type": null,
+      "text": "С 03:00 до 05:00 силы ПВО и средства радиоэлектронной борьбы сбили и подавили 249 БПЛА в 17 округах.",
+      "source_name": "Андрей Воробьёв — губернатор Московской области",
+      "url": "https://t.me/vorobiev_live/12826",
+      "source_kind": "telegram",
+      "lat": null,
+      "lon": null,
+      "mentioned_places": []
+    },
+    {
+      "id": "b041be04552d76f2",
+      "region": "Moscow",
+      "place": "Moscow",
+      "scope": "region",
+      "at": "2026-09-20T04:05:01+00:00",
+      "count": 152,
+      "count_type": "destroyed_or_suppressed",
+      "count_qualifier": null,
+      "secondary_count": null,
+      "secondary_type": null,
+      "text": "Силами ПВО Минобороны уничтожены 152 БПЛА.",
+      "source_name": "Мэр Москвы Сергей Собянин",
+      "url": "https://t.me/mos_sobyanin/21848",
+      "source_kind": "telegram",
+      "lat": null,
+      "lon": null,
+      "mentioned_places": []
+    },
+    {
+      "id": "54b77b61c258f6a9",
+      "region": "Kaluga Oblast",
+      "place": "Kaluga Oblast",
+      "scope": "region",
+      "at": "2026-09-20T04:59:38+00:00",
       "count": 17,
       "count_type": "destroyed_or_suppressed",
+      "count_qualifier": null,
       "secondary_count": null,
       "secondary_type": null,
-      "text": "🖥 Информация о нанесённых ВСУ ударах по нашему региону за прошедшие сутки (часть 1): 📍 Над Алексеевским округом сбиты 17 беспилотников.",
-      "source_name": "Оперштаб Белгородской области",
-      "url": "https://t.me/operativno31/14802",
-      "source_kind": "telegram"
-    },
-    {
-      "id": "831cca6fbf46e805",
-      "region": "Belgorod Oblast",
-      "place": "Belgorod Oblast",
-      "scope": "region",
-      "at": "2026-09-20T05:42:40+00:00",
-      "count": 9,
-      "count_type": "destroyed_or_suppressed",
-      "secondary_count": null,
-      "secondary_type": null,
-      "text": "📍 Над Борисовским округом сбиты 9 беспилотников.",
-      "source_name": "Оперштаб Белгородской области",
-      "url": "https://t.me/operativno31/14802",
-      "source_kind": "telegram"
-    },
-    {
-      "id": "8a6162ef527f95fd",
-      "region": "Belgorod Oblast",
-      "place": "Belgorod Oblast",
-      "scope": "region",
-      "at": "2026-09-20T05:42:40+00:00",
-      "count": 4,
-      "count_type": "destroyed_or_suppressed",
-      "secondary_count": null,
-      "secondary_type": null,
-      "text": "📍 Над Вейделевским округом сбиты 4 беспилотника.",
-      "source_name": "Оперштаб Белгородской области",
-      "url": "https://t.me/operativno31/14802",
-      "source_kind": "telegram"
-    },
-    {
-      "id": "3dcee50d82404ce5",
-      "region": "Belgorod Oblast",
-      "place": "Belgorod Oblast",
-      "scope": "region",
-      "at": "2026-09-20T05:42:40+00:00",
-      "count": 3,
-      "count_type": "destroyed_or_suppressed",
-      "secondary_count": null,
-      "secondary_type": null,
-      "text": "Также над округом сбиты 3 БПЛА.",
-      "source_name": "Оперштаб Белгородской области",
-      "url": "https://t.me/operativno31/14802",
-      "source_kind": "telegram"
+      "text": "Сегодня ночью силами ПВО уничтожены 17 БПЛА над территориями Боровского, Дзержинского, Жуковского, Малоярославецкого,  и Ферзиковского муниципальных округов.",
+      "source_name": "Владислав Шапша — губернатор Калужской области",
+      "url": "https://t.me/Shapsha_VV/20152",
+      "source_kind": "telegram",
+      "lat": null,
+      "lon": null,
+      "mentioned_places": []
     },
     {
       "id": "4cc724fa932e5c4e",
@@ -358,12 +425,31 @@
       "at": "2026-09-20T05:42:40+00:00",
       "count": 53,
       "count_type": "attacked",
+      "count_qualifier": null,
       "secondary_count": null,
       "secondary_type": null,
       "text": "📍 В Грайворонском округе по городу Грайворон, посёлкам Горьковский, Хотмыжск, сёлам Безымено, Глотово, Головчино, Гора-Подол, Дунайка, Косилово, Ломное, Новостроевка-Вторая, Пороз, Рождественка и Смородино выпущено 14 боеприпасов в ходе 3 обстрелов, сброшены 2 взрывных устройства с БПЛА и нанесены удары 53 беспилотников, 31 из которых сбит.",
       "source_name": "Оперштаб Белгородской области",
       "url": "https://t.me/operativno31/14802",
-      "source_kind": "telegram"
+      "source_kind": "telegram",
+      "lat": 50.4767,
+      "lon": 35.6773,
+      "mentioned_places": [
+        {
+          "name": "Grayvoron",
+          "label": "Грайворон",
+          "type": "city",
+          "lat": 50.4767,
+          "lon": 35.6773
+        },
+        {
+          "name": "Golovchino",
+          "label": "Golovchino",
+          "type": "city",
+          "lat": 50.53458,
+          "lon": 35.80633
+        }
+      ]
     },
     {
       "id": "0530e1481d25be69",
@@ -373,57 +459,58 @@
       "at": "2026-09-20T05:42:40+00:00",
       "count": 24,
       "count_type": "attacked",
+      "count_qualifier": null,
       "secondary_count": null,
       "secondary_type": null,
       "text": "📍 В Валуйском округе по городу Валуйки, сёлам Долгое, Казинка, Казначеевка, Лавы, Посохово, Принцевка, Солоти и хутору Леоновка в ходе 2 обстрелов выпущено 4 боеприпаса и нанесены удары 24 беспилотников, 17 из которых сбиты и подавлены.",
       "source_name": "Оперштаб Белгородской области",
       "url": "https://t.me/operativno31/14802",
-      "source_kind": "telegram"
+      "source_kind": "telegram",
+      "lat": 50.2118,
+      "lon": 38.0996,
+      "mentioned_places": [
+        {
+          "name": "Valuyki",
+          "label": "Валуйки",
+          "type": "city",
+          "lat": 50.2118,
+          "lon": 38.0996
+        }
+      ]
     },
     {
-      "id": "bdb167dde183c0f3",
+      "id": "a233a81361ed8c4f",
       "region": "Belgorod Oblast",
-      "place": "Belgorod Oblast",
-      "scope": "region",
+      "place": "Rakitnoye",
+      "scope": "city",
       "at": "2026-09-20T05:45:09+00:00",
       "count": 62,
       "count_type": "attacked",
+      "count_qualifier": null,
       "secondary_count": null,
       "secondary_type": null,
       "text": "📍 В Ракитянском округе по посёлкам Пролетарский, Ракитное, сёлам Бобрава, Введенская Готня, Ворсклица, Русская Березовка, Чистополье, хуторам Зайчик, Петровский, Семейный и Смирнов нанесены удары 62 беспилотников, 54 из которых сбиты.",
       "source_name": "Оперштаб Белгородской области",
       "url": "https://t.me/operativno31/14803",
-      "source_kind": "telegram"
-    },
-    {
-      "id": "594bd62caecea679",
-      "region": "Belgorod Oblast",
-      "place": "Belgorod Oblast",
-      "scope": "region",
-      "at": "2026-09-20T05:45:09+00:00",
-      "count": 39,
-      "count_type": "destroyed_or_suppressed",
-      "secondary_count": null,
-      "secondary_type": null,
-      "text": "📍 Над Ровеньским округом сбиты 39 беспилотников.",
-      "source_name": "Оперштаб Белгородской области",
-      "url": "https://t.me/operativno31/14803",
-      "source_kind": "telegram"
-    },
-    {
-      "id": "7a696365b6359a17",
-      "region": "Belgorod Oblast",
-      "place": "Belgorod Oblast",
-      "scope": "region",
-      "at": "2026-09-20T05:45:09+00:00",
-      "count": 13,
-      "count_type": "destroyed_or_suppressed",
-      "secondary_count": null,
-      "secondary_type": null,
-      "text": "📍 Над Чернянским округом сбиты 13 беспилотников.",
-      "source_name": "Оперштаб Белгородской области",
-      "url": "https://t.me/operativno31/14803",
-      "source_kind": "telegram"
+      "source_kind": "telegram",
+      "lat": 50.84076,
+      "lon": 35.85212,
+      "mentioned_places": [
+        {
+          "name": "Rakitnoye",
+          "label": "Rakitnoye",
+          "type": "city",
+          "lat": 50.84076,
+          "lon": 35.85212
+        },
+        {
+          "name": "Proletarskiy",
+          "label": "Proletarskiy",
+          "type": "city",
+          "lat": 50.79139,
+          "lon": 35.77306
+        }
+      ]
     },
     {
       "id": "9f79814fbb6c6c43",
@@ -433,87 +520,123 @@
       "at": "2026-09-20T06:35:37+00:00",
       "count": 43,
       "count_type": "detected_and_destroyed",
+      "count_qualifier": null,
       "secondary_count": null,
       "secondary_type": null,
       "text": "Минувшей ночью дежурными силами ПВО в небе над тремя городскими округами и девятью районами Воронежской области были обнаружены и уничтожены 43 беспилотных летательных аппарата.",
       "source_name": "Губернатор Воронежской области Александр Гусев",
       "url": "https://t.me/gusev_36/7356",
-      "source_kind": "telegram"
+      "source_kind": "telegram",
+      "lat": null,
+      "lon": null,
+      "mentioned_places": []
     },
     {
-      "id": "d57791acb349f1d3",
-      "region": "Belgorod Oblast",
-      "place": "Belgorod Oblast",
+      "id": "8b418fb047f75769",
+      "region": "Kaluga Oblast",
+      "place": "Kaluga Oblast",
       "scope": "region",
-      "at": "2026-09-21T06:20:31+00:00",
-      "count": 26,
-      "count_type": "attacked",
+      "at": "2026-09-20T16:50:37+00:00",
+      "count": 3,
+      "count_type": "destroyed_or_suppressed",
+      "count_qualifier": null,
       "secondary_count": null,
       "secondary_type": null,
-      "text": "🖥 Информация о нанесённых ВСУ ударах по нашему региону за прошедшие сутки (часть 1): 📍 В Белгородском округе по посёлкам Малиновка, Октябрьский, сёлам Бессоновка, Бочковка, Весёлая Лопань, Карнауховка, Нижний Ольшанец, Никольское, Отрадное, Севрюково, Чайки нанесены удары 26 беспилотниками, 13 из которых подавлены и сбиты.",
-      "source_name": "Оперштаб Белгородской области",
-      "url": "https://t.me/operativno31/14833",
-      "source_kind": "telegram"
+      "text": "Сегодня в течение дня силами ПВО уничтожены 3 БПЛА над территориями Мещовского, Ульяновского и Хвастовичского муниципальных округов.",
+      "source_name": "Владислав Шапша — губернатор Калужской области",
+      "url": "https://t.me/Shapsha_VV/20175",
+      "source_kind": "telegram",
+      "lat": null,
+      "lon": null,
+      "mentioned_places": []
     },
     {
-      "id": "7fadb5092d9cb437",
+      "id": "dc5860b71292d162",
+      "region": "Kaluga Oblast",
+      "place": "Kaluga",
+      "scope": "city",
+      "at": "2026-09-21T04:21:06+00:00",
+      "count": 13,
+      "count_type": "destroyed_or_suppressed",
+      "count_qualifier": null,
+      "secondary_count": null,
+      "secondary_type": null,
+      "text": "Сегодня в течение ночи силами ПВО уничтожены 13 БПЛА над территориями Козельского, Мещовского, Сухиничского, Ульяновского и Хвастовичского  муниципальных округов, а также на окраине Калуги.",
+      "source_name": "Владислав Шапша — губернатор Калужской области",
+      "url": "https://t.me/Shapsha_VV/20177",
+      "source_kind": "telegram",
+      "lat": 54.5138,
+      "lon": 36.2612,
+      "mentioned_places": [
+        {
+          "name": "Kaluga",
+          "label": "Калуга",
+          "type": "city",
+          "lat": 54.5138,
+          "lon": 36.2612
+        }
+      ]
+    },
+    {
+      "id": "2ee5843af33fc351",
       "region": "Belgorod Oblast",
-      "place": "Belgorod Oblast",
-      "scope": "region",
+      "place": "Borisovka",
+      "scope": "city",
       "at": "2026-09-21T06:20:31+00:00",
       "count": 9,
       "count_type": "attacked",
+      "count_qualifier": null,
       "secondary_count": null,
       "secondary_type": null,
       "text": "📍 В Борисовском округе посёлок Борисовка, сёла Берёзовка, Стригуны атакованы 9 беспилотниками.",
       "source_name": "Оперштаб Белгородской области",
       "url": "https://t.me/operativno31/14833",
-      "source_kind": "telegram"
+      "source_kind": "telegram",
+      "lat": 50.59942,
+      "lon": 36.01716,
+      "mentioned_places": [
+        {
+          "name": "Borisovka",
+          "label": "Borisovka",
+          "type": "city",
+          "lat": 50.59942,
+          "lon": 36.01716
+        }
+      ]
     },
     {
-      "id": "7855c8a38fcdde7d",
+      "id": "d1606bc6e2a1c0ce",
       "region": "Belgorod Oblast",
-      "place": "Belgorod Oblast",
-      "scope": "region",
+      "place": "Borisovka",
+      "scope": "city",
       "at": "2026-09-21T06:20:31+00:00",
       "count": 18,
       "count_type": "attacked",
+      "count_qualifier": null,
       "secondary_count": null,
       "secondary_type": null,
       "text": "📍 В Волоконовском округе посёлки Волоконовка, Красный Пахарь, Пятницкое, сёла Борисовка, Грушевка, Погромец, Фощеватово, хутор Хуторище атакованы 18 беспилотниками, 7 из которых сбиты.",
       "source_name": "Оперштаб Белгородской области",
       "url": "https://t.me/operativno31/14833",
-      "source_kind": "telegram"
-    },
-    {
-      "id": "a343f82c2f239a29",
-      "region": "Belgorod Oblast",
-      "place": "Belgorod Oblast",
-      "scope": "region",
-      "at": "2026-09-21T06:20:31+00:00",
-      "count": 4,
-      "count_type": "destroyed_or_suppressed",
-      "secondary_count": null,
-      "secondary_type": null,
-      "text": "📍 Над Ивнянским округом сбиты 4 беспилотника.",
-      "source_name": "Оперштаб Белгородской области",
-      "url": "https://t.me/operativno31/14833",
-      "source_kind": "telegram"
-    },
-    {
-      "id": "a68f1874f892a597",
-      "region": "Belgorod Oblast",
-      "place": "Belgorod Oblast",
-      "scope": "region",
-      "at": "2026-09-21T06:20:31+00:00",
-      "count": 2,
-      "count_type": "destroyed_or_suppressed",
-      "secondary_count": null,
-      "secondary_type": null,
-      "text": "📍 Над Корочанским округом сбиты 2 беспилотника.",
-      "source_name": "Оперштаб Белгородской области",
-      "url": "https://t.me/operativno31/14833",
-      "source_kind": "telegram"
+      "source_kind": "telegram",
+      "lat": 50.59942,
+      "lon": 36.01716,
+      "mentioned_places": [
+        {
+          "name": "Borisovka",
+          "label": "Borisovka",
+          "type": "city",
+          "lat": 50.59942,
+          "lon": 36.01716
+        },
+        {
+          "name": "Volokonovka",
+          "label": "Volokonovka",
+          "type": "city",
+          "lat": 50.48504,
+          "lon": 37.86093
+        }
+      ]
     },
     {
       "id": "9e2c9a8687494d88",
@@ -523,42 +646,78 @@
       "at": "2026-09-21T06:20:31+00:00",
       "count": 64,
       "count_type": "attacked",
+      "count_qualifier": null,
       "secondary_count": null,
       "secondary_type": null,
       "text": "📍 В Грайворонском округе по городу Грайворон, посёлку Горьковский, сёлам Безымено, Глотово, Гора-Подол, Дорогощь, Дроновка, Дунайка, Замостье, Ивановская Лисица, Козинка, Мощёное, Новостроевка-Вторая, Пороз, Почаево, Смородино, Сподарюшино в ходе 9 обстрелов выпущено 39 боеприпасов, 2 раза сброшено 5 взрывных устройств с БПЛА и нанесены удары 64 беспилотниками, 19 из которых сбиты.",
       "source_name": "Оперштаб Белгородской области",
       "url": "https://t.me/operativno31/14833",
-      "source_kind": "telegram"
+      "source_kind": "telegram",
+      "lat": 50.4767,
+      "lon": 35.6773,
+      "mentioned_places": [
+        {
+          "name": "Grayvoron",
+          "label": "Грайворон",
+          "type": "city",
+          "lat": 50.4767,
+          "lon": 35.6773
+        }
+      ]
     },
     {
-      "id": "073ac7e1e9c018fa",
+      "id": "1c7d3dab073485d9",
       "region": "Belgorod Oblast",
-      "place": "Belgorod Oblast",
-      "scope": "region",
+      "place": "Oktyabr'skiy",
+      "scope": "city",
+      "at": "2026-09-21T06:20:31+00:00",
+      "count": 26,
+      "count_type": "attacked",
+      "count_qualifier": null,
+      "secondary_count": null,
+      "secondary_type": null,
+      "text": "🖥 Информация о нанесённых ВСУ ударах по нашему региону за прошедшие сутки (часть 1): 📍 В Белгородском округе по посёлкам Малиновка, Октябрьский, сёлам Бессоновка, Бочковка, Весёлая Лопань, Карнауховка, Нижний Ольшанец, Никольское, Отрадное, Севрюково, Чайки нанесены удары 26 беспилотниками, 13 из которых подавлены и сбиты.",
+      "source_name": "Оперштаб Белгородской области",
+      "url": "https://t.me/operativno31/14833",
+      "source_kind": "telegram",
+      "lat": 50.44521,
+      "lon": 36.36066,
+      "mentioned_places": [
+        {
+          "name": "Oktyabr'skiy",
+          "label": "Oktyabr’skiy",
+          "type": "city",
+          "lat": 50.44521,
+          "lon": 36.36066
+        }
+      ]
+    },
+    {
+      "id": "dd64884da9c49d69",
+      "region": "Belgorod Oblast",
+      "place": "Novy Oskol",
+      "scope": "city",
       "at": "2026-09-21T06:20:52+00:00",
       "count": 2,
       "count_type": "attacked",
+      "count_qualifier": null,
       "secondary_count": null,
       "secondary_type": null,
       "text": "📍 По городу Новый Оскол нанесены удары 2 беспилотниками.",
       "source_name": "Оперштаб Белгородской области",
       "url": "https://t.me/operativno31/14834",
-      "source_kind": "telegram"
-    },
-    {
-      "id": "1c6029b6352ac850",
-      "region": "Belgorod Oblast",
-      "place": "Belgorod Oblast",
-      "scope": "region",
-      "at": "2026-09-21T06:20:52+00:00",
-      "count": 3,
-      "count_type": "destroyed_or_suppressed",
-      "secondary_count": null,
-      "secondary_type": null,
-      "text": "📍 Над Ровеньским округом сбиты 3 беспилотника.",
-      "source_name": "Оперштаб Белгородской области",
-      "url": "https://t.me/operativno31/14834",
-      "source_kind": "telegram"
+      "source_kind": "telegram",
+      "lat": 50.76331,
+      "lon": 37.86415,
+      "mentioned_places": [
+        {
+          "name": "Novy Oskol",
+          "label": "Novy Oskol",
+          "type": "city",
+          "lat": 50.76331,
+          "lon": 37.86415
+        }
+      ]
     }
   ],
   "unmatched": [
@@ -829,7 +988,7 @@
       "ok": true,
       "posts": 93,
       "events": 4,
-      "reports": 17,
+      "reports": 8,
       "alert_posts": 20,
       "start_posts": 15,
       "end_posts": 5
@@ -837,6 +996,18 @@
     {
       "source_type": "mchs_rss",
       "source": "https://32.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
+      "region": "Bryansk Oblast",
+      "ok": true,
+      "posts": 1,
+      "events": 0,
+      "reports": 0,
+      "alert_posts": 0,
+      "start_posts": 0,
+      "end_posts": 0
+    },
+    {
+      "source_type": "telegram",
+      "source": "avbogomaz",
       "region": "Bryansk Oblast",
       "ok": true,
       "posts": 1,
@@ -981,6 +1152,18 @@
       "posts": 3,
       "events": 0,
       "reports": 0,
+      "alert_posts": 0,
+      "start_posts": 0,
+      "end_posts": 0
+    },
+    {
+      "source_type": "telegram",
+      "source": "Shapsha_VV",
+      "region": "Kaluga Oblast",
+      "ok": true,
+      "posts": 10,
+      "events": 0,
+      "reports": 3,
       "alert_posts": 0,
       "start_posts": 0,
       "end_posts": 0
@@ -1233,6 +1416,18 @@
       "end_posts": 0
     },
     {
+      "source_type": "telegram",
+      "source": "mos_sobyanin",
+      "region": "Moscow",
+      "ok": true,
+      "posts": 19,
+      "events": 0,
+      "reports": 2,
+      "alert_posts": 0,
+      "start_posts": 0,
+      "end_posts": 0
+    },
+    {
       "source_type": "mchs_rss",
       "source": "https://50.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
       "region": "Moscow Oblast",
@@ -1240,6 +1435,18 @@
       "posts": 7,
       "events": 0,
       "reports": 0,
+      "alert_posts": 0,
+      "start_posts": 0,
+      "end_posts": 0
+    },
+    {
+      "source_type": "telegram",
+      "source": "vorobiev_live",
+      "region": "Moscow Oblast",
+      "ok": true,
+      "posts": 4,
+      "events": 0,
+      "reports": 1,
       "alert_posts": 0,
       "start_posts": 0,
       "end_posts": 0
@@ -1274,6 +1481,18 @@
       "alert_posts": 0,
       "start_posts": 0,
       "end_posts": 0
+    },
+    {
+      "source_type": "telegram",
+      "source": "nn52signal",
+      "region": "Nizhny Novgorod Oblast",
+      "ok": true,
+      "posts": 59,
+      "events": 1,
+      "reports": 0,
+      "alert_posts": 3,
+      "start_posts": 1,
+      "end_posts": 2
     },
     {
       "source_type": "mchs_rss",
@@ -1336,6 +1555,18 @@
       "end_posts": 0
     },
     {
+      "source_type": "telegram",
+      "source": "Klychkov_Andrey",
+      "region": "Oryol Oblast",
+      "ok": true,
+      "posts": 0,
+      "events": 0,
+      "reports": 0,
+      "alert_posts": 0,
+      "start_posts": 0,
+      "end_posts": 0
+    },
+    {
       "source_type": "mchs_rss",
       "source": "https://58.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
       "region": "Penza Oblast",
@@ -1376,7 +1607,7 @@
       "source": "https://25.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
       "region": "Primorsky Krai",
       "ok": true,
-      "posts": 5,
+      "posts": 6,
       "events": 0,
       "reports": 0,
       "alert_posts": 0,
@@ -1571,11 +1802,23 @@
       "end_posts": 0
     },
     {
+      "source_type": "telegram",
+      "source": "ryazanoblast_official",
+      "region": "Ryazan Oblast",
+      "ok": true,
+      "posts": 0,
+      "events": 0,
+      "reports": 0,
+      "alert_posts": 0,
+      "start_posts": 0,
+      "end_posts": 0
+    },
+    {
       "source_type": "mchs_rss",
       "source": "https://78.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
       "region": "Saint Petersburg",
       "ok": true,
-      "posts": 5,
+      "posts": 4,
       "events": 0,
       "reports": 0,
       "alert_posts": 0,
@@ -1734,8 +1977,8 @@
       "posts": 13,
       "events": 3,
       "reports": 0,
-      "alert_posts": 9,
-      "start_posts": 7,
+      "alert_posts": 10,
+      "start_posts": 8,
       "end_posts": 2
     },
     {
@@ -1811,6 +2054,18 @@
       "end_posts": 0
     },
     {
+      "source_type": "telegram",
+      "source": "region33vladimir",
+      "region": "Vladimir Oblast",
+      "ok": true,
+      "posts": 14,
+      "events": 0,
+      "reports": 0,
+      "alert_posts": 0,
+      "start_posts": 0,
+      "end_posts": 0
+    },
+    {
       "source_type": "mchs_rss",
       "source": "https://34.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya/operativnye-sobytiya/rss",
       "region": "Volgograd Oblast",
@@ -1871,6 +2126,18 @@
       "region": "Yaroslavl Oblast",
       "ok": true,
       "posts": 7,
+      "events": 0,
+      "reports": 0,
+      "alert_posts": 0,
+      "start_posts": 0,
+      "end_posts": 0
+    },
+    {
+      "source_type": "telegram",
+      "source": "evraevmikhail",
+      "region": "Yaroslavl Oblast",
+      "ok": true,
+      "posts": 15,
       "events": 0,
       "reports": 0,
       "alert_posts": 0,
