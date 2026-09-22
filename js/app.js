@@ -1,7 +1,9 @@
 const REGION_GEOJSON_URLS = [
   "data/russia.geojson",
+  "https://raw.githubusercontent.com/rnekrasov-msk/geojson/master/admin_level_1.geojson",
+  "https://raw.githubusercontent.com/imsha/russia_geojson_regions_2021/main/ru.json",
+  "https://raw.githubusercontent.com/antibioticbook/russian-geo-data/master/geo.json",
   "https://raw.githubusercontent.com/rnekrasov-msk/geojson/master/regions.geojson",
-  "https://raw.githubusercontent.com/codeforgermany/click_that_hood/main/public/data/russia.geojson",
 ];
 
 // No-key raster stack. CARTO Dark Matter now requires an API key, so it is
