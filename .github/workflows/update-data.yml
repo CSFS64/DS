@@ -6,7 +6,7 @@ on:
       lookback_hours:
         description: "Archive window before the 24h safety lag"
         required: false
-        default: "72"
+        default: "120"
   schedule:
     - cron: "17 10 * * *"
 
@@ -44,9 +44,9 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Collect official delayed records
         env:
-          LOOKBACK_HOURS: ${{ github.event.inputs.lookback_hours || '72' }}
+          LOOKBACK_HOURS: ${{ github.event.inputs.lookback_hours || '120' }}
           SAFETY_LAG_HOURS: "24"
-          TELEGRAM_MAX_PAGES: "60"
+          TELEGRAM_MAX_PAGES: "80"
         run: python collector/collect.py
       - name: Commit archive and catalog
         shell: bash

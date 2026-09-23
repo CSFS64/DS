@@ -22,6 +22,7 @@ const state = {
   previousActivePlaceIds: new Set(),
   previousReportRegionIds: new Set(),
   previousReportPlaceIds: new Set(),
+  previousRecentRegionIds: new Set(),
   currentMs: 0,
   timelineStartMs: 0,
   timelineEndMs: 0,
@@ -332,27 +333,6 @@ function installArchiveLayers() {
 
   const beforeId = firstSymbolLayerId();
 
-  // Dim lamp for every mapped populated place in OpenFreeMap/OpenMapTiles.
-  // This is independent of our source registry: cities are visible even before
-  // we have a high-resolution official feed for them.
-  if (state.map.getSource("openmaptiles") && !state.map.getLayer("archive-all-city-lamps")) {
-    state.map.addLayer({
-      id: "archive-all-city-lamps",
-      type: "circle",
-      source: "openmaptiles",
-      "source-layer": "place",
-      minzoom: 3,
-      filter: ["in", ["get", "class"], ["literal", ["city", "town", "village"]]],
-      paint: {
-        "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 1.35, 6, 1.8, 9, 2.35, 12, 2.8],
-        "circle-color": "#617580",
-        "circle-stroke-color": "#9cb0b9",
-        "circle-stroke-width": 0.45,
-        "circle-opacity": ["interpolate", ["linear"], ["zoom"], 3, 0.35, 5, 0.55, 8, 0.72],
-      },
-    }, beforeId);
-  }
-
   const regionData = prepareRegionGeoJson();
   if (regionData) {
     state.map.addSource("archive-regions", { type: "geojson", data: regionData });
@@ -361,8 +341,8 @@ function installArchiveLayers() {
       type: "fill",
       source: "archive-regions",
       paint: {
-        "fill-color": ["case", ["boolean", ["feature-state", "active"], false], "#39d8ff", ["boolean", ["feature-state", "report"], false], "#ffb347", "#39d8ff"],
-        "fill-opacity": ["case", ["boolean", ["feature-state", "active"], false], 0.17, ["boolean", ["feature-state", "report"], false], 0.09, 0.0],
+        "fill-color": ["case", ["boolean", ["feature-state", "active"], false], "#39d8ff", ["boolean", ["feature-state", "report"], false], "#ffb347", ["boolean", ["feature-state", "recent"], false], "#2d9fba", "#39d8ff"],
+        "fill-opacity": ["case", ["boolean", ["feature-state", "active"], false], 0.17, ["boolean", ["feature-state", "report"], false], 0.09, ["boolean", ["feature-state", "recent"], false], 0.055, 0.0],
       },
     }, beforeId);
     state.map.addLayer({
@@ -370,9 +350,9 @@ function installArchiveLayers() {
       type: "line",
       source: "archive-regions",
       paint: {
-        "line-color": ["case", ["boolean", ["feature-state", "active"], false], "#62e2ff", ["boolean", ["feature-state", "report"], false], "#ffc15a", "#31566a"],
-        "line-width": ["case", ["boolean", ["feature-state", "active"], false], 2.2, ["boolean", ["feature-state", "report"], false], 1.6, 0.65],
-        "line-opacity": ["case", ["boolean", ["feature-state", "active"], false], 0.95, ["boolean", ["feature-state", "report"], false], 0.85, 0.25],
+        "line-color": ["case", ["boolean", ["feature-state", "active"], false], "#62e2ff", ["boolean", ["feature-state", "report"], false], "#ffc15a", ["boolean", ["feature-state", "recent"], false], "#2f7e93", "#31566a"],
+        "line-width": ["case", ["boolean", ["feature-state", "active"], false], 2.2, ["boolean", ["feature-state", "report"], false], 1.6, ["boolean", ["feature-state", "recent"], false], 1.15, 0.65],
+        "line-opacity": ["case", ["boolean", ["feature-state", "active"], false], 0.95, ["boolean", ["feature-state", "report"], false], 0.85, ["boolean", ["feature-state", "recent"], false], 0.52, 0.25],
       },
     }, beforeId);
   }
@@ -398,7 +378,7 @@ function installArchiveLayers() {
       "circle-color": ["case", ["boolean", ["feature-state", "active"], false], "#ff4258", ["boolean", ["feature-state", "report"], false], "#ffb347", "#506571"],
       "circle-stroke-color": ["case", ["boolean", ["feature-state", "active"], false], "#ffd8dc", ["boolean", ["feature-state", "report"], false], "#ffe0a8", "#99aeb9"],
       "circle-stroke-width": ["case", ["boolean", ["feature-state", "active"], false], 1.6, ["boolean", ["feature-state", "report"], false], 1.3, 0.8],
-      "circle-opacity": ["case", ["boolean", ["feature-state", "active"], false], 1, ["boolean", ["feature-state", "report"], false], 0.95, 0.68],
+      "circle-opacity": ["case", ["boolean", ["feature-state", "active"], false], 1, ["boolean", ["feature-state", "report"], false], 0.95, 0],
     },
   });
   state.map.addLayer({
@@ -419,6 +399,7 @@ function installArchiveLayers() {
       "text-halo-color": "#071018",
       "text-halo-width": 1.5,
       "text-halo-blur": 0.6,
+      "text-opacity": ["case", ["boolean", ["feature-state", "active"], false], 1, ["boolean", ["feature-state", "report"], false], 1, 0],
     },
   });
 }
@@ -579,10 +560,14 @@ function renderMap(active, reports = []) {
     for (const id of state.previousReportPlaceIds) {
       try { state.map.setFeatureState({ source: "archive-places", id }, { report: false }); } catch (_) {}
     }
+    for (const id of state.previousRecentRegionIds) {
+      try { state.map.setFeatureState({ source: "archive-regions", id }, { recent: false }); } catch (_) {}
+    }
     state.previousActiveRegionIds.clear();
     state.previousActivePlaceIds.clear();
     state.previousReportRegionIds.clear();
     state.previousReportPlaceIds.clear();
+    state.previousRecentRegionIds.clear();
 
     // Hierarchy rule: a local alert necessarily means its parent region is active.
     // The city/municipality dot gives precision; the region fill gives containment.
@@ -600,6 +585,20 @@ function renderMap(active, reports = []) {
           state.previousActivePlaceIds.add(id);
         }
       }
+    }
+
+
+    // Rolling historical trace: regions that had a formal official alert during
+    // the previous six hours remain faintly outlined. This visualizes the
+    // sequence of *reported* alerts without inventing an inferred flight path.
+    const recentCutoff = state.currentMs - 6 * 3600000;
+    for (const event of (state.archive.events || [])) {
+      const s = Date.parse(event.start), e = Date.parse(event.end);
+      if (e < recentCutoff || s > state.currentMs) continue;
+      const rid = state.regionFeatureIds.get(event.region);
+      if (rid == null || state.previousActiveRegionIds.has(rid)) continue;
+      try { state.map.setFeatureState({ source: "archive-regions", id: rid }, { recent: true }); } catch (_) {}
+      state.previousRecentRegionIds.add(rid);
     }
 
     // Official local reports are shown as amber activity, not mislabelled as a

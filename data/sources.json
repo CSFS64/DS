@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "sources": [
     {
       "region": "Belgorod Oblast",
@@ -1696,6 +1696,535 @@
       "region_aliases": [
         "волгоградская область",
         "волгоградской области"
+      ],
+      "verified_official": true
+    },
+    {
+      "region": "Orenburg Oblast",
+      "region_label": "Оренбургская область",
+      "channel": "solntsev_official",
+      "source_name": "Евгений Солнцев — губернатор Оренбургской области",
+      "source_url": "https://t.me/solntsev_official",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Orenburg",
+          "label": "Оренбург",
+          "type": "city",
+          "lat": 51.7682,
+          "lon": 55.0969,
+          "aliases": [
+            "оренбург",
+            "оренбурге"
+          ]
+        },
+        {
+          "name": "Orsk",
+          "label": "Орск",
+          "type": "city",
+          "lat": 51.2293,
+          "lon": 58.4752,
+          "aliases": [
+            "орск",
+            "орске"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "оренбургская область",
+        "оренбургской области"
+      ],
+      "verified_official": true
+    },
+    {
+      "region": "Udmurt Republic",
+      "region_label": "Удмуртская Республика",
+      "channel": "udmurt_gov",
+      "source_name": "Правительство Удмуртии",
+      "source_url": "https://t.me/udmurt_gov",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Izhevsk",
+          "label": "Ижевск",
+          "type": "city",
+          "lat": 56.8527,
+          "lon": 53.2115,
+          "aliases": [
+            "ижевск",
+            "ижевске"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "удмуртская республика",
+        "удмуртии",
+        "удмуртия"
+      ],
+      "verified_official": true
+    },
+    {
+      "region": "Perm Krai",
+      "region_label": "Пермский край",
+      "channel": "mahonin59",
+      "source_name": "Дмитрий Махонин — губернатор Пермского края",
+      "source_url": "https://t.me/mahonin59",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Perm",
+          "label": "Пермь",
+          "type": "city",
+          "lat": 58.0105,
+          "lon": 56.2502,
+          "aliases": [
+            "пермь",
+            "перми"
+          ]
+        },
+        {
+          "name": "Berezniki",
+          "label": "Березники",
+          "type": "city",
+          "lat": 59.4091,
+          "lon": 56.8204,
+          "aliases": [
+            "березники",
+            "березниках"
+          ]
+        },
+        {
+          "name": "Gubakha",
+          "label": "Губаха",
+          "type": "city",
+          "lat": 58.837,
+          "lon": 57.554,
+          "aliases": [
+            "губаха",
+            "губахе",
+            "губахи"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "пермский край",
+        "пермского края",
+        "прикамье"
+      ],
+      "verified_official": true
+    },
+    {
+      "region": "Chelyabinsk Oblast",
+      "region_label": "Челябинская область",
+      "channel": "gov74",
+      "source_name": "Правительство Челябинской области",
+      "source_url": "https://t.me/gov74",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Chelyabinsk",
+          "label": "Челябинск",
+          "type": "city",
+          "lat": 55.1644,
+          "lon": 61.4368,
+          "aliases": [
+            "челябинск",
+            "челябинске"
+          ]
+        },
+        {
+          "name": "Magnitogorsk",
+          "label": "Магнитогорск",
+          "type": "city",
+          "lat": 53.4072,
+          "lon": 58.9799,
+          "aliases": [
+            "магнитогорск",
+            "магнитогорске"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "челябинская область",
+        "челябинской области"
+      ],
+      "verified_official": true
+    },
+    {
+      "region": "Tver Oblast",
+      "region_label": "Тверская область",
+      "channel": "pul69",
+      "source_name": "Тверская область. Официально",
+      "source_url": "https://t.me/pul69",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Tver",
+          "label": "Тверь",
+          "type": "city",
+          "lat": 56.8587,
+          "lon": 35.9176,
+          "aliases": [
+            "тверь",
+            "твери"
+          ]
+        },
+        {
+          "name": "Toropets",
+          "label": "Торопец",
+          "type": "city",
+          "lat": 56.4978,
+          "lon": 31.6353,
+          "aliases": [
+            "торопец",
+            "торопце"
+          ]
+        },
+        {
+          "name": "Bologoye",
+          "label": "Бологое",
+          "type": "city",
+          "lat": 57.8856,
+          "lon": 34.0536,
+          "aliases": [
+            "бологое",
+            "бологовском округе",
+            "бологовский округ"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "тверская область",
+        "тверской области",
+        "верхневолжье"
+      ],
+      "verified_official": true
+    },
+    {
+      "region": "Novgorod Oblast",
+      "region_label": "Новгородская область",
+      "channel": "novgorodinfo",
+      "source_name": "Официально 53. Новгородская область",
+      "source_url": "https://t.me/novgorodinfo",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Veliky Novgorod",
+          "label": "Великий Новгород",
+          "type": "city",
+          "lat": 58.5213,
+          "lon": 31.2712,
+          "aliases": [
+            "великий новгород",
+            "великом новгороде",
+            "новгород"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "новгородская область",
+        "новгородской области"
+      ],
+      "verified_official": true
+    },
+    {
+      "region": "Vologda Oblast",
+      "region_label": "Вологодская область",
+      "channel": "filimonov_official",
+      "source_name": "Георгий Филимонов — губернатор Вологодской области",
+      "source_url": "https://t.me/filimonov_official",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Vologda",
+          "label": "Вологда",
+          "type": "city",
+          "lat": 59.2205,
+          "lon": 39.8915,
+          "aliases": [
+            "вологда",
+            "вологде"
+          ]
+        },
+        {
+          "name": "Cherepovets",
+          "label": "Череповец",
+          "type": "city",
+          "lat": 59.1269,
+          "lon": 37.909,
+          "aliases": [
+            "череповец",
+            "череповце",
+            "череповецкую промышленную зону"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "вологодская область",
+        "вологодской области"
+      ],
+      "verified_official": true
+    },
+    {
+      "region": "Pskov Oblast",
+      "region_label": "Псковская область",
+      "channel": "pskov_oblast",
+      "source_name": "Официальный канал Псковской области",
+      "source_url": "https://t.me/pskov_oblast",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Pskov",
+          "label": "Псков",
+          "type": "city",
+          "lat": 57.8136,
+          "lon": 28.3496,
+          "aliases": [
+            "псков",
+            "пскове"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "псковская область",
+        "псковской области"
+      ],
+      "verified_official": true
+    },
+    {
+      "region": "Astrakhan Oblast",
+      "region_label": "Астраханская область",
+      "channel": "astrakhan_governor",
+      "source_name": "Астраханская область — официальный канал",
+      "source_url": "https://t.me/astrakhan_governor",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Astrakhan",
+          "label": "Астрахань",
+          "type": "city",
+          "lat": 46.3479,
+          "lon": 48.0408,
+          "aliases": [
+            "астрахань",
+            "астрахани"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "астраханская область",
+        "астраханской области"
+      ],
+      "verified_official": true
+    },
+    {
+      "region": "Kurgan Oblast",
+      "region_label": "Курганская область",
+      "channel": "kurganskayaobl",
+      "source_name": "Курганская область — официальный канал",
+      "source_url": "https://t.me/kurganskayaobl",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Kurgan",
+          "label": "Курган",
+          "type": "city",
+          "lat": 55.4414,
+          "lon": 65.3411,
+          "aliases": [
+            "курган",
+            "кургане"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "курганская область",
+        "курганской области"
+      ],
+      "verified_official": true
+    },
+    {
+      "region": "Leningrad Oblast",
+      "region_label": "Ленинградская область",
+      "channel": "drozdenko_au_lo",
+      "source_name": "Александр Дрозденко — губернатор Ленинградской области",
+      "source_url": "https://t.me/drozdenko_au_lo",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Vyborg",
+          "label": "Выборг",
+          "type": "city",
+          "lat": 60.7076,
+          "lon": 28.7528,
+          "aliases": [
+            "выборг",
+            "выборге"
+          ]
+        },
+        {
+          "name": "Kirishi",
+          "label": "Кириши",
+          "type": "city",
+          "lat": 59.4497,
+          "lon": 32.0087,
+          "aliases": [
+            "кириши",
+            "киришском районе",
+            "киришский район"
+          ]
+        },
+        {
+          "name": "Luga",
+          "label": "Луга",
+          "type": "city",
+          "lat": 58.7372,
+          "lon": 29.8453,
+          "aliases": [
+            "луга",
+            "луге",
+            "лужском районе",
+            "лужский район"
+          ]
+        },
+        {
+          "name": "Primorsk",
+          "label": "Приморск",
+          "type": "city",
+          "lat": 60.3662,
+          "lon": 28.6134,
+          "aliases": [
+            "приморск",
+            "приморске"
+          ]
+        },
+        {
+          "name": "Ust-Luga",
+          "label": "Усть-Луга",
+          "type": "municipality",
+          "lat": 59.6676,
+          "lon": 28.2871,
+          "aliases": [
+            "усть-луга",
+            "усть-луге",
+            "порту усть-луга"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "ленинградская область",
+        "ленинградской области",
+        "ленобласть",
+        "ленобласти"
+      ],
+      "verified_official": true
+    },
+    {
+      "region": "Sverdlovsk Oblast",
+      "region_label": "Свердловская область",
+      "channel": "miduralofficial",
+      "source_name": "Правительство Свердловской области",
+      "source_url": "https://t.me/miduralofficial",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Yekaterinburg",
+          "label": "Екатеринбург",
+          "type": "city",
+          "lat": 56.8389,
+          "lon": 60.6057,
+          "aliases": [
+            "екатеринбург",
+            "екатеринбурге"
+          ]
+        },
+        {
+          "name": "Nizhny Tagil",
+          "label": "Нижний Тагил",
+          "type": "city",
+          "lat": 57.9194,
+          "lon": 59.965,
+          "aliases": [
+            "нижний тагил",
+            "нижнем тагиле"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "свердловская область",
+        "свердловской области"
       ],
       "verified_official": true
     }

@@ -85,7 +85,7 @@ class CollectorTests(unittest.TestCase):
         self.assertTrue({'mos_sobyanin','vorobiev_live','avbogomaz','evraevmikhail','glebnikitin_nn','Shapsha_VV'} <= channels)
         self.assertTrue({'ivanovoobl','anohin67','busargin_r','officialmordovia','ulgovru','RostovRegion','kondratyevvi','chuvashia_region','rgn_34'} <= channels)
         self.assertNotIn('nn52signal', channels)
-        self.assertGreaterEqual(len(channels), 27)
+        self.assertGreaterEqual(len(channels), 40)
 
 
     def test_samara_city_then_regional_clear_pairs_city(self):
@@ -163,6 +163,23 @@ class CollectorTests(unittest.TestCase):
         self.assertFalse(mod_derived(local))
         self.assertTrue(mod_derived(copied))
 
+
+    def test_v8_additional_official_sources_and_wording(self):
+        cfg = json.loads((ROOT / 'data' / 'sources.json').read_text(encoding='utf-8'))
+        channels = {s['channel'] for s in cfg['sources'] if s.get('enabled')}
+        self.assertTrue({'solntsev_official','udmurt_gov','mahonin59','gov74','pul69','novgorodinfo','filimonov_official','pskov_oblast','kurganskayaobl','drozdenko_au_lo','miduralofficial'} <= channels)
+        self.assertEqual(text_kind('Отбой воздушной опасности в Ленинградской области.'), 'end')
+        self.assertEqual(text_kind('Отбой сигнала «Опасное небо».'), 'end')
+
+    def test_v8_countless_local_incident_becomes_activity_report(self):
+        cfg = json.loads((ROOT / 'data' / 'sources.json').read_text(encoding='utf-8'))
+        source = next(s for s in cfg['sources'] if s['channel'] == 'filimonov_official')
+        posts = [Post('filimonov_official', 1, datetime(2026,9,20,1,0,tzinfo=timezone.utc),
+                      'Идет атака БПЛА на череповецкую промышленную зону. Действует ПВО.', 'https://t.me/x/1')]
+        reports = extract_reports(posts, source, datetime(2026,9,20,0,0,tzinfo=timezone.utc), datetime(2026,9,21,0,0,tzinfo=timezone.utc))
+        self.assertEqual(len(reports), 1)
+        self.assertEqual(reports[0]['count_type'], 'official_activity')
+        self.assertEqual(reports[0]['place'], 'Cherepovets')
 
 if __name__ == "__main__":
     unittest.main()

@@ -67,6 +67,10 @@ END_MARKERS = (
     "отмена сигнала опасность атаки бпла",
     "отменен сигнал опасность атаки бпла",
     "отменена опасность атаки бпла",
+    "отбой воздушной опасности",
+    "отбой режима воздушная опасность",
+    "отбой сигнала опасное небо",
+    "отмена сигнала опасное небо",
 )
 
 # Regional authorities use many word orders for the same clear message.  These
@@ -81,6 +85,8 @@ END_PATTERNS = tuple(re.compile(p) for p in (
     r"\bугроз\w*\s+атак\w*\s+(?:бпла|беспилотн\w*).{0,100}\b(?:снят|снята|отменен|отменена)\b",
     r"\bугроз\w*\s+(?:снят|снята|снято|отменен|отменена|отменено)\b",
     r"\b(?:снят|снята|снято|отменен|отменена|отменено)\b.{0,50}\bугроз\w*\b",
+    r"\bотбой\b.{0,70}\bвоздушн\w*\s+опасност\w*",
+    r"\b(?:снят|отменен|отбой)\w*\b.{0,70}\bопасн\w*\s+неб\w*",
 ))
 START_PATTERNS = tuple(re.compile(p) for p in (
     r"\b(?:объявлен\w*|введен\w*|действует|сохраняется)\b.{0,90}\bбеспилотн\w*\s+опасност\w*",
@@ -226,7 +232,7 @@ def fetch_posts_for_window(
     end_utc: datetime,
     max_pages: int = 18,
 ) -> list[Post]:
-    context_start = start_utc - timedelta(hours=48)
+    context_start = start_utc - timedelta(hours=96)
     all_posts: dict[int, Post] = {}
     before: int | None = None
 
@@ -299,7 +305,7 @@ def fetch_mchs_posts_for_window(
     start_utc: datetime,
     end_utc: datetime,
 ) -> list[Post]:
-    context_start = start_utc - timedelta(hours=48)
+    context_start = start_utc - timedelta(hours=96)
     r = session.get(region_cfg["mchs_rss_url"], timeout=18)
     r.raise_for_status()
     posts = parse_mchs_rss(r.text, region_cfg)
@@ -556,6 +562,19 @@ def infer_report_places(sentence: str, source: dict[str, Any]) -> list[dict[str,
     return places
 
 
+INCIDENT_ACTIVITY_PATTERNS = tuple(re.compile(p) for p in (
+    r"\b(?:идет|идёт|отражается|продолжается)\s+атак\w*\s+(?:бпла|беспилотн\w*)",
+    r"\bатак\w*.{0,45}(?:бпла|беспилотн\w*)",
+    r"\b(?:бпла|беспилотн\w*).{0,45}\bатак\w*",
+    r"\b(?:сбит|сбиты|сбито|уничтожен|уничтожены|уничтожено|подавлен|подавлены|ликвидирован|ликвидированы)\w*.{0,40}(?:бпла|беспилотн\w*)",
+    r"\b(?:обломк\w*|падени\w*).{0,50}(?:бпла|беспилотн\w*)",
+    r"\bприлет\w*.{0,40}(?:бпла|беспилотн\w*)",
+))
+
+def is_official_activity_text(text: str) -> bool:
+    n = normalize(text)
+    return any(p.search(n) for p in INCIDENT_ACTIVITY_PATTERNS)
+
 def extract_reports(posts: list[Post], source: dict[str, Any], window_start: datetime, window_end: datetime):
     reports = []
     for post in posts:
@@ -563,47 +582,58 @@ def extract_reports(posts: list[Post], source: dict[str, Any], window_start: dat
             continue
         if mod_derived(post):
             continue
-        if not any(token in normalize(post.text) for token in ("бпла", "беспилот")):
+        npost = normalize(post.text)
+        if not any(token in npost for token in ("бпла", "беспилот")):
             continue
+        produced_for_post = False
         for sentence in sentence_split(post.text):
             counts = classify_count_sentence(sentence)
             if not counts:
                 continue
-            mentioned = infer_report_places(sentence, source)
-            if not mentioned:
-                # Local authorities often put the total in one sentence and list
-                # affected cities/municipalities on subsequent lines. Preserve
-                # those named places as activity markers rather than losing the
-                # geographic detail.
-                mentioned = infer_report_places(post.text, source)
+            mentioned = infer_report_places(sentence, source) or infer_report_places(post.text, source)
             primary_place = mentioned[0] if mentioned else None
             place = primary_place["name"] if primary_place else source["region"]
             scope = alert_scope(primary_place) if primary_place else "region"
             mentioned_places = [
                 {"name": p["name"], "label": p.get("label", p["name"]), "type": p.get("type", "city"),
                  "lat": p.get("lat"), "lon": p.get("lon")}
-                for p in mentioned[:80]
+                for p in mentioned[:120]
             ]
             for count, ctype, secondary_count, secondary_type, qualifier in counts:
                 reports.append({
                     "id": stable_id(source.get("channel", source.get("source_id", "source")), str(post.post_id), place, ctype, str(count)),
-                    "region": source["region"],
-                    "place": place,
-                    "scope": scope,
-                    "at": post.published_at.isoformat(),
-                    "count": count,
-                    "count_type": ctype,
-                    "count_qualifier": qualifier,
-                    "secondary_count": secondary_count,
-                    "secondary_type": secondary_type,
-                    "text": sentence,
-                    "source_name": source["source_name"],
-                    "url": post.url,
+                    "region": source["region"], "place": place, "scope": scope,
+                    "at": post.published_at.isoformat(), "count": count, "count_type": ctype,
+                    "count_qualifier": qualifier, "secondary_count": secondary_count, "secondary_type": secondary_type,
+                    "text": sentence, "source_name": source["source_name"], "url": post.url,
                     "source_kind": source.get("kind", "official"),
                     "lat": primary_place.get("lat") if primary_place else None,
                     "lon": primary_place.get("lon") if primary_place else None,
                     "mentioned_places": mentioned_places,
                 })
+                produced_for_post = True
+        # Many governors report a local UAV attack without giving a count.  Keep
+        # that first-party event as amber activity instead of dropping it.  Do
+        # not turn a formal START/END alert into a duplicate report.
+        if not produced_for_post and text_kind(post.text) is None and is_official_activity_text(post.text):
+            mentioned = infer_report_places(post.text, source)
+            primary_place = mentioned[0] if mentioned else None
+            place = primary_place["name"] if primary_place else source["region"]
+            scope = alert_scope(primary_place) if primary_place else "region"
+            reports.append({
+                "id": stable_id(source.get("channel", source.get("source_id", "source")), str(post.post_id), place, "official_activity"),
+                "region": source["region"], "place": place, "scope": scope,
+                "at": post.published_at.isoformat(), "count": None, "count_type": "official_activity",
+                "count_qualifier": None, "secondary_count": None, "secondary_type": None,
+                "text": post.text, "source_name": source["source_name"], "url": post.url,
+                "source_kind": source.get("kind", "official"),
+                "lat": primary_place.get("lat") if primary_place else None,
+                "lon": primary_place.get("lon") if primary_place else None,
+                "mentioned_places": [
+                    {"name": p["name"], "label": p.get("label", p["name"]), "type": p.get("type", "city"),
+                     "lat": p.get("lat"), "lon": p.get("lon")} for p in mentioned[:120]
+                ],
+            })
     unique = {r["id"]: r for r in reports}
     return sorted(unique.values(), key=lambda r: r["at"])
 
@@ -795,15 +825,16 @@ def main():
     p.add_argument("--regions", default=str(DEFAULT_REGIONS))
     p.add_argument("--cities", default=str(DEFAULT_CITIES))
     p.add_argument("--output", default=str(DEFAULT_OUTPUT))
-    p.add_argument("--lookback-hours", type=int, default=int(os.getenv("LOOKBACK_HOURS", "48")))
+    p.add_argument("--lookback-hours", type=int, default=int(os.getenv("LOOKBACK_HOURS", "120")))
     p.add_argument("--safety-lag-hours", type=int, default=int(os.getenv("SAFETY_LAG_HOURS", "24")))
-    p.add_argument("--max-pages", type=int, default=int(os.getenv("TELEGRAM_MAX_PAGES", "40")))
+    p.add_argument("--max-pages", type=int, default=int(os.getenv("TELEGRAM_MAX_PAGES", "80")))
     p.add_argument("--mchs-workers", type=int, default=int(os.getenv("MCHS_WORKERS", "8")))
     args = p.parse_args()
     args.safety_lag_hours = max(24, args.safety_lag_hours)
     args.lookback_hours = max(24, args.lookback_hours)
 
     data = collect(args)
+    data = merge_existing_archive(data, Path(args.output))
     if data["source_status"] and not any(s.get("ok") for s in data["source_status"]):
         raise RuntimeError("all configured sources failed; keeping the previous archive file")
 
