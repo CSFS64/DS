@@ -41,15 +41,20 @@ from bs4 import BeautifulSoup
 try:
     from telethon.sync import TelegramClient
     from telethon.sessions import StringSession
+    from telethon.tl.types import InputPeerChannel, InputPeerUser, InputPeerChat
 except Exception:  # optional; public HTML fallback remains available
     TelegramClient = None
     StringSession = None
+    InputPeerChannel = None
+    InputPeerUser = None
+    InputPeerChat = None
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SOURCES = ROOT / "data" / "sources.json"
 DEFAULT_REGIONS = ROOT / "data" / "regions.json"
 DEFAULT_CITIES = ROOT / "data" / "cities.json"
 DEFAULT_OUTPUT = ROOT / "data" / "events.json"
+DEFAULT_TELEGRAM_PEERS = ROOT / "data" / "telegram_peers.json"
 
 USER_AGENT = (
     "DeepstrikeArchive/3.0 (+https://github.com/; historical archive; 24h+ lag) "
@@ -147,10 +152,19 @@ UAV_OPERATIONAL_PATTERNS = tuple(re.compile(p) for p in (
 ))
 
 NON_OPERATIONAL_UAV_PATTERNS = tuple(re.compile(p) for p in (
-    r"\b(?:производств\w*|разработк\w*|изготовлен\w*|сборк\w*|закупк\w*|контракт\w*)\b",
+    r"\b(?:производ\w*|разработк\w*|изготовлен\w*|сборк\w*|закупк\w*|контракт\w*)\b",
     r"\b(?:выставк\w*|форум\w*|соревнован\w*|чемпионат\w*|фестивал\w*|кружок\w*|обучен\w*|учебн\w*|учени\w*|тренировк\w*|инструктаж\w*|памятк\w*|профилактич\w*)\b",
     r"\b(?:алгоритм\w*\s+действ\w*|правил\w*\s+поведен\w*)\b",
     r"\b(?:сельскохозяйствен\w*|доставк\w*|аэрофотосъем\w*)\b",
+    r"\b(?:фейк\w*|дипфейк\w*|фейкодел\w*|дезинформац\w*|опроверг\w*|якобы|пропаганд\w*)\b",
+    r"\b(?:не\s+снимайте|не\s+публикуйте|запрет\w*|запрещен\w*|фотографирован\w*|видеосъем\w*|распространен\w*)\b",
+    r"\b(?:научн\w*|исследован\w*|университет\w*|институт\w*|лаборатор\w*|образован\w*|студент\w*)\b",
+))
+
+UAV_WEAK_OPERATIONAL_PATTERNS = tuple(re.compile(p) for p in (
+    r"\b(?:сообща\w*|поступил\w*\s+информац\w*)\b.{0,70}\b(?:бпла|беспилотн\w*|дрон\w*)\b",
+    r"\b(?:бпла|беспилотн\w*|дрон\w*)\b.{0,70}\b(?:в\s+район\w*|в\s+округ\w*|в\s+город\w*|над\s+территор\w*|над\s+город\w*|в\s+неб\w*|поблизост\w*)\b",
+    r"\b(?:в\s+район\w*|в\s+округ\w*|в\s+город\w*|над\s+территор\w*|над\s+город\w*|в\s+неб\w*)\b.{0,70}\b(?:бпла|беспилотн\w*|дрон\w*)\b",
 ))
 
 MISSILE_START_PATTERNS = tuple(re.compile(p) for p in (
@@ -179,9 +193,10 @@ MISSILE_OPERATIONAL_PATTERNS = tuple(re.compile(p) for p in (
     r"\b(?:обломк\w*|падени\w*|прилет\w*|попадани\w*|взрыв\w*|поврежден\w*)\b",
 ))
 NON_OPERATIONAL_MISSILE_PATTERNS = tuple(re.compile(p) for p in (
-    r"\b(?:производств\w*|разработк\w*|изготовлен\w*|сборк\w*|закупк\w*|контракт\w*)\b",
-    r"\b(?:выставк\w*|форум\w*|соревнован\w*|фестивал\w*|учебн\w*|учени\w*)\b",
-    r"\b(?:ракетн\w*\s+комплекс\w*|космическ\w*|носител\w*)\b",
+    r"\b(?:производ\w*|разработк\w*|изготовлен\w*|сборк\w*|закупк\w*|контракт\w*|комплектующ\w*|сертификац\w*)\b",
+    r"\b(?:выставк\w*|форум\w*|соревнован\w*|фестивал\w*|учебн\w*|учени\w*|научн\w*|исследован\w*|университет\w*)\b",
+    r"\b(?:ракетн\w*\s+комплекс\w*|космическ\w*|носител\w*|орбит\w*|фанер\w*)\b",
+    r"\b(?:фейк\w*|дипфейк\w*|дезинформац\w*|опроверг\w*|якобы)\b",
 ))
 
 
@@ -227,7 +242,7 @@ def missile_activity_kind(text: str) -> str | None:
             return "missile_attack_activity"
         if any(p.search(n) for p in MISSILE_OPERATIONAL_PATTERNS):
             return "official_missile_activity"
-        return "official_missile_activity"
+        continue
     return None
 
 def activity_signals(text: str) -> list[tuple[str, str]]:
@@ -283,9 +298,8 @@ def uav_activity_kind(text: str) -> str | None:
             return "uav_attack_activity"
         if any(p.search(n) for p in UAV_OPERATIONAL_PATTERNS):
             return "official_uav_activity"
-        # Display-first fallback: an official local post explicitly about a UAV
-        # is retained unless it is clearly instructional/non-operational.
-        return "official_uav_activity"
+        if any(p.search(n) for p in UAV_WEAK_OPERATIONAL_PATTERNS):
+            return "official_uav_activity"
     return None
 
 REGION_PHRASES = (
@@ -354,6 +368,8 @@ class FetchResult:
     oldest: datetime | None = None
     newest: datetime | None = None
     raw_items: int = 0
+    mtproto_peer_cache_hit: bool = False
+    mtproto_peer_resolved: bool = False
 
 
 def normalize(text: str) -> str:
@@ -536,7 +552,9 @@ def fetch_posts_html_for_window(
 
 def _fetch_result(posts: list[Post], context_start: datetime, *, transport: str,
                   transport_ok: bool = True, window_complete: bool = False,
-                  error: str | None = None, raw_items: int | None = None) -> FetchResult:
+                  error: str | None = None, raw_items: int | None = None,
+                  mtproto_peer_cache_hit: bool = False,
+                  mtproto_peer_resolved: bool = False) -> FetchResult:
     posts = sorted(posts, key=lambda p: (p.published_at, str(p.post_id)))
     return FetchResult(
         posts=posts,
@@ -547,16 +565,163 @@ def _fetch_result(posts: list[Post], context_start: datetime, *, transport: str,
         oldest=posts[0].published_at if posts else None,
         newest=posts[-1].published_at if posts else None,
         raw_items=len(posts) if raw_items is None else raw_items,
+        mtproto_peer_cache_hit=mtproto_peer_cache_hit,
+        mtproto_peer_resolved=mtproto_peer_resolved,
     )
+
+
+def _channel_cache_key(channel: str) -> str:
+    return str(channel or "").strip().lstrip("@").lower()
+
+
+def load_telegram_peer_cache(path: Path) -> dict[str, dict[str, Any]]:
+    """Load non-secret Telegram peer metadata used to avoid username resolves.
+
+    The cache contains only entity type/id/access_hash. It does NOT contain the
+    Telegram authorization key or StringSession credential.
+    """
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        print(f"telegram peer cache: ignoring unreadable {path}: {exc}", file=sys.stderr)
+        return {}
+    raw = payload.get("peers", payload) if isinstance(payload, dict) else {}
+    if not isinstance(raw, dict):
+        return {}
+
+    out: dict[str, dict[str, Any]] = {}
+    for channel, entry in raw.items():
+        if not isinstance(entry, dict):
+            continue
+        key = _channel_cache_key(channel)
+        peer_type = str(entry.get("peer_type") or "").lower()
+        try:
+            peer_id = int(entry.get("id"))
+        except Exception:
+            continue
+        access_hash = entry.get("access_hash")
+        if peer_type in {"channel", "user"}:
+            try:
+                access_hash = int(access_hash)
+            except Exception:
+                continue
+        elif peer_type != "chat":
+            continue
+        out[key] = {
+            "peer_type": peer_type,
+            "id": peer_id,
+            **({"access_hash": access_hash} if peer_type in {"channel", "user"} else {}),
+            "username": key,
+            "source": entry.get("source") or "persisted",
+        }
+    return out
+
+
+def save_telegram_peer_cache(path: Path, peers: dict[str, dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "version": 1,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "note": "Entity metadata only; no Telegram auth/session credential is stored here.",
+        "peers": {k: peers[k] for k in sorted(peers)},
+    }
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.replace(path)
+
+
+def _input_peer_from_cache(entry: dict[str, Any] | None):
+    if not entry:
+        return None
+    peer_type = entry.get("peer_type")
+    try:
+        if peer_type == "channel" and InputPeerChannel is not None:
+            return InputPeerChannel(int(entry["id"]), int(entry["access_hash"]))
+        if peer_type == "user" and InputPeerUser is not None:
+            return InputPeerUser(int(entry["id"]), int(entry["access_hash"]))
+        if peer_type == "chat" and InputPeerChat is not None:
+            return InputPeerChat(int(entry["id"]))
+    except Exception:
+        return None
+    return None
+
+
+def _store_input_peer(peer_cache: dict[str, dict[str, Any]], channel: str, peer,
+                      *, source: str) -> bool:
+    key = _channel_cache_key(channel)
+    entry: dict[str, Any] | None = None
+    try:
+        if InputPeerChannel is not None and isinstance(peer, InputPeerChannel):
+            entry = {
+                "peer_type": "channel",
+                "id": int(peer.channel_id),
+                "access_hash": int(peer.access_hash),
+                "username": key,
+                "source": source,
+            }
+        elif InputPeerUser is not None and isinstance(peer, InputPeerUser):
+            entry = {
+                "peer_type": "user",
+                "id": int(peer.user_id),
+                "access_hash": int(peer.access_hash),
+                "username": key,
+                "source": source,
+            }
+        elif InputPeerChat is not None and isinstance(peer, InputPeerChat):
+            entry = {
+                "peer_type": "chat",
+                "id": int(peer.chat_id),
+                "username": key,
+                "source": source,
+            }
+    except (TypeError, ValueError):
+        return False
+    if entry is None:
+        return False
+    changed = peer_cache.get(key) != entry
+    peer_cache[key] = entry
+    return changed
+
+
+def preload_peer_cache_from_dialogs(client, peer_cache: dict[str, dict[str, Any]],
+                                    channels: list[str]) -> tuple[int, str | None]:
+    """Seed peers from the account's existing dialogs without ResolveUsername.
+
+    During a ResolveUsername FloodWait, official channels already followed by
+    this account can still use MTProto because GetDialogs supplies access hashes.
+    """
+    wanted = {_channel_cache_key(c) for c in channels if c}
+    missing = wanted - set(peer_cache)
+    if not missing:
+        return 0, None
+    added = 0
+    try:
+        for dialog in client.iter_dialogs(limit=None):
+            entity = getattr(dialog, "entity", None)
+            username = _channel_cache_key(getattr(entity, "username", ""))
+            if not username or username not in missing:
+                continue
+            peer = getattr(dialog, "input_entity", None)
+            if peer is None:
+                peer = client.get_input_entity(entity)
+            if _store_input_peer(peer_cache, username, peer, source="dialog"):
+                added += 1
+            missing.discard(username)
+            if not missing:
+                break
+    except Exception as exc:
+        return added, str(exc)
+    return added, None
 
 
 def make_telegram_mtproto_client():
     """Return an authenticated read-only Telegram client when secrets exist.
 
-    Public t.me HTML is not a reliable history API: GitHub-hosted requests can
-    return a perfectly valid HTTP page with zero parseable messages.  MTProto
-    is therefore the preferred transport.  A StringSession keeps the login
-    credential in GitHub Secrets rather than in the repository.
+    The authorization credential remains a StringSession in GitHub Secrets.
+    Entity ids/access hashes are persisted separately in data/telegram_peers.json
+    so normal archive runs do not repeatedly call ResolveUsernameRequest.
     """
     api_id = (os.getenv("TELEGRAM_API_ID") or "").strip()
     api_hash = (os.getenv("TELEGRAM_API_HASH") or "").strip()
@@ -573,17 +738,46 @@ def make_telegram_mtproto_client():
     return client
 
 
+def _resolve_mtproto_peer(client, channel: str,
+                          peer_cache: dict[str, dict[str, Any]]) -> tuple[Any, bool, bool]:
+    key = _channel_cache_key(channel)
+    cached = _input_peer_from_cache(peer_cache.get(key))
+    if cached is not None:
+        return cached, True, False
+
+    if getattr(client, "_archive_resolve_flooded", False):
+        wait_s = int(getattr(client, "_archive_resolve_wait_seconds", 0) or 0)
+        suffix = f" ({wait_s}s remaining when observed)" if wait_s else ""
+        raise RuntimeError(f"MTProto peer cache miss while ResolveUsername flood-wait is active{suffix}")
+
+    resolve_delay = max(0.0, float(os.getenv("TELEGRAM_RESOLVE_DELAY_SECONDS", "5.0")))
+    last_resolve = float(getattr(client, "_archive_last_resolve_monotonic", 0.0) or 0.0)
+    wait_for = resolve_delay - (time.monotonic() - last_resolve)
+    if wait_for > 0:
+        time.sleep(wait_for)
+
+    try:
+        peer = client.get_input_entity(channel)
+    finally:
+        setattr(client, "_archive_last_resolve_monotonic", time.monotonic())
+
+    stored = _store_input_peer(peer_cache, channel, peer, source="resolved")
+    if not stored and _input_peer_from_cache(peer_cache.get(key)) is None:
+        raise RuntimeError(f"MTProto resolved @{key} but did not return a cacheable input peer")
+    return peer, False, True
+
+
 def fetch_posts_mtproto_for_window(client, channel: str, start_utc: datetime,
                                     end_utc: datetime, context_hours: int = 48,
-                                    max_messages: int = 20000) -> FetchResult:
+                                    max_messages: int = 20000,
+                                    peer_cache: dict[str, dict[str, Any]] | None = None) -> FetchResult:
     context_start = start_utc - timedelta(hours=max(12, context_hours))
-    entity = client.get_entity(channel)
+    peer_cache = peer_cache if peer_cache is not None else {}
+    entity, cache_hit, resolved_now = _resolve_mtproto_peer(client, channel, peer_cache)
     posts: list[Post] = []
     scanned = 0
     reached_old_edge = False
 
-    # iter_messages walks newest -> oldest. offset_date prevents collecting
-    # messages newer than the deliberately delayed archive cutoff.
     for msg in client.iter_messages(
         entity,
         offset_date=end_utc + timedelta(seconds=1),
@@ -612,8 +806,6 @@ def fetch_posts_mtproto_for_window(client, channel: str, start_utc: datetime,
             forwarded_from=fwd_name,
         ))
 
-    # If fewer than max_messages exist before end_utc, iter_messages exhausted
-    # the channel and we also know the requested old edge was covered.
     complete = reached_old_edge or scanned < max_messages
     return _fetch_result(
         posts,
@@ -621,34 +813,25 @@ def fetch_posts_mtproto_for_window(client, channel: str, start_utc: datetime,
         transport="telegram_mtproto",
         window_complete=complete,
         raw_items=scanned,
+        mtproto_peer_cache_hit=cache_hit,
+        mtproto_peer_resolved=resolved_now,
     )
 
 
 def fetch_telegram_with_fallback(session: requests.Session, channel: str,
                                  start_utc: datetime, end_utc: datetime,
                                  max_pages: int, context_hours: int,
-                                 mt_client=None) -> FetchResult:
+                                 mt_client=None,
+                                 peer_cache: dict[str, dict[str, Any]] | None = None) -> FetchResult:
     errors: list[str] = []
-    if mt_client is not None and not getattr(mt_client, "_archive_resolve_flooded", False):
+    if mt_client is not None:
         try:
-            # StringSession does not persist Telethon's entity cache. Rate-limit
-            # username resolution so a wide source registry does not trip
-            # ResolveUsernameRequest flood control during backfills.
-            resolve_delay = max(0.0, float(os.getenv("TELEGRAM_RESOLVE_DELAY_SECONDS", "1.0")))
-            last_resolve = float(getattr(mt_client, "_archive_last_resolve_monotonic", 0.0) or 0.0)
-            wait_for = resolve_delay - (time.monotonic() - last_resolve)
-            if wait_for > 0:
-                time.sleep(wait_for)
             mt_result = fetch_posts_mtproto_for_window(
                 mt_client, channel, start_utc, end_utc,
                 context_hours=context_hours,
                 max_messages=int(os.getenv("TELEGRAM_MT_MAX_MESSAGES", "20000")),
+                peer_cache=peer_cache,
             )
-            setattr(mt_client, "_archive_last_resolve_monotonic", time.monotonic())
-            # A complete MTProto window with zero posts is normally valid, but
-            # raw_items <= 1 is suspicious for established public channels and
-            # has produced false "quiet" results. Cross-check public HTML/search
-            # before accepting that state.
             if mt_result.posts or mt_result.raw_items > 1:
                 return mt_result
             errors.append("mtproto returned suspiciously empty history (raw_items <= 1)")
@@ -657,13 +840,14 @@ def fetch_telegram_with_fallback(session: requests.Session, channel: str,
             errors.append(f"mtproto: {message}")
             if "ResolveUsernameRequest" in message and ("A wait of" in message or "FloodWait" in type(exc).__name__):
                 setattr(mt_client, "_archive_resolve_flooded", True)
+                m = re.search(r"A wait of\s+(\d+)\s+seconds", message)
+                if m:
+                    setattr(mt_client, "_archive_resolve_wait_seconds", int(m.group(1)))
                 print(
                     "telegram MTProto ResolveUsername flood-wait detected; "
-                    "disabling MTProto for the rest of this run",
+                    "cached peers continue on MTProto, uncached peers use HTML fallback",
                     file=sys.stderr,
                 )
-    elif mt_client is not None:
-        errors.append("mtproto skipped after ResolveUsername flood-wait earlier in this run")
 
     context_start = start_utc - timedelta(hours=max(12, context_hours))
     try:
@@ -677,8 +861,6 @@ def fetch_telegram_with_fallback(session: requests.Session, channel: str,
                              transport_ok=False, window_complete=False,
                              error="; ".join(errors))
 
-    # This is the v11 root-cause fix: HTTP 200 with zero parsed Telegram
-    # messages is NOT a successful source fetch.
     if not posts:
         errors.append("public Telegram page returned zero parseable messages")
         return _fetch_result([], context_start, transport="telegram_public_html",
@@ -690,7 +872,6 @@ def fetch_telegram_with_fallback(session: requests.Session, channel: str,
     return _fetch_result(posts, context_start, transport="telegram_public_html",
                          transport_ok=True, window_complete=complete,
                          error="; ".join(errors) if errors else None)
-
 
 def source_status_row(source_type: str, source_name: str, region: str,
                       fetched: FetchResult, events, reports, alert_stats,
@@ -723,6 +904,8 @@ def source_status_row(source_type: str, source_name: str, region: str,
         "window_complete": fetched.window_complete,
         "posts": len(fetched.posts),
         "raw_items": fetched.raw_items,
+        "mtproto_peer_cache_hit": fetched.mtproto_peer_cache_hit,
+        "mtproto_peer_resolved": fetched.mtproto_peer_resolved,
         "oldest_post": fetched.oldest.isoformat() if fetched.oldest else None,
         "newest_post": fetched.newest.isoformat() if fetched.newest else None,
         "error": fetched.error,
@@ -1408,6 +1591,11 @@ def record_quality(record: dict[str, Any]) -> int:
 def collect(args) -> dict[str, Any]:
     source_cfg = json.loads(Path(args.sources).read_text(encoding="utf-8"))
     region_cfg = json.loads(Path(args.regions).read_text(encoding="utf-8"))
+    peer_cache_path = Path(getattr(args, "telegram_peer_cache", DEFAULT_TELEGRAM_PEERS))
+    peer_cache = load_telegram_peer_cache(peer_cache_path)
+    peer_cache_initial = len(peer_cache)
+    dialog_peers_added = 0
+    dialog_peer_error = None
     city_path = Path(args.cities)
     city_cfg = json.loads(city_path.read_text(encoding="utf-8")) if city_path.exists() else {"cities": [], "municipalities": []}
     cities_by_region: dict[str, list[dict[str, Any]]] = {}
@@ -1436,6 +1624,23 @@ def collect(args) -> dict[str, Any]:
     try:
         mt_client = make_telegram_mtproto_client()
         mtproto_enabled = mt_client is not None
+        if mt_client is not None:
+            configured_channels = [
+                str(s.get("channel"))
+                for s in source_cfg.get("sources", [])
+                if s.get("enabled", False) and s.get("kind", "telegram") == "telegram" and s.get("channel")
+            ]
+            dialog_peers_added, dialog_peer_error = preload_peer_cache_from_dialogs(
+                mt_client, peer_cache, configured_channels
+            )
+            if dialog_peers_added:
+                save_telegram_peer_cache(peer_cache_path, peer_cache)
+                print(
+                    f"telegram peer cache: seeded {dialog_peers_added} peers from existing dialogs",
+                    file=sys.stderr,
+                )
+            if dialog_peer_error:
+                print(f"telegram peer cache dialog preload warning: {dialog_peer_error}", file=sys.stderr)
     except Exception as exc:
         mtproto_error = str(exc)
         print(f"telegram MTProto setup ERROR: {exc}; falling back to public HTML", file=sys.stderr)
@@ -1450,11 +1655,15 @@ def collect(args) -> dict[str, Any]:
             source["_catalog_places"] = cities_by_region.get(source.get("region", ""), [])
             channel = source["channel"]
             try:
+                before_peer_count = len(peer_cache)
                 fetched = fetch_telegram_with_fallback(
                     session, channel, window_start, window_end,
                     max_pages=args.max_pages, context_hours=args.context_hours,
                     mt_client=mt_client,
+                    peer_cache=peer_cache,
                 )
+                if len(peer_cache) != before_peer_count:
+                    save_telegram_peer_cache(peer_cache_path, peer_cache)
                 posts = fetched.posts
                 events, unmatched = pair_alerts(posts, source, window_start, window_end)
                 reports = extract_reports(posts, source, window_start, window_end)
@@ -1492,6 +1701,8 @@ def collect(args) -> dict[str, Any]:
                 mt_client.disconnect()
             except Exception:
                 pass
+        if peer_cache != load_telegram_peer_cache(peer_cache_path):
+            save_telegram_peer_cache(peer_cache_path, peer_cache)
 
     # Nationwide official region-level RSS fallback. One request per region, in a
     # bounded worker pool so a slow regional site does not block the entire job.
@@ -1562,7 +1773,7 @@ def collect(args) -> dict[str, Any]:
         if not any(s.get("region") == region and s.get("transport_ok") for s in telegram_status)
     }
     return {
-        "schema_version": 6,
+        "schema_version": 7,
         "generated_at": now.isoformat(),
         "safety_lag_hours": args.safety_lag_hours,
         "window_start": window_start.isoformat(),
@@ -1596,6 +1807,17 @@ def collect(args) -> dict[str, Any]:
             "high_resolution_regions_with_events": len(hi_res_regions_with_events),
             "telegram_mtproto_enabled": mtproto_enabled,
             "telegram_mtproto_error": mtproto_error,
+            "telegram_mtproto_sources_used": sum(1 for s in telegram_status if s.get("transport") == "telegram_mtproto" and s.get("transport_ok")),
+            "telegram_public_html_sources_used": sum(1 for s in telegram_status if s.get("transport") == "telegram_public_html"),
+            "high_resolution_sources_window_complete": sum(1 for s in telegram_status if s.get("window_complete")),
+            "telegram_peer_cache_entries": len(peer_cache),
+            "telegram_peer_cache_initial_entries": peer_cache_initial,
+            "telegram_peer_cache_dialog_added": dialog_peers_added,
+            "telegram_peer_cache_hits": sum(1 for s in telegram_status if s.get("mtproto_peer_cache_hit")),
+            "telegram_peer_resolved_this_run": sum(1 for s in telegram_status if s.get("mtproto_peer_resolved")),
+            "telegram_mtproto_resolve_flooded": bool(getattr(mt_client, "_archive_resolve_flooded", False)) if mt_client is not None else False,
+            "telegram_mtproto_resolve_wait_seconds": int(getattr(mt_client, "_archive_resolve_wait_seconds", 0) or 0) if mt_client is not None else 0,
+            "telegram_dialog_preload_error": dialog_peer_error,
             "city_catalog_count": len(city_cfg.get("cities", [])),
             "municipality_catalog_count": len(city_cfg.get("municipalities", [])),
             "unmatched_starts": sum(1 for u in all_unmatched if u.get("type") == "unmatched_start"),
@@ -1708,6 +1930,52 @@ def merge_existing_archive(data: dict[str, Any], output_path: Path) -> dict[str,
     data["coverage"]["archive_regions_with_records"] = len(archive_regions)
     data["coverage"]["archive_regions_with_local_records"] = len({x for x in archive_local_regions if x})
     return data
+
+
+def revalidate_archive_reports(data: dict[str, Any]) -> dict[str, Any]:
+    """Re-run non-formal archived activity through the current classifier."""
+    kept: list[dict[str, Any]] = []
+    removed = 0
+    reclassified = 0
+    for report in data.get("reports", []) or []:
+        signal_class = report.get("signal_class")
+        threat = report.get("threat_class")
+        text = str(report.get("text") or "").strip()
+
+        if signal_class in {"formal_alert_signal", "alert_clear_signal"} or not text:
+            kept.append(report)
+            continue
+
+        kind = None
+        if threat == "uav" and signal_class == "uav_activity_signal":
+            kind = uav_activity_kind(text)
+        elif threat == "missile" and signal_class == "missile_activity_signal":
+            kind = missile_activity_kind(text)
+        else:
+            kept.append(report)
+            continue
+
+        if kind is None or kind in {"alert_start_signal", "alert_end_signal"}:
+            removed += 1
+            continue
+        if report.get("activity_kind") != kind:
+            report["activity_kind"] = kind
+            if report.get("count") is None:
+                report["count_type"] = "official_activity"
+            reclassified += 1
+        kept.append(report)
+
+    data["reports"] = kept
+    coverage = data.setdefault("coverage", {})
+    coverage["reports_revalidated_removed"] = removed
+    coverage["reports_revalidated_reclassified"] = reclassified
+    coverage["archive_reports_total"] = len(kept)
+    archive_regions = {e.get("region") for e in data.get("events", []) if e.get("region")} | {
+        r.get("region") for r in kept if r.get("region")
+    }
+    coverage["archive_regions_with_records"] = len(archive_regions)
+    return data
+
 
 def reenrich_archive_places(data: dict[str, Any], source_cfg: dict[str, Any],
                             city_cfg: dict[str, Any]) -> dict[str, Any]:
@@ -1833,6 +2101,7 @@ def main():
     p.add_argument("--regions", default=str(DEFAULT_REGIONS))
     p.add_argument("--cities", default=str(DEFAULT_CITIES))
     p.add_argument("--output", default=str(DEFAULT_OUTPUT))
+    p.add_argument("--telegram-peer-cache", default=str(DEFAULT_TELEGRAM_PEERS))
     p.add_argument("--lookback-hours", type=int, default=int(os.getenv("LOOKBACK_HOURS", "120")))
     p.add_argument("--safety-lag-hours", type=int, default=int(os.getenv("SAFETY_LAG_HOURS", "0")))
     p.add_argument("--max-pages", type=int, default=int(os.getenv("TELEGRAM_MAX_PAGES", "50")))
@@ -1854,6 +2123,7 @@ def main():
 
     data = collect(args)
     data = merge_existing_archive(data, Path(args.output))
+    data = revalidate_archive_reports(data)
     source_cfg = json.loads(Path(args.sources).read_text(encoding="utf-8"))
     city_path = Path(args.cities)
     city_cfg = json.loads(city_path.read_text(encoding="utf-8")) if city_path.exists() else {"cities": [], "municipalities": []}

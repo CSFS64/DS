@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "updated_at": null,
+  "note": "Entity metadata only; no Telegram auth/session credential is stored here.",
+  "peers": {}
+}

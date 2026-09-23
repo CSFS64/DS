@@ -19,11 +19,19 @@ for row in rows:
 
 print('## v12 official-source health')
 print()
-print(f"- MTProto: **{'ON' if coverage.get('telegram_mtproto_enabled') else 'OFF'}**")
+print(f"- MTProto credential/client: **{'ON' if coverage.get('telegram_mtproto_enabled') else 'OFF'}**")
+print(f"- MTProto sources actually used: **{coverage.get('telegram_mtproto_sources_used', 0)}/{coverage.get('high_resolution_sources_configured', len(rows))}**")
+print(f"- Complete high-resolution windows: **{coverage.get('high_resolution_sources_window_complete', 0)}/{coverage.get('high_resolution_sources_configured', len(rows))}**")
+print(f"- Persisted Telegram peer cache: **{coverage.get('telegram_peer_cache_entries', 0)}** entries")
+print(f"- Peer-cache hits this run: **{coverage.get('telegram_peer_cache_hits', 0)}**")
+print(f"- Username peers resolved this run: **{coverage.get('telegram_peer_resolved_this_run', 0)}**")
 print(f"- High-resolution regions configured: **{coverage.get('high_resolution_regions_configured', 0)}**")
 print(f"- Regions with at least one transport-OK source: **{coverage.get('high_resolution_regions_transport_ok', 0)}**")
 print(f"- Failed high-resolution sources: **{coverage.get('high_resolution_sources_failed', 0)}**")
 print(f"- MChS RSS alert regions (auxiliary only): **{coverage.get('mchs_regions_with_alert_posts', 0)}**")
+if coverage.get('telegram_mtproto_resolve_flooded'):
+    wait_s = coverage.get('telegram_mtproto_resolve_wait_seconds', 0) or 0
+    print(f"- ResolveUsername flood-wait observed: **YES** ({wait_s}s reported); cached peers continued over MTProto")
 if coverage.get('telegram_mtproto_error'):
     print(f"- MTProto setup error: `{coverage['telegram_mtproto_error']}`")
 
