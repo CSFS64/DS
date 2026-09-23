@@ -137,8 +137,8 @@ UAV_OPERATIONAL_PATTERNS = tuple(re.compile(p) for p in (
     # warnings / danger / threat
     r"\b(?:опасност\w*|угроз\w*|тревог\w*|опасн\w*\s+неб\w*)\b",
     r"\b(?:объявлен\w*|введен\w*|действует|сохраняется)\b.{0,100}\b(?:режим\w*|опасност\w*|угроз\w*)\b",
-    # attack / approach / flight / detection
-    r"\bатак\w*\b",
+    # attack / strike / approach / flight / detection
+    r"\b(?:атак\w*|удар\w*|пораж\w*|врезал\w*)\b",
     r"\b(?:летит|летят|летел\w*|движ\w*|направля\w*|приближа\w*|подлета\w*|подлет\w*|пролет\w*|следу\w*)\b",
     r"\b(?:обнаруж\w*|зафиксир\w*|замеч\w*|выявл\w*|наблюда\w*|фиксиру\w*)\b",
     # air-defence / EW response
@@ -149,6 +149,17 @@ UAV_OPERATIONAL_PATTERNS = tuple(re.compile(p) for p in (
     r"\b(?:обломк\w*|падени\w*|прилет\w*|попадани\w*|взрыв\w*|поврежден\w*)\b",
     # restrictions explicitly tied to UAVs
     r"\b(?:ковер|ограничен\w*|закрыт\w*|приостанов\w*)\b",
+))
+
+UAV_ARTICLE_REJECTION_PATTERNS = tuple(re.compile(p) for p in (
+    # Strong whole-post debunk framing. This is intentionally narrower than
+    # sentence-level exclusions so a real alert followed by generic advice such
+    # as "do not publish PVO footage" remains operational.
+    r"\bочередн\w*\s+дипфейк\w*\b",
+    r"\bэто\s+(?:очередн\w*\s+)?(?:фейк\w*|дипфейк\w*)\b",
+    r"\b(?:фейк\w*|дипфейк\w*)\b.{0,120}\b(?:опроверг\w*|не\s+соответству\w*\s+действительност\w*)\b",
+    r"\b(?:опроверг\w*|разоблачил\w*)\b.{0,120}\b(?:фейк\w*|дипфейк\w*)\b",
+    r"\bпропаганд\w*.{0,120}\b(?:пугат\w*|фейк\w*|дипфейк\w*)\b",
 ))
 
 NON_OPERATIONAL_UAV_PATTERNS = tuple(re.compile(p) for p in (
@@ -273,6 +284,10 @@ def has_uav_reference(text: str) -> bool:
 
 def uav_activity_kind(text: str) -> str | None:
     """Classify operational UAV wording without cross-sentence false matches."""
+    whole = normalize(text)
+    if any(p.search(whole) for p in UAV_ARTICLE_REJECTION_PATTERNS):
+        return None
+
     formal = text_kind(text)
     if formal == "start":
         return "alert_start_signal"
@@ -294,7 +309,7 @@ def uav_activity_kind(text: str) -> str | None:
             return "uav_detected"
         if re.search(r"\b(?:летит|летят|летел\w*|движ\w*|направля\w*|приближа\w*|подлета\w*|подлет\w*|пролет\w*|следу\w*)\b", n):
             return "uav_movement"
-        if re.search(r"\bатак\w*\b", n):
+        if re.search(r"\b(?:атак\w*|удар\w*|пораж\w*|врезал\w*)\b", n):
             return "uav_attack_activity"
         if any(p.search(n) for p in UAV_OPERATIONAL_PATTERNS):
             return "official_uav_activity"
