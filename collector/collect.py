@@ -146,7 +146,7 @@ UAV_OPERATIONAL_PATTERNS = tuple(re.compile(p) for p in (
 
 NON_OPERATIONAL_UAV_PATTERNS = tuple(re.compile(p) for p in (
     r"\b(?:производств\w*|разработк\w*|изготовлен\w*|сборк\w*|закупк\w*|контракт\w*)\b",
-    r"\b(?:выставк\w*|форум\w*|соревнован\w*|фестивал\w*|кружок\w*|обучен\w*|учебн\w*|учени\w*|тренировк\w*|инструктаж\w*|памятк\w*|профилактич\w*)\b",
+    r"\b(?:выставк\w*|форум\w*|соревнован\w*|чемпионат\w*|фестивал\w*|кружок\w*|обучен\w*|учебн\w*|учени\w*|тренировк\w*|инструктаж\w*|памятк\w*|профилактич\w*)\b",
     r"\b(?:алгоритм\w*\s+действ\w*|правил\w*\s+поведен\w*)\b",
     r"\b(?:сельскохозяйствен\w*|доставк\w*|аэрофотосъем\w*)\b",
 ))
@@ -444,6 +444,8 @@ def parse_telegram_html(html: str, channel: str) -> list[Post]:
 TELEGRAM_ACTIVITY_QUERIES = (
     "БПЛА",
     "беспилот",
+    "беспилотная опасность",
+    "угроза атаки БПЛА",
     "дрон",
     "воздушная опасность",
     "опасное небо",
@@ -625,13 +627,22 @@ def fetch_telegram_with_fallback(session: requests.Session, channel: str,
                                  max_pages: int, context_hours: int,
                                  mt_client=None) -> FetchResult:
     errors: list[str] = []
-    if mt_client is not None:
+    if mt_client is not None and not getattr(mt_client, "_archive_resolve_flooded", False):
         try:
+            # StringSession does not persist Telethon's entity cache. Rate-limit
+            # username resolution so a wide source registry does not trip
+            # ResolveUsernameRequest flood control during backfills.
+            resolve_delay = max(0.0, float(os.getenv("TELEGRAM_RESOLVE_DELAY_SECONDS", "1.0")))
+            last_resolve = float(getattr(mt_client, "_archive_last_resolve_monotonic", 0.0) or 0.0)
+            wait_for = resolve_delay - (time.monotonic() - last_resolve)
+            if wait_for > 0:
+                time.sleep(wait_for)
             mt_result = fetch_posts_mtproto_for_window(
                 mt_client, channel, start_utc, end_utc,
                 context_hours=context_hours,
                 max_messages=int(os.getenv("TELEGRAM_MT_MAX_MESSAGES", "20000")),
             )
+            setattr(mt_client, "_archive_last_resolve_monotonic", time.monotonic())
             # A complete MTProto window with zero posts is normally valid, but
             # raw_items <= 1 is suspicious for established public channels and
             # has produced false "quiet" results. Cross-check public HTML/search
@@ -640,7 +651,17 @@ def fetch_telegram_with_fallback(session: requests.Session, channel: str,
                 return mt_result
             errors.append("mtproto returned suspiciously empty history (raw_items <= 1)")
         except Exception as exc:
-            errors.append(f"mtproto: {exc}")
+            message = str(exc)
+            errors.append(f"mtproto: {message}")
+            if "ResolveUsernameRequest" in message and ("A wait of" in message or "FloodWait" in type(exc).__name__):
+                setattr(mt_client, "_archive_resolve_flooded", True)
+                print(
+                    "telegram MTProto ResolveUsername flood-wait detected; "
+                    "disabling MTProto for the rest of this run",
+                    file=sys.stderr,
+                )
+    elif mt_client is not None:
+        errors.append("mtproto skipped after ResolveUsername flood-wait earlier in this run")
 
     context_start = start_utc - timedelta(hours=max(12, context_hours))
     try:

@@ -90,7 +90,7 @@ class CollectorTests(unittest.TestCase):
         cfg = json.loads((ROOT / 'data' / 'sources.json').read_text(encoding='utf-8'))
         channels = {s['channel'] for s in cfg['sources'] if s.get('enabled')}
         self.assertTrue({'regionbez71', 'nashtatarstan_official', 'omelnichenko', 'mchsrb01', 'fedorishchev_official'} <= channels)
-        self.assertTrue({'mos_sobyanin','vorobiev_live','avbogomaz','evraevmikhail','glebnikitin_nn','Shapsha_VV'} <= channels)
+        self.assertTrue({'mos_sobyanin','vorobiev_live','E_V_Kovalchuk','evraevmikhail','glebnikitin_nn','Shapsha_VV'} <= channels)
         self.assertTrue({'ivanovoobl','anohin67','busargin_r','officialmordovia','ulgovru','RostovRegion','kondratyevvi','chuvashia_region','rgn_34'} <= channels)
         self.assertNotIn('nn52signal', channels)
         self.assertGreaterEqual(len(channels), 40)
@@ -250,7 +250,7 @@ class CollectorTests(unittest.TestCase):
         enabled = [s for s in cfg['sources'] if s.get('enabled')]
         channels = {s['channel'] for s in enabled}
         required = {
-            'mchs_orel', 'mchs_bryansk', 'gumchs48', 'lipobl',
+            'mchs_orel', 'orelregion_government', 'mchs_bryansk', 'E_V_Kovalchuk', 'gumchs48', 'lipobl',
             'pavelmalkov_official', 'PervyshovEA', 'gu_mchs_tambov',
             'mchs_mo', 'govrme12', 'mchs12gov', 'mchs_ulyanovsk',
             'mchs34', 'volgadmin', 'Yuri_Slusar', 'mchs_rostov',
@@ -270,6 +270,7 @@ class CollectorTests(unittest.TestCase):
         # An official local post explicitly reporting a UAV remains visible even
         # if it uses wording outside the current operational regex families.
         self.assertEqual(uav_activity_kind('В районе сообщается о БПЛА.'), 'official_uav_activity')
+        self.assertIsNone(uav_activity_kind('В регионе стартовал чемпионат по управлению БПЛА среди школьников.'))
     def test_v13_mixed_missile_clear_uav_continues(self):
         mixed = (
             'Режим «Ракетная опасность» на территории Республики Татарстан отменен. '

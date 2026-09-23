@@ -1,5 +1,5 @@
 {
-  "version": 8,
+  "version": 13,
   "sources": [
     {
       "region": "Belgorod Oblast",
@@ -760,7 +760,7 @@
       "region_label": "Московская область",
       "region_center": [
         55.5,
-        38.0
+        38
       ],
       "channel": "vorobiev_live",
       "source_name": "Андрей Воробьёв — губернатор Московской области",
@@ -935,7 +935,7 @@
         "alerts",
         "reports"
       ],
-      "enabled": true,
+      "enabled": false,
       "places": [
         {
           "name": "Bryansk",
@@ -958,7 +958,48 @@
       "verified_official": true,
       "source_layer": "official_local",
       "priority": 2,
-      "expected_active": true
+      "expected_active": false,
+      "notes": "Historical former-governor source; disabled for current collection after 2026 leadership change."
+    },
+    {
+      "region": "Bryansk Oblast",
+      "region_label": "Брянская область",
+      "region_center": [
+        52.95,
+        33.4
+      ],
+      "channel": "E_V_Kovalchuk",
+      "source_name": "Егор Ковальчук — врио губернатора Брянской области",
+      "source_url": "https://t.me/E_V_Kovalchuk",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Bryansk",
+          "label": "Брянск",
+          "type": "city",
+          "lat": 53.2434,
+          "lon": 34.3637,
+          "aliases": [
+            "брянск",
+            "брянске"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "брянская область",
+        "брянской области"
+      ],
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 1,
+      "expected_active": true,
+      "notes": "Current official governor channel listed by the Bryansk regional government."
     },
     {
       "region": "Yaroslavl Oblast",
@@ -1118,6 +1159,48 @@
       "source_layer": "official_local",
       "priority": 2,
       "expected_active": true
+    },
+    {
+      "region": "Oryol Oblast",
+      "region_label": "Орловская область",
+      "region_center": [
+        52.97,
+        36.07
+      ],
+      "channel": "orelregion_government",
+      "source_name": "Орловская область — официальный канал правительства",
+      "source_url": "https://t.me/orelregion_government",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Oryol",
+          "label": "Орёл",
+          "type": "city",
+          "lat": 52.9685,
+          "lon": 36.0692,
+          "aliases": [
+            "орел",
+            "орёл",
+            "орле",
+            "городе орле"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "орловская область",
+        "орловской области"
+      ],
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 1,
+      "expected_active": true,
+      "notes": "Official regional-government mirror; adds redundancy because some operational notices moved primarily to MAX."
     },
     {
       "region": "Kaluga Oblast",
@@ -2396,7 +2479,7 @@
       "region_label": "Краснодарский край",
       "region_center": [
         45.1,
-        39.0
+        39
       ],
       "channel": "officialsochi",
       "source_name": "Сочи Официальный",
@@ -2436,7 +2519,7 @@
       "region_label": "Краснодарский край",
       "region_center": [
         45.1,
-        39.0
+        39
       ],
       "channel": "anapaofficial",
       "source_name": "Мэрия Анапы",
@@ -3110,6 +3193,7 @@
   "notes": [
     "High-resolution official local sources. Nationwide regional fallback sources are in data/regions.json.",
     "City/municipality matches take precedence. Valid UAV alerts that cannot be resolved locally fall back to the parent region.",
-    "MAX RSChS channels are tracked separately as provenance where verified; the collector does not use the authenticated MAX Bot API for channels it does not administer."
+    "MAX RSChS channels are tracked separately as provenance where verified; the collector does not use the authenticated MAX Bot API for channels it does not administer.",
+    "v13.1: current Bryansk governor source + Oryol government mirror; MTProto flood-wait hardening."
   ]
 }
