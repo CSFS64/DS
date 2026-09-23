@@ -146,7 +146,8 @@ UAV_OPERATIONAL_PATTERNS = tuple(re.compile(p) for p in (
 
 NON_OPERATIONAL_UAV_PATTERNS = tuple(re.compile(p) for p in (
     r"\b(?:производств\w*|разработк\w*|изготовлен\w*|сборк\w*|закупк\w*|контракт\w*)\b",
-    r"\b(?:выставк\w*|форум\w*|соревнован\w*|фестивал\w*|кружок\w*|обучен\w*|учебн\w*)\b",
+    r"\b(?:выставк\w*|форум\w*|соревнован\w*|фестивал\w*|кружок\w*|обучен\w*|учебн\w*|учени\w*|тренировк\w*|инструктаж\w*|памятк\w*|профилактич\w*)\b",
+    r"\b(?:алгоритм\w*\s+действ\w*|правил\w*\s+поведен\w*)\b",
     r"\b(?:сельскохозяйствен\w*|доставк\w*|аэрофотосъем\w*)\b",
 ))
 
@@ -197,32 +198,35 @@ def has_missile_reference(text: str) -> bool:
 
 
 def missile_activity_kind(text: str) -> str | None:
-    n = normalize(text)
     formal = missile_text_kind(text)
     if formal == "start":
         return "alert_start_signal"
     if formal == "end":
         return "alert_end_signal"
-    if not has_missile_reference(text):
-        return None
-    if any(p.search(n) for p in NON_OPERATIONAL_MISSILE_PATTERNS) and not any(p.search(n) for p in MISSILE_OPERATIONAL_PATTERNS):
-        return None
-    if not any(p.search(n) for p in MISSILE_OPERATIONAL_PATTERNS):
-        return None
-    if re.search(r"\b(?:обломк\w*|падени\w*|прилет\w*|попадани\w*|поврежден\w*)\b", n):
-        return "impact_or_debris"
-    if re.search(r"\b(?:сбит\w*|уничтож\w*|перехват\w*|нейтрализ\w*|ликвидир\w*)\b", n):
-        return "air_defense_action"
-    if re.search(r"\b(?:обнаруж\w*|зафиксир\w*|замеч\w*|выявл\w*|наблюда\w*)\b", n):
-        return "missile_detected"
-    if re.search(r"\b(?:летит|летят|летел\w*|движ\w*|направля\w*|приближа\w*|подлета\w*|подлет\w*|пролет\w*)\b", n):
-        return "missile_movement"
-    if re.search(r"\b(?:пуск\w*|запуск\w*)\b", n):
-        return "missile_launch"
-    if re.search(r"\b(?:атак\w*|удар\w*|обстрел\w*)\b", n):
-        return "missile_attack_activity"
-    return "official_missile_activity"
 
+    chunks = [s.strip() for s in re.split(r"(?<=[.!?])\s+|\n+", str(text)) if s.strip()] or [str(text)]
+    for chunk in chunks:
+        if not has_missile_reference(chunk):
+            continue
+        n = normalize(chunk)
+        if any(p.search(n) for p in NON_OPERATIONAL_MISSILE_PATTERNS):
+            continue
+        if re.search(r"\b(?:обломк\w*|падени\w*|прилет\w*|попадани\w*|поврежден\w*)\b", n):
+            return "impact_or_debris"
+        if re.search(r"\b(?:сбит\w*|уничтож\w*|перехват\w*|нейтрализ\w*|ликвидир\w*)\b", n):
+            return "air_defense_action"
+        if re.search(r"\b(?:обнаруж\w*|зафиксир\w*|замеч\w*|выявл\w*|наблюда\w*)\b", n):
+            return "missile_detected"
+        if re.search(r"\b(?:летит|летят|летел\w*|движ\w*|направля\w*|приближа\w*|подлета\w*|подлет\w*|пролет\w*)\b", n):
+            return "missile_movement"
+        if re.search(r"\b(?:пуск\w*|запуск\w*)\b", n):
+            return "missile_launch"
+        if re.search(r"\b(?:атак\w*|удар\w*|обстрел\w*)\b", n):
+            return "missile_attack_activity"
+        if any(p.search(n) for p in MISSILE_OPERATIONAL_PATTERNS):
+            return "official_missile_activity"
+        return "official_missile_activity"
+    return None
 
 def activity_signals(text: str) -> list[tuple[str, str]]:
     out: list[tuple[str, str]] = []
@@ -251,35 +255,36 @@ def has_uav_reference(text: str) -> bool:
 
 
 def uav_activity_kind(text: str) -> str | None:
-    """Classify any clearly operational UAV wording from an official local source.
-
-    This intentionally prioritizes recall for the delayed historical display.
-    Formal alert START/END still use text_kind(); everything else is retained as
-    a timestamped official signal instead of being silently discarded.
-    """
-    n = normalize(text)
+    """Classify operational UAV wording without cross-sentence false matches."""
     formal = text_kind(text)
     if formal == "start":
         return "alert_start_signal"
     if formal == "end":
         return "alert_end_signal"
-    if not has_uav_reference(text):
-        return None
-    if any(p.search(n) for p in NON_OPERATIONAL_UAV_PATTERNS) and not any(p.search(n) for p in UAV_OPERATIONAL_PATTERNS):
-        return None
-    if not any(p.search(n) for p in UAV_OPERATIONAL_PATTERNS):
-        return None
-    if re.search(r"\b(?:обломк\w*|падени\w*|прилет\w*|попадани\w*|поврежден\w*)\b", n):
-        return "impact_or_debris"
-    if re.search(r"\b(?:сбит\w*|уничтож\w*|перехват\w*|подав\w*|нейтрализ\w*|обезвреж\w*)\b", n):
-        return "air_defense_action"
-    if re.search(r"\b(?:обнаруж\w*|зафиксир\w*|замеч\w*|выявл\w*|наблюда\w*)\b", n):
-        return "uav_detected"
-    if re.search(r"\b(?:летит|летят|движ\w*|направля\w*|приближа\w*|подлета\w*|подлет\w*|пролет\w*)\b", n):
-        return "uav_movement"
-    if re.search(r"\bатак\w*\b", n):
-        return "uav_attack_activity"
-    return "official_uav_activity"
+
+    chunks = [s.strip() for s in re.split(r"(?<=[.!?])\s+|\n+", str(text)) if s.strip()] or [str(text)]
+    for chunk in chunks:
+        if not has_uav_reference(chunk):
+            continue
+        n = normalize(chunk)
+        if any(p.search(n) for p in NON_OPERATIONAL_UAV_PATTERNS):
+            continue
+        if re.search(r"\b(?:обломк\w*|падени\w*|прилет\w*|попадани\w*|поврежден\w*)\b", n):
+            return "impact_or_debris"
+        if re.search(r"\b(?:сбит\w*|уничтож\w*|перехват\w*|подав\w*|нейтрализ\w*|обезвреж\w*|ликвидир\w*)\b", n):
+            return "air_defense_action"
+        if re.search(r"\b(?:обнаруж\w*|зафиксир\w*|замеч\w*|выявл\w*|наблюда\w*|фиксиру\w*)\b", n):
+            return "uav_detected"
+        if re.search(r"\b(?:летит|летят|летел\w*|движ\w*|направля\w*|приближа\w*|подлета\w*|подлет\w*|пролет\w*|следу\w*)\b", n):
+            return "uav_movement"
+        if re.search(r"\bатак\w*\b", n):
+            return "uav_attack_activity"
+        if any(p.search(n) for p in UAV_OPERATIONAL_PATTERNS):
+            return "official_uav_activity"
+        # Display-first fallback: an official local post explicitly about a UAV
+        # is retained unless it is clearly instructional/non-operational.
+        return "official_uav_activity"
+    return None
 
 REGION_PHRASES = (
     "на всей территории области",
@@ -622,11 +627,18 @@ def fetch_telegram_with_fallback(session: requests.Session, channel: str,
     errors: list[str] = []
     if mt_client is not None:
         try:
-            return fetch_posts_mtproto_for_window(
+            mt_result = fetch_posts_mtproto_for_window(
                 mt_client, channel, start_utc, end_utc,
                 context_hours=context_hours,
                 max_messages=int(os.getenv("TELEGRAM_MT_MAX_MESSAGES", "20000")),
             )
+            # A complete MTProto window with zero posts is normally valid, but
+            # raw_items <= 1 is suspicious for established public channels and
+            # has produced false "quiet" results. Cross-check public HTML/search
+            # before accepting that state.
+            if mt_result.posts or mt_result.raw_items > 1:
+                return mt_result
+            errors.append("mtproto returned suspiciously empty history (raw_items <= 1)")
         except Exception as exc:
             errors.append(f"mtproto: {exc}")
 
@@ -795,6 +807,8 @@ def alert_post_stats(posts: list[Post]) -> dict[str, int]:
             uav_activity += 1
         if any(threat == "missile" for threat, _ in signals):
             missile_activity += 1
+    uav_reference_posts = sum(1 for post in posts if has_uav_reference(post.text))
+    missile_reference_posts = sum(1 for post in posts if has_missile_reference(post.text))
     return {
         "alert_posts": starts + ends,
         "start_posts": starts,
@@ -802,6 +816,9 @@ def alert_post_stats(posts: list[Post]) -> dict[str, int]:
         "activity_posts": activity,
         "uav_activity_posts": uav_activity,
         "missile_activity_posts": missile_activity,
+        "uav_reference_posts": uav_reference_posts,
+        "missile_reference_posts": missile_reference_posts,
+        "unclassified_reference_posts": max(0, uav_reference_posts + missile_reference_posts - uav_activity - missile_activity),
         "missile_start_posts": missile_starts,
         "missile_end_posts": missile_ends,
     }

@@ -259,6 +259,17 @@ class CollectorTests(unittest.TestCase):
         self.assertGreaterEqual(len(enabled), 67)
         self.assertTrue(required <= channels)
 
+    def test_v13_classifier_is_sentence_scoped_and_display_first(self):
+        # Operational word in an unrelated sentence must not combine with a
+        # later training/instruction sentence to create a false activity hit.
+        text = (
+            'На объекте зафиксировано 460 нарушений пожарной безопасности. '
+            'В школах проходят тренировки по алгоритмам действий при угрозе БПЛА.'
+        )
+        self.assertIsNone(uav_activity_kind(text))
+        # An official local post explicitly reporting a UAV remains visible even
+        # if it uses wording outside the current operational regex families.
+        self.assertEqual(uav_activity_kind('В районе сообщается о БПЛА.'), 'official_uav_activity')
     def test_v13_missile_activity_and_formal_pairing(self):
         self.assertEqual(missile_text_kind('В регионе объявлена ракетная опасность.'), 'start')
         self.assertEqual(missile_text_kind('Отбой ракетной опасности.'), 'end')
