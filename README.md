@@ -158,3 +158,7 @@ The data Action defaults to a 48-hour collection window ending at least 24 hours
 ## v9 update
 
 See `README_V9.md`. v9 hides inactive archive point markers, removes post-clear region trails, adds a cumulative `Σ` timeline pointer, and changes scheduled data collection to incremental updates (new safe archive edge + overlap) instead of re-fetching the full lookback on every run.
+
+## v10 parser behavior
+
+v10 prioritizes retaining official local UAV activity instead of discarding posts that do not form a perfect START/END pair. See `README_V10.md` for the activity classes and display semantics.

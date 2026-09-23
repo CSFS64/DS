@@ -42,7 +42,7 @@ DEFAULT_CITIES = ROOT / "data" / "cities.json"
 DEFAULT_OUTPUT = ROOT / "data" / "events.json"
 
 USER_AGENT = (
-    "DeepstrikeArchive/2.0 (+https://github.com/; historical archive; 24h+ lag) "
+    "DeepstrikeArchive/3.0 (+https://github.com/; historical archive; 24h+ lag) "
     "requests/2"
 )
 
@@ -55,6 +55,11 @@ START_MARKERS = (
     "режим атака бпла",
     "угроза беспилотной атаки",
     "опасность бпла",
+    "воздушная опасность",
+    "режим воздушная опасность",
+    "угроза подлета бпла",
+    "угроза подлета беспилотников",
+    "опасное небо",
 )
 END_MARKERS = (
     "отбой опасности атаки бпла",
@@ -87,15 +92,92 @@ END_PATTERNS = tuple(re.compile(p) for p in (
     r"\b(?:снят|снята|снято|отменен|отменена|отменено)\b.{0,50}\bугроз\w*\b",
     r"\bотбой\b.{0,70}\bвоздушн\w*\s+опасност\w*",
     r"\b(?:снят|отменен|отбой)\w*\b.{0,70}\bопасн\w*\s+неб\w*",
+    r"\bотбой\b.{0,90}\bугроз\w*.{0,35}\bподлет\w*.{0,35}\b(?:бпла|беспилотн\w*)\b",
+    r"\b(?:снят|снята|отменен|отменена|отбой)\w*\b.{0,100}\bвоздушн\w*\s+опасност\w*",
 ))
 START_PATTERNS = tuple(re.compile(p) for p in (
-    r"\b(?:объявлен\w*|введен\w*|действует|сохраняется)\b.{0,90}\bбеспилотн\w*\s+опасност\w*",
-    r"\b(?:опасност\w*|угроз\w*)\s+атак\w*\s+бпла\b",
+    r"\b(?:объявлен\w*|введен\w*|действует|сохраняется)\b.{0,110}\bбеспилотн\w*\s+опасност\w*",
+    r"\b(?:объявлен\w*|введен\w*|действует|сохраняется)\b.{0,110}\bвоздушн\w*\s+опасност\w*",
+    r"\b(?:опасност\w*|угроз\w*)\s+атак\w*\s+(?:бпла|беспилотн\w*)\b",
     r"\bугроз\w*\s+беспилотн\w*\s+атак\w*\b",
-    r"\bопасност\w*\s+бпла\b",
+    r"\bопасност\w*\s+(?:бпла|беспилотн\w*)\b",
     r"\bрежим\s+атака\s+бпла\b",
-    r"\bтревог\w*.{0,60}\bбпла\b",
+    r"\bтревог\w*.{0,80}\b(?:бпла|беспилотн\w*)\b",
+    r"\bугроз\w*.{0,30}\bподлет\w*.{0,30}\b(?:бпла|беспилотн\w*)\b",
+    r"\b(?:объявлен\w*|введен\w*|действует|сохраняется)\b.{0,80}\bопасн\w*\s+неб\w*",
 ))
+
+# Broad historical-activity classifier.  Official regional channels use far more
+# wording than formal START/END templates.  We therefore keep any post that has
+# a clear UAV reference plus operational context as a point-in-time signal.  It
+# is displayed as activity unless a paired formal alert provides a real interval.
+UAV_REFERENCE_PATTERNS = tuple(re.compile(p) for p in (
+    r"\bбпла\b",
+    r"\bбеспилотн\w*\b",
+    r"\bдрон\w*\b",
+    r"\bбеспилотн\w*\s+(?:летательн\w*\s+аппарат\w*|воздушн\w*\s+(?:суд\w*|средств\w*|аппарат\w*))\b",
+))
+
+UAV_OPERATIONAL_PATTERNS = tuple(re.compile(p) for p in (
+    # warnings / danger / threat
+    r"\b(?:опасност\w*|угроз\w*|тревог\w*|опасн\w*\s+неб\w*)\b",
+    r"\b(?:объявлен\w*|введен\w*|действует|сохраняется)\b.{0,100}\b(?:режим\w*|опасност\w*|угроз\w*)\b",
+    # attack / approach / flight / detection
+    r"\bатак\w*\b",
+    r"\b(?:летит|летят|летел\w*|движ\w*|направля\w*|приближа\w*|подлета\w*|подлет\w*|пролет\w*|следу\w*)\b",
+    r"\b(?:обнаруж\w*|зафиксир\w*|замеч\w*|выявл\w*|наблюда\w*|фиксиру\w*)\b",
+    # air-defence / EW response
+    r"\b(?:сбит\w*|уничтож\w*|перехват\w*|подав\w*|нейтрализ\w*|обезвреж\w*|ликвидир\w*)\b",
+    r"\b(?:пво|рэб)\b.{0,80}\b(?:работа\w*|отража\w*|сбит\w*|уничтож\w*|подав\w*)\b",
+    r"\b(?:работа\w*|отража\w*)\b.{0,80}\b(?:пво|рэб)\b",
+    # impact / debris / incident
+    r"\b(?:обломк\w*|падени\w*|прилет\w*|попадани\w*|взрыв\w*|поврежден\w*)\b",
+    # restrictions explicitly tied to UAVs
+    r"\b(?:ковер|ограничен\w*|закрыт\w*|приостанов\w*)\b",
+))
+
+NON_OPERATIONAL_UAV_PATTERNS = tuple(re.compile(p) for p in (
+    r"\b(?:производств\w*|разработк\w*|изготовлен\w*|сборк\w*|закупк\w*|контракт\w*)\b",
+    r"\b(?:выставк\w*|форум\w*|соревнован\w*|фестивал\w*|кружок\w*|обучен\w*|учебн\w*)\b",
+    r"\b(?:сельскохозяйствен\w*|доставк\w*|аэрофотосъем\w*)\b",
+))
+
+def has_uav_reference(text: str) -> bool:
+    n = normalize(text)
+    return any(p.search(n) for p in UAV_REFERENCE_PATTERNS) or "опасное небо" in n
+
+
+def uav_activity_kind(text: str) -> str | None:
+    """Classify any clearly operational UAV wording from an official local source.
+
+    This intentionally prioritizes recall for the delayed historical display.
+    Formal alert START/END still use text_kind(); everything else is retained as
+    a timestamped official signal instead of being silently discarded.
+    """
+    n = normalize(text)
+    formal = text_kind(text)
+    if formal == "start":
+        return "alert_start_signal"
+    if formal == "end":
+        return "alert_end_signal"
+    if not has_uav_reference(text):
+        return None
+    if any(p.search(n) for p in NON_OPERATIONAL_UAV_PATTERNS) and not any(p.search(n) for p in UAV_OPERATIONAL_PATTERNS):
+        return None
+    if not any(p.search(n) for p in UAV_OPERATIONAL_PATTERNS):
+        return None
+    if re.search(r"\b(?:обломк\w*|падени\w*|прилет\w*|попадани\w*|поврежден\w*)\b", n):
+        return "impact_or_debris"
+    if re.search(r"\b(?:сбит\w*|уничтож\w*|перехват\w*|подав\w*|нейтрализ\w*|обезвреж\w*)\b", n):
+        return "air_defense_action"
+    if re.search(r"\b(?:обнаруж\w*|зафиксир\w*|замеч\w*|выявл\w*|наблюда\w*)\b", n):
+        return "uav_detected"
+    if re.search(r"\b(?:летит|летят|движ\w*|направля\w*|приближа\w*|подлета\w*|подлет\w*|пролет\w*)\b", n):
+        return "uav_movement"
+    if re.search(r"\bатак\w*\b", n):
+        return "uav_attack_activity"
+    return "official_uav_activity"
+
 REGION_PHRASES = (
     "на всей территории области",
     "на всей территории республики",
@@ -333,20 +415,62 @@ def text_kind(text: str) -> str | None:
 def alert_post_stats(posts: list[Post]) -> dict[str, int]:
     starts = 0
     ends = 0
+    activity = 0
     for post in posts:
         kind = text_kind(post.text)
         if kind == "start":
             starts += 1
         elif kind == "end":
             ends += 1
-    return {"alert_posts": starts + ends, "start_posts": starts, "end_posts": ends}
+        if uav_activity_kind(post.text) is not None:
+            activity += 1
+    return {
+        "alert_posts": starts + ends,
+        "start_posts": starts,
+        "end_posts": ends,
+        "activity_posts": activity,
+    }
+
+
+def alias_variants(value: str) -> list[str]:
+    """Generate conservative Russian case variants for place aliases at parse time."""
+    raw = str(value or "").strip()
+    if not raw:
+        return []
+    out = [raw]
+    words = raw.split()
+    if not words or not re.search(r"[А-Яа-яЁё]", words[-1]):
+        return out
+    w = words[-1]
+    lw = w.lower().replace("ё", "е")
+    base = words[:-1]
+    def add(last: str):
+        out.append(" ".join([*base, last]))
+    if lw.endswith("а") and len(w) > 3:
+        stem = w[:-1]
+        for ending in ("е", "ы", "у", "ой"):
+            add(stem + ending)
+    elif lw.endswith("я") and len(w) > 3:
+        stem = w[:-1]
+        for ending in ("е", "и", "ю", "ей"):
+            add(stem + ending)
+    elif lw.endswith("ь") and len(w) > 3:
+        stem = w[:-1]
+        for ending in ("и", "ью"):
+            add(stem + ending)
+    elif not lw.endswith(("ово", "ево", "ино", "ы", "и")) and re.search(r"[бвгджзклмнпрстфхцчшщ]$", lw):
+        for ending in ("е", "а", "у", "ом"):
+            add(w + ending)
+    # Common feminine genitive -зы/-сы etc. can be missed when a manually
+    # configured alias only contains nominative; the -а rule above covers it.
+    return list(dict.fromkeys(out))
 
 
 def extract_places(text: str, source: dict[str, Any]) -> list[dict[str, Any]]:
     n = normalize(text)
     matches = []
     for place in [*(source.get("places", []) or []), *(source.get("_catalog_places", []) or [])]:
-        aliases = [normalize(a) for a in place.get("aliases", [])]
+        aliases = [normalize(v) for a in place.get("aliases", []) for v in alias_variants(a)]
 
         def alias_present(alias: str) -> bool:
             if not alias:
@@ -564,18 +688,9 @@ def infer_report_places(sentence: str, source: dict[str, Any]) -> list[dict[str,
     return places
 
 
-INCIDENT_ACTIVITY_PATTERNS = tuple(re.compile(p) for p in (
-    r"\b(?:идет|идёт|отражается|продолжается)\s+атак\w*\s+(?:бпла|беспилотн\w*)",
-    r"\bатак\w*.{0,45}(?:бпла|беспилотн\w*)",
-    r"\b(?:бпла|беспилотн\w*).{0,45}\bатак\w*",
-    r"\b(?:сбит|сбиты|сбито|уничтожен|уничтожены|уничтожено|подавлен|подавлены|ликвидирован|ликвидированы)\w*.{0,40}(?:бпла|беспилотн\w*)",
-    r"\b(?:обломк\w*|падени\w*).{0,50}(?:бпла|беспилотн\w*)",
-    r"\bприлет\w*.{0,40}(?:бпла|беспилотн\w*)",
-))
-
 def is_official_activity_text(text: str) -> bool:
-    n = normalize(text)
-    return any(p.search(n) for p in INCIDENT_ACTIVITY_PATTERNS)
+    return uav_activity_kind(text) is not None
+
 
 def extract_reports(posts: list[Post], source: dict[str, Any], window_start: datetime, window_end: datetime):
     reports = []
@@ -585,7 +700,8 @@ def extract_reports(posts: list[Post], source: dict[str, Any], window_start: dat
         if mod_derived(post):
             continue
         npost = normalize(post.text)
-        if not any(token in npost for token in ("бпла", "беспилот")):
+        whole_activity_kind = uav_activity_kind(post.text)
+        if whole_activity_kind is None and not any(token in npost for token in ("бпла", "беспилот", "дрон")):
             continue
         produced_for_post = False
         for sentence in sentence_split(post.text):
@@ -606,6 +722,8 @@ def extract_reports(posts: list[Post], source: dict[str, Any], window_start: dat
                     "id": stable_id(source.get("channel", source.get("source_id", "source")), str(post.post_id), place, ctype, str(count)),
                     "region": source["region"], "place": place, "scope": scope,
                     "at": post.published_at.isoformat(), "count": count, "count_type": ctype,
+                    "signal_class": "uav_activity_signal",
+                    "activity_kind": uav_activity_kind(sentence) or whole_activity_kind or "official_uav_activity",
                     "count_qualifier": qualifier, "secondary_count": secondary_count, "secondary_type": secondary_type,
                     "text": sentence, "source_name": source["source_name"], "url": post.url,
                     "source_kind": source.get("kind", "official"),
@@ -614,18 +732,29 @@ def extract_reports(posts: list[Post], source: dict[str, Any], window_start: dat
                     "mentioned_places": mentioned_places,
                 })
                 produced_for_post = True
-        # Many governors report a local UAV attack without giving a count.  Keep
-        # that first-party event as amber activity instead of dropping it.  Do
-        # not turn a formal START/END alert into a duplicate report.
-        if not produced_for_post and text_kind(post.text) is None and is_official_activity_text(post.text):
+        # Display-first historical policy: any clearly operational UAV wording
+        # from an official local source is retained as a timestamped signal, even
+        # when START/END cannot be paired. Paired intervals still remain the
+        # authoritative red alert windows; these point signals prevent real local
+        # activity from disappearing merely because the wording is non-standard.
+        activity_kind = uav_activity_kind(post.text)
+        if not produced_for_post and activity_kind is not None:
             mentioned = infer_report_places(post.text, source)
             primary_place = mentioned[0] if mentioned else None
             place = primary_place["name"] if primary_place else source["region"]
             scope = alert_scope(primary_place) if primary_place else "region"
+            display_type = activity_kind if activity_kind.startswith("alert_") else "official_activity"
+            signal_class = (
+                "formal_alert_signal" if activity_kind == "alert_start_signal"
+                else "alert_clear_signal" if activity_kind == "alert_end_signal"
+                else "uav_activity_signal"
+            )
             reports.append({
-                "id": stable_id(source.get("channel", source.get("source_id", "source")), str(post.post_id), place, "official_activity"),
+                "id": stable_id(source.get("channel", source.get("source_id", "source")), str(post.post_id), place, activity_kind),
                 "region": source["region"], "place": place, "scope": scope,
-                "at": post.published_at.isoformat(), "count": None, "count_type": "official_activity",
+                "at": post.published_at.isoformat(), "count": None, "count_type": display_type,
+                "activity_kind": activity_kind,
+                "signal_class": signal_class,
                 "count_qualifier": None, "secondary_count": None, "secondary_type": None,
                 "text": post.text, "source_name": source["source_name"], "url": post.url,
                 "source_kind": source.get("kind", "official"),
@@ -750,9 +879,11 @@ def collect(args) -> dict[str, Any]:
     telegram_status = [s for s in statuses if s["source_type"] == "telegram"]
     regions_with_events = sorted({e["region"] for e in all_events})
     regions_with_alert_posts = sorted({s["region"] for s in statuses if s.get("alert_posts", 0) > 0})
+    regions_with_activity_posts = sorted({s["region"] for s in statuses if s.get("activity_posts", 0) > 0})
+    regions_with_any_record = sorted({e["region"] for e in all_events} | {r["region"] for r in all_reports})
     hi_res_regions_with_events = sorted({e["region"] for e in all_events if e.get("source_kind") == "telegram"})
     return {
-        "schema_version": 3,
+        "schema_version": 4,
         "generated_at": now.isoformat(),
         "safety_lag_hours": args.safety_lag_hours,
         "window_start": window_start.isoformat(),
@@ -767,10 +898,13 @@ def collect(args) -> dict[str, Any]:
             "region_feeds_http_ok": sum(1 for s in rss_status if s.get("ok")),
             "mchs_regions_with_alert_posts": sum(1 for s in rss_status if s.get("alert_posts", 0) > 0),
             "regions_with_any_alert_posts": len(regions_with_alert_posts),
+            "regions_with_activity_posts": len(regions_with_activity_posts),
+            "regions_with_any_record": len(regions_with_any_record),
             "regions_with_paired_alerts": len(regions_with_events),
             "high_resolution_sources_configured": len([s for s in source_cfg.get("sources", []) if s.get("enabled", False)]),
             "high_resolution_sources_ok": sum(1 for s in telegram_status if s.get("ok")),
             "high_resolution_sources_with_alert_posts": sum(1 for s in telegram_status if s.get("alert_posts", 0) > 0),
+            "high_resolution_sources_with_activity_posts": sum(1 for s in telegram_status if s.get("activity_posts", 0) > 0),
             "high_resolution_regions_with_events": len(hi_res_regions_with_events),
             "city_catalog_count": len(city_cfg.get("cities", [])),
             "municipality_catalog_count": len(city_cfg.get("municipalities", [])),

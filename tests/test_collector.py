@@ -15,6 +15,7 @@ from collector.collect import (
     parse_mchs_rss,
     parse_telegram_html,
     text_kind,
+    uav_activity_kind,
     configure_incremental_window,
 )
 
@@ -209,6 +210,49 @@ class CollectorTests(unittest.TestCase):
         configure_incremental_window(args)
         self.assertEqual(args.collection_mode, "backfill")
         self.assertEqual(args.lookback_hours, 168)
+
+    def test_v10_broad_alert_wording(self):
+        self.assertEqual(text_kind('На территории города Пензы объявлен режим «Воздушная опасность».'), 'start')
+        self.assertEqual(text_kind('В Самарской области объявлена угроза подлёта БПЛА.'), 'start')
+        self.assertEqual(text_kind('Отбой по угрозе подлёта БПЛА.'), 'end')
+        self.assertEqual(text_kind('Объявлен режим «Опасное небо».'), 'start')
+
+    def test_v10_any_operational_uav_wording_is_signal(self):
+        cases = {
+            'В районе города обнаружен беспилотник.': 'uav_detected',
+            'Два БПЛА движутся в направлении города.': 'uav_movement',
+            'ПВО отражает атаку беспилотников.': 'uav_attack_activity',
+            'Обломки БПЛА упали на окраине города.': 'impact_or_debris',
+            'Силами ПВО уничтожен БПЛА.': 'air_defense_action',
+        }
+        for text, expected in cases.items():
+            with self.subTest(text=text):
+                self.assertEqual(uav_activity_kind(text), expected)
+        self.assertIsNone(uav_activity_kind('Обсудили производство БПЛА на предприятии.'))
+
+    def test_v10_unpaired_formal_start_is_still_display_signal(self):
+        cfg = json.loads((ROOT / 'data' / 'sources.json').read_text(encoding='utf-8'))
+        source = next(s for s in cfg['sources'] if s['channel'] == 'omelnichenko')
+        posts = [Post('omelnichenko', 9001, datetime(2026,9,20,1,0,tzinfo=timezone.utc),
+                      'На территории города Пензы объявлен режим «Воздушная опасность».', 'https://t.me/x/9001')]
+        reports = extract_reports(posts, source, datetime(2026,9,20,0,0,tzinfo=timezone.utc), datetime(2026,9,21,0,0,tzinfo=timezone.utc))
+        self.assertTrue(reports)
+        self.assertEqual(reports[0]['count_type'], 'alert_start_signal')
+        self.assertEqual(reports[0]['signal_class'], 'formal_alert_signal')
+        self.assertEqual(reports[0]['place'], 'Penza')
+
+    def test_v10_countless_multi_place_activity_is_retained(self):
+        source = dict(self.source)
+        source['_catalog_places'] = [
+            {'name':'Alpha','label':'Альфа','type':'city','lat':50,'lon':36,'aliases':['альфа','альфе']},
+            {'name':'Beta','label':'Бета','type':'city','lat':51,'lon':37,'aliases':['бета','бете']},
+        ]
+        posts = [Post('gov', 1, datetime(2026,9,20,1,0,tzinfo=timezone.utc),
+                      'БПЛА замечены в Альфе и Бете, ПВО работает.', 'https://t.me/gov/1')]
+        reports = extract_reports(posts, source, datetime(2026,9,20,0,0,tzinfo=timezone.utc), datetime(2026,9,21,0,0,tzinfo=timezone.utc))
+        self.assertEqual(len(reports), 1)
+        names = {p['name'] for p in reports[0]['mentioned_places']}
+        self.assertEqual(names, {'Alpha','Beta'})
 
 if __name__ == "__main__":
     unittest.main()

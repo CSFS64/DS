@@ -180,6 +180,13 @@ function updateDataStatus() {
     "regions_with_paired_alerts",
     new Set((state.archive.events || []).map(e => e.region)).size,
   );
+  const regionsWithRecords = coverageNumber(
+    "regions_with_any_record",
+    new Set([
+      ...(state.archive.events || []).map(e => e.region),
+      ...(state.archive.reports || []).map(r => r.region),
+    ]).size,
+  );
   const rssAlertCapable = coverageNumber(
     "mchs_regions_with_alert_posts",
     (state.archive.source_status || []).filter(s => s.source_type === "mchs_rss" && (s.alert_posts || 0) > 0).length,
@@ -189,6 +196,10 @@ function updateDataStatus() {
     "high_resolution_sources_with_alert_posts",
     (state.archive.source_status || []).filter(s => s.source_type === "telegram" && (s.alert_posts || 0) > 0).length,
   );
+  const hiActivityCapable = coverageNumber(
+    "high_resolution_sources_with_activity_posts",
+    (state.archive.source_status || []).filter(s => s.source_type === "telegram" && (s.activity_posts || 0) > 0).length,
+  );
   const unmatched = coverageNumber(
     "unmatched_starts",
     (state.archive.unmatched || []).filter(u => u.type === "unmatched_start").length,
@@ -196,9 +207,10 @@ function updateDataStatus() {
 
   els.dataStatus.textContent = [
     `${state.archive.events.length} PAIRED`,
-    `${regionsWithEvents}/${configured} REGIONS WITH EVENTS`,
+    `${regionsWithRecords}/${configured} REGIONS WITH RECORDS`,
+    `${regionsWithEvents}/${configured} PAIRED-REGIONS`,
     `${rssAlertCapable}/${configured} RSS ALERT-CAPABLE`,
-    `${hiAlertCapable}/${hiCfg} HIGH-RES ALERT-CAPABLE`,
+    `${hiActivityCapable}/${hiCfg} HIGH-RES ACTIVITY`,
     `${coverageNumber("city_catalog_count", state.cities?.cities?.length || 0)} CITIES`,
     `${coverageNumber("municipality_catalog_count", state.cities?.municipalities?.length || 0)} DISTRICTS`,
     `${unmatched} UNMATCHED`,
@@ -575,10 +587,19 @@ function cumulativeEvents() {
   return (state.archive.events || []).filter(e => Date.parse(e.end) >= start && Date.parse(e.start) <= end);
 }
 
+function cumulativeReports() {
+  const start = selectionStartMs();
+  const end = Math.min(Math.max(state.cumulativeMs, start), selectionEndMs());
+  return (state.archive.reports || []).filter(r => {
+    const at = Date.parse(r.at);
+    return at >= start && at <= end;
+  });
+}
+
 function render() {
   const cumulative = state.viewMode === "cumulative";
   const active = cumulative ? cumulativeEvents() : activeEvents();
-  const reports = cumulative ? [] : activeReports();
+  const reports = cumulative ? cumulativeReports() : activeReports();
   renderMap(active, reports);
   renderClocks(active, reports);
   renderScrubber();
@@ -628,18 +649,29 @@ function renderMap(active, reports = []) {
     // formal alert. This makes Moscow-style governor/mayor incident reporting
     // visible even when no explicit START/END warning was published.
     for (const report of reports) {
+      const formalSignal = report.signal_class === "formal_alert_signal";
       const rid = state.regionFeatureIds.get(report.region);
       if (rid != null && !state.previousActiveRegionIds.has(rid)) {
-        try { state.map.setFeatureState({ source: "archive-regions", id: rid }, { report: true }); } catch (_) {}
-        state.previousReportRegionIds.add(rid);
+        if (formalSignal) {
+          setFeatureActive("archive-regions", rid, true);
+          state.previousActiveRegionIds.add(rid);
+        } else {
+          try { state.map.setFeatureState({ source: "archive-regions", id: rid }, { report: true }); } catch (_) {}
+          state.previousReportRegionIds.add(rid);
+        }
       }
       const mentioned = (report.mentioned_places?.length ? report.mentioned_places : [report]);
       for (const place of mentioned) {
         const key = `${report.region}::${place.name || report.place}`;
         const id = state.placeFeatureIds.get(key);
         if (id != null && !state.previousActivePlaceIds.has(id)) {
-          try { state.map.setFeatureState({ source: "archive-places", id }, { report: true }); } catch (_) {}
-          state.previousReportPlaceIds.add(id);
+          if (formalSignal) {
+            setFeatureActive("archive-places", id, true);
+            state.previousActivePlaceIds.add(id);
+          } else {
+            try { state.map.setFeatureState({ source: "archive-places", id }, { report: true }); } catch (_) {}
+            state.previousReportPlaceIds.add(id);
+          }
         }
       }
     }
@@ -654,7 +686,11 @@ function renderClocks(active, reports = []) {
   if (state.viewMode === "cumulative") {
     const regionCount = new Set(active.map(e => e.region)).size;
     const placeCount = new Set(active.filter(e => e.scope !== "region").map(e => `${e.region}::${e.place}`)).size;
-    els.currentTimeLabel.textContent = `Σ START → ${formatTime(state.cumulativeMs, "Europe/Moscow")} MSK · ${regionCount} REGIONS · ${placeCount} LOCAL`;
+    const reportRegions = new Set(reports.map(r => r.region));
+    const allRegions = new Set([...active.map(e => e.region), ...reportRegions]);
+    const reportPlaces = new Set(reports.flatMap(r => (r.mentioned_places?.length ? r.mentioned_places : [r]).map(p => `${r.region}::${p.name || r.place}`)));
+    const allPlaces = new Set([...active.filter(e => e.scope !== "region").map(e => `${e.region}::${e.place}`), ...reportPlaces]);
+    els.currentTimeLabel.textContent = `Σ START → ${formatTime(state.cumulativeMs, "Europe/Moscow")} MSK · ${allRegions.size} REGIONS · ${allPlaces.size} LOCAL`;
   } else {
     const reportCount = reports.length;
     els.currentTimeLabel.textContent = `${formatTime(state.currentMs, "Europe/Moscow")} MSK · ${active.length} ALERT${active.length === 1 ? "" : "S"} · ${reportCount} REPORT${reportCount === 1 ? "" : "S"}`;
@@ -692,7 +728,7 @@ function sourceStatusText(region) {
   return rows.map(s => {
     const kind = s.source_type === "telegram" ? "HIGH-RES" : "MChS RSS";
     if (!s.ok) return `${kind}: ERROR`;
-    return `${kind}: ${s.alert_posts ?? "?"} alert posts · ${s.events ?? 0} paired`;
+    return `${kind}: ${s.activity_posts ?? s.alert_posts ?? "?"} UAV activity posts · ${s.events ?? 0} paired · ${s.reports ?? 0} signals`;
   }).join("\n");
 }
 
@@ -753,7 +789,11 @@ function showRegionDetail(regionName) {
 }
 
 function showReportDetail(report) {
-  els.detailEyebrow.textContent = "LOCAL OFFICIAL REPORT";
+  els.detailEyebrow.textContent = report.signal_class === "formal_alert_signal"
+    ? "UNPAIRED FORMAL ALERT START"
+    : report.signal_class === "alert_clear_signal"
+      ? "UNPAIRED ALERT CLEAR SIGNAL"
+      : "LOCAL OFFICIAL UAV ACTIVITY";
   els.detailTitle.textContent = report.place;
   els.detailBody.textContent = `${formatTime(Date.parse(report.at), "Europe/Moscow")} MSK\n${report.text || `${report.count ?? "—"} ${report.count_type || "reported"}`}`;
   els.detailSource.href = report.url;
