@@ -410,6 +410,14 @@ class CollectorTests(unittest.TestCase):
             {'Klintsy District','Starodub Municipal Okrug','Boguchar District'},
         )
 
+        shared = 'Клинцовский, Богучарский и Стародубский районы находятся под угрозой БПЛА.'
+        places = extract_places(shared, source)
+        self.assertTrue({'Klintsy District','Boguchar District'} <= {p['name'] for p in places})
+
+        short = 'Угроза атаки БПЛА в Клинцовском МО.'
+        places = extract_places(short, source)
+        self.assertIn('Klintsy District', {p['name'] for p in places})
+
     def test_v14_multi_district_report_keeps_all_places(self):
         source = dict(self.source)
         source['_catalog_places'] = [

@@ -954,18 +954,74 @@ def alias_variants(value: str) -> list[str]:
     return list(dict.fromkeys(v for v in out if v))
 
 
+ADMIN_CONTEXT_RE = re.compile(
+    r"\b(?:"
+    r"район(?:ы|ов|ах|ам|ами|е|а|у|ом)?|"
+    r"округ(?:а|ов|ах|ам|ами|е|у|ом)?|"
+    r"муниципалитет(?:ы|ов|ах|ам|ами|е|а|у|ом)?|"
+    r"муниципальн\w*\s+(?:район\w*|округ\w*)|"
+    r"городск\w*\s+округ\w*|"
+    r"\bмо\b"
+    r")\b"
+)
+
+def administrative_head_variants(value: str) -> list[str]:
+    """Return the distinctive adjective part of an administrative alias.
+
+    This lets us resolve compact official phrasing such as
+    "Лискинский и Острогожский районы" or
+    "Боровского, Жуковского ... муниципальных округов".
+    """
+    raw = str(value or "").strip()
+    if not raw or not re.search(r"[А-Яа-яЁё]", raw):
+        return []
+    words = raw.split()
+    clean = [w.lower().replace("ё", "е").strip(".,:;()[]{}«»\"'") for w in words]
+    admin_idx = next((i for i, w in enumerate(clean) if w in ADMIN_NOUN_CASES), None)
+    if admin_idx is None or admin_idx == 0:
+        return []
+
+    prefixes = [words[:admin_idx]]
+    if admin_idx > 1:
+        prefixes.append(words[:1])
+
+    out = []
+    for prefix in prefixes:
+        out.append(" ".join(prefix))
+        for case in ("prep", "gen", "dat", "inst"):
+            out.append(" ".join(_ru_adjective_case(w, case) for w in prefix))
+    return list(dict.fromkeys(v for v in out if len(normalize(v)) >= 4))
+
+
 def extract_places(text: str, source: dict[str, Any]) -> list[dict[str, Any]]:
     n = normalize(text)
     matches = []
+
+    def alias_present(alias: str) -> bool:
+        if not alias:
+            return False
+        return re.search(r"(?<![а-яa-z0-9])" + re.escape(alias) + r"(?![а-яa-z0-9])", n) is not None
+
+    def administrative_head_present(place: dict[str, Any]) -> bool:
+        if place.get("type") not in ("district", "municipality", "okrug"):
+            return False
+        for raw_alias in place.get("aliases", []) or []:
+            for raw_head in administrative_head_variants(raw_alias):
+                head = normalize(raw_head)
+                if not head:
+                    continue
+                for m in re.finditer(r"(?<![а-яa-z0-9])" + re.escape(head) + r"(?![а-яa-z0-9])", n):
+                    # Shared administrative nouns often appear once after a
+                    # coordinated list of adjectives, so inspect a generous
+                    # local window rather than requiring adjacency.
+                    window = n[max(0, m.start() - 40): min(len(n), m.end() + 180)]
+                    if ADMIN_CONTEXT_RE.search(window):
+                        return True
+        return False
+
     for place in [*(source.get("places", []) or []), *(source.get("_catalog_places", []) or [])]:
         aliases = [normalize(v) for a in place.get("aliases", []) for v in alias_variants(a)]
-
-        def alias_present(alias: str) -> bool:
-            if not alias:
-                return False
-            return re.search(r"(?<![а-яa-z0-9])" + re.escape(alias) + r"(?![а-яa-z0-9])", n) is not None
-
-        if any(alias_present(alias) for alias in aliases):
+        if any(alias_present(alias) for alias in aliases) or administrative_head_present(place):
             matches.append(place)
 
     seen = set()
