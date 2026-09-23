@@ -1,5 +1,6 @@
 import os
 import sys
+
 from telethon.sync import TelegramClient
 from telethon.sessions import StringSession
 
@@ -29,6 +30,7 @@ session = os.environ.get("TELEGRAM_SESSION", "").strip()
 channel_raw = os.environ.get("TEST_CHANNEL", "").strip()
 limit = int(os.environ.get("TEST_LIMIT", "10"))
 
+
 if not api_id:
     sys.exit("ERROR: TELEGRAM_API_ID is missing")
 
@@ -41,6 +43,7 @@ if not session:
 if not channel_raw:
     sys.exit("ERROR: TEST_CHANNEL is missing")
 
+
 channel = normalize_channel(channel_raw)
 
 print("=== Telegram API connectivity test ===")
@@ -48,19 +51,22 @@ print(f"Target channel: {channel}")
 print(f"Message limit: {limit}")
 print()
 
+
 client = TelegramClient(
     StringSession(session),
     int(api_id),
     api_hash,
 )
 
+
 try:
-    client.start()
+    print("Connecting...")
+    client.connect()
+
+    if not client.is_user_authorized():
+        sys.exit("ERROR: TELEGRAM_SESSION is not authorized")
 
     me = client.get_me()
-
-    if not me:
-        sys.exit("ERROR: Telegram session could not authenticate")
 
     print("AUTH: OK")
     print(f"Account ID: {me.id}")
