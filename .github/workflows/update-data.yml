@@ -1,6 +1,15 @@
 name: Update delayed archive data
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "collector/**"
+      - "tests/**"
+      - "data/sources.json"
+      - "data/regions.json"
+      - ".github/workflows/update-data.yml"
   workflow_dispatch:
     inputs:
       mode:
@@ -52,8 +61,8 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Collect official delayed records
         env:
-          LOOKBACK_HOURS: ${{ github.event.inputs.backfill_hours || '168' }}
-          FULL_BACKFILL: ${{ github.event.inputs.mode == 'backfill' && '1' || '0' }}
+          LOOKBACK_HOURS: ${{ github.event_name == 'push' && '168' || github.event.inputs.backfill_hours || '168' }}
+          FULL_BACKFILL: ${{ github.event_name == 'push' && '1' || (github.event.inputs.mode == 'backfill' && '1' || '0') }}
           INCREMENTAL_OVERLAP_HOURS: "18"
           SAFETY_LAG_HOURS: "24"
           TELEGRAM_MAX_PAGES: "80"

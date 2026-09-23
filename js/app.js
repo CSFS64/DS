@@ -65,14 +65,20 @@ function formatDuration(start, end) {
   return h ? `${h}h ${m}m` : `${m}m`;
 }
 
-function normalizeAdminName(value) {
+function normalizeAdminNameStrict(value) {
   return String(value || "")
     .toLowerCase()
     .replace(/ё/g, "е")
     .replace(/[–—−]/g, "-")
+    .replace(/[^a-zа-я0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeAdminName(value) {
+  return normalizeAdminNameStrict(value)
     .replace(/\b(the|federal city|autonomous oblast|autonomous okrug|autonomous district|republic of|republic|oblast|krai|region)\b/g, " ")
     .replace(/\b(республика|область|край|автономная область|автономный округ|город федерального значения)\b/g, " ")
-    .replace(/[^a-zа-я0-9]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -112,9 +118,9 @@ function sourcePlaceIndex() {
   return map;
 }
 
-function regionAliases(region) {
+function regionAliases(region, normalizer = normalizeAdminName) {
   return [region.region, region.region_label, ...(region.geo_aliases || [])]
-    .map(normalizeAdminName)
+    .map(normalizer)
     .filter(Boolean);
 }
 
@@ -313,22 +319,30 @@ function prepareRegionGeoJson() {
 
   const featureRows = state.regionGeoJson.features.map(feature => {
     const clone = { ...feature, properties: { ...(feature.properties || {}) } };
-    const names = new Set(
-      Object.values(clone.properties)
-        .filter(v => typeof v === "string" && v.length < 180)
-        .map(normalizeAdminName)
-        .filter(Boolean),
+    const rawNames = Object.values(clone.properties)
+      .filter(v => typeof v === "string" && v.length < 180);
+    const strictNames = new Set(rawNames.map(normalizeAdminNameStrict).filter(Boolean));
+    const looseNames = new Set(rawNames.map(normalizeAdminName).filter(Boolean));
+
+    // Preserve administrative type first: Moscow != Moscow Oblast,
+    // Novgorod Oblast != Nizhny Novgorod Oblast, Altai Krai != Altai Republic.
+    const strictCandidates = (state.regions.regions || []).filter(region =>
+      regionAliases(region, normalizeAdminNameStrict).some(a => strictNames.has(a)),
     );
-    let canonical = null;
-    for (const region of state.regions.regions || []) {
-      const aliases = regionAliases(region);
-      const exact = aliases.some(a => names.has(a));
-      const fuzzy = !exact && aliases.some(a => a.length >= 5 && [...names].some(n => n.length >= 5 && (n.includes(a) || a.includes(n))));
-      if (exact || fuzzy) {
-        canonical = region.region;
-        break;
-      }
+    let candidates = strictCandidates;
+    if (!candidates.length) {
+      candidates = (state.regions.regions || []).filter(region => {
+        const aliases = regionAliases(region, normalizeAdminName);
+        const exact = aliases.some(a => looseNames.has(a));
+        return exact || aliases.some(a => a.length >= 5 && [...looseNames].some(n => n.length >= 5 && (n.includes(a) || a.includes(n))));
+      });
     }
+
+    const canonical = candidates.length === 1 ? candidates[0].region : null;
+    if (!canonical && candidates.length > 1) {
+      console.warn("Ambiguous archive region geometry", clone.properties, candidates.map(r => r.region));
+    }
+
     clone.id = nextId++;
     clone.properties.archive_region = canonical || "";
     if (canonical && !state.regionFeatureIds.has(canonical)) {
@@ -340,7 +354,6 @@ function prepareRegionGeoJson() {
   state.regionMatchedCount = matched;
   return { type: "FeatureCollection", features: featureRows };
 }
-
 function preparePlacesGeoJson() {
   state.placeFeatureIds.clear();
   let nextId = 1;
@@ -386,8 +399,20 @@ function installArchiveLayers() {
       type: "fill",
       source: "archive-regions",
       paint: {
-        "fill-color": ["case", ["boolean", ["feature-state", "active"], false], "#39d8ff", ["boolean", ["feature-state", "report"], false], "#ffb347", "#39d8ff"],
-        "fill-opacity": ["case", ["boolean", ["feature-state", "active"], false], 0.17, ["boolean", ["feature-state", "report"], false], 0.09, 0.0],
+        "fill-color": ["case",
+          ["boolean", ["feature-state", "missileActive"], false], "#ff334d",
+          ["boolean", ["feature-state", "active"], false], "#39d8ff",
+          ["boolean", ["feature-state", "missileReport"], false], "#ff8a33",
+          ["boolean", ["feature-state", "report"], false], "#ffb347",
+          "#39d8ff"
+        ],
+        "fill-opacity": ["case",
+          ["boolean", ["feature-state", "missileActive"], false], 0.24,
+          ["boolean", ["feature-state", "active"], false], 0.17,
+          ["boolean", ["feature-state", "missileReport"], false], 0.13,
+          ["boolean", ["feature-state", "report"], false], 0.09,
+          0.0
+        ],
       },
     }, beforeId);
     state.map.addLayer({
@@ -395,9 +420,27 @@ function installArchiveLayers() {
       type: "line",
       source: "archive-regions",
       paint: {
-        "line-color": ["case", ["boolean", ["feature-state", "active"], false], "#62e2ff", ["boolean", ["feature-state", "report"], false], "#ffc15a", "#31566a"],
-        "line-width": ["case", ["boolean", ["feature-state", "active"], false], 2.2, ["boolean", ["feature-state", "report"], false], 1.6, 0.65],
-        "line-opacity": ["case", ["boolean", ["feature-state", "active"], false], 0.95, ["boolean", ["feature-state", "report"], false], 0.85, 0.25],
+        "line-color": ["case",
+          ["boolean", ["feature-state", "missileActive"], false], "#ff6678",
+          ["boolean", ["feature-state", "active"], false], "#62e2ff",
+          ["boolean", ["feature-state", "missileReport"], false], "#ff9f4a",
+          ["boolean", ["feature-state", "report"], false], "#ffc15a",
+          "#31566a"
+        ],
+        "line-width": ["case",
+          ["boolean", ["feature-state", "missileActive"], false], 2.5,
+          ["boolean", ["feature-state", "active"], false], 2.2,
+          ["boolean", ["feature-state", "missileReport"], false], 1.8,
+          ["boolean", ["feature-state", "report"], false], 1.6,
+          0.65
+        ],
+        "line-opacity": ["case",
+          ["boolean", ["feature-state", "missileActive"], false], 1,
+          ["boolean", ["feature-state", "active"], false], 0.95,
+          ["boolean", ["feature-state", "missileReport"], false], 0.9,
+          ["boolean", ["feature-state", "report"], false], 0.85,
+          0.25
+        ],
       },
     }, beforeId);
   }
@@ -409,8 +452,19 @@ function installArchiveLayers() {
     source: "archive-places",
     paint: {
       "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 8, 7, 15, 11, 20],
-      "circle-color": ["case", ["boolean", ["feature-state", "active"], false], "#ff4258", "#ffb347"],
-      "circle-opacity": ["case", ["boolean", ["feature-state", "active"], false], 0.28, ["boolean", ["feature-state", "report"], false], 0.22, 0],
+      "circle-color": ["case",
+        ["boolean", ["feature-state", "missileActive"], false], "#ff334d",
+        ["boolean", ["feature-state", "active"], false], "#39d8ff",
+        ["boolean", ["feature-state", "missileReport"], false], "#ff8a33",
+        "#ffb347"
+      ],
+      "circle-opacity": ["case",
+        ["boolean", ["feature-state", "missileActive"], false], 0.34,
+        ["boolean", ["feature-state", "active"], false], 0.28,
+        ["boolean", ["feature-state", "missileReport"], false], 0.25,
+        ["boolean", ["feature-state", "report"], false], 0.22,
+        0
+      ],
       "circle-blur": 0.7,
     },
   });
@@ -420,11 +474,23 @@ function installArchiveLayers() {
     source: "archive-places",
     paint: {
       "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 2.4, 7, 4.2, 11, 5.5],
-      "circle-color": ["case", ["boolean", ["feature-state", "active"], false], "#ff4258", ["boolean", ["feature-state", "report"], false], "#ffb347", "#506571"],
-      "circle-stroke-color": ["case", ["boolean", ["feature-state", "active"], false], "#ffd8dc", ["boolean", ["feature-state", "report"], false], "#ffe0a8", "#99aeb9"],
-      "circle-stroke-width": ["case", ["boolean", ["feature-state", "active"], false], 1.6, ["boolean", ["feature-state", "report"], false], 1.3, 0],
-      "circle-stroke-opacity": ["case", ["boolean", ["feature-state", "active"], false], 1, ["boolean", ["feature-state", "report"], false], 1, 0],
-      "circle-opacity": ["case", ["boolean", ["feature-state", "active"], false], 1, ["boolean", ["feature-state", "report"], false], 0.95, 0],
+      "circle-color": ["case",
+        ["boolean", ["feature-state", "missileActive"], false], "#ff334d",
+        ["boolean", ["feature-state", "active"], false], "#39d8ff",
+        ["boolean", ["feature-state", "missileReport"], false], "#ff8a33",
+        ["boolean", ["feature-state", "report"], false], "#ffb347",
+        "#506571"
+      ],
+      "circle-stroke-color": ["case",
+        ["boolean", ["feature-state", "missileActive"], false], "#ffd8dc",
+        ["boolean", ["feature-state", "active"], false], "#d6f7ff",
+        ["boolean", ["feature-state", "missileReport"], false], "#ffe0bf",
+        ["boolean", ["feature-state", "report"], false], "#ffe0a8",
+        "#99aeb9"
+      ],
+      "circle-stroke-width": ["case", ["any", ["boolean", ["feature-state", "missileActive"], false], ["boolean", ["feature-state", "active"], false]], 1.6, ["any", ["boolean", ["feature-state", "missileReport"], false], ["boolean", ["feature-state", "report"], false]], 1.3, 0],
+      "circle-stroke-opacity": ["case", ["any", ["boolean", ["feature-state", "missileActive"], false], ["boolean", ["feature-state", "active"], false], ["boolean", ["feature-state", "missileReport"], false], ["boolean", ["feature-state", "report"], false]], 1, 0],
+      "circle-opacity": ["case", ["any", ["boolean", ["feature-state", "missileActive"], false], ["boolean", ["feature-state", "active"], false]], 1, ["any", ["boolean", ["feature-state", "missileReport"], false], ["boolean", ["feature-state", "report"], false]], 0.95, 0],
     },
   });
   state.map.addLayer({
@@ -445,7 +511,7 @@ function installArchiveLayers() {
       "text-halo-color": "#071018",
       "text-halo-width": 1.5,
       "text-halo-blur": 0.6,
-      "text-opacity": ["case", ["boolean", ["feature-state", "active"], false], 1, ["boolean", ["feature-state", "report"], false], 1, 0],
+      "text-opacity": ["case", ["any", ["boolean", ["feature-state", "missileActive"], false], ["boolean", ["feature-state", "active"], false], ["boolean", ["feature-state", "missileReport"], false], ["boolean", ["feature-state", "report"], false]], 1, 0],
     },
   });
 }
@@ -582,7 +648,8 @@ function buildEventBars() {
     const left = Math.max(0, pctInTimeline(Math.max(start, state.timelineStartMs)));
     const right = Math.min(100, pctInTimeline(Math.min(end, state.timelineEndMs)));
     const bar = document.createElement("span");
-    bar.className = `event-bar ${event.scope === "region" ? "region" : "city"}`;
+    const eventThreat = event.threat_class || (String(event.alert_type || "").startsWith("missile") ? "missile" : "uav");
+    bar.className = `event-bar ${event.scope === "region" ? "region" : "city"} ${eventThreat === "missile" ? "missile" : "uav"}`;
     if (event.precision === "parent_region_fallback") bar.classList.add("fallback");
     bar.style.left = `${left}%`; bar.style.width = `${Math.max(.3, right - left)}%`;
     bar.title = `${event.place} ${formatTime(start, "Europe/Moscow")}–${formatTime(end, "Europe/Moscow")}`;
@@ -596,7 +663,9 @@ function buildReportDots() {
     const ms = Date.parse(report.at);
     if (ms < state.timelineStartMs || ms > state.timelineEndMs) continue;
     const dot = document.createElement("button");
-    dot.type = "button"; dot.className = "report-dot"; dot.style.left = `${pctInTimeline(ms)}%`;
+    dot.type = "button";
+    dot.className = `report-dot ${(report.threat_class || "uav") === "missile" ? "missile" : "uav"}`;
+    dot.style.left = `${pctInTimeline(ms)}%`;
     dot.title = `${report.place}: ${report.count ?? "—"}`;
     dot.addEventListener("click", () => showReportDetail(report));
     els.reportDots.appendChild(dot);
@@ -637,21 +706,24 @@ function render() {
   updateCumulativeHandle();
 }
 
-function setFeatureActive(source, id, active) {
+function threatClass(record) {
+  return record?.threat_class || (String(record?.alert_type || "").startsWith("missile") ? "missile" : "uav");
+}
+
+function setFeatureActive(source, id, active, missile = false) {
   if (!state.mapReady || !state.map.getSource(source) || id == null) return;
-  try { state.map.setFeatureState({ source, id }, { active }); } catch (_) {}
+  try { state.map.setFeatureState({ source, id }, { active, missileActive: active && missile }); } catch (_) {}
+}
+
+function clearThreatFeatureState(source, id) {
+  if (!state.mapReady || !state.map.getSource(source) || id == null) return;
+  try { state.map.setFeatureState({ source, id }, { active: false, missileActive: false, report: false, missileReport: false }); } catch (_) {}
 }
 
 function renderMap(active, reports = []) {
   if (state.mapReady) {
-    for (const id of state.previousActiveRegionIds) setFeatureActive("archive-regions", id, false);
-    for (const id of state.previousActivePlaceIds) setFeatureActive("archive-places", id, false);
-    for (const id of state.previousReportRegionIds) {
-      try { state.map.setFeatureState({ source: "archive-regions", id }, { report: false }); } catch (_) {}
-    }
-    for (const id of state.previousReportPlaceIds) {
-      try { state.map.setFeatureState({ source: "archive-places", id }, { report: false }); } catch (_) {}
-    }
+    for (const id of new Set([...state.previousActiveRegionIds, ...state.previousReportRegionIds])) clearThreatFeatureState("archive-regions", id);
+    for (const id of new Set([...state.previousActivePlaceIds, ...state.previousReportPlaceIds])) clearThreatFeatureState("archive-places", id);
     state.previousActiveRegionIds.clear();
     state.previousActivePlaceIds.clear();
     state.previousReportRegionIds.clear();
@@ -660,16 +732,17 @@ function renderMap(active, reports = []) {
     // Hierarchy rule: a local alert necessarily means its parent region is active.
     // The city/municipality dot gives precision; the region fill gives containment.
     for (const event of active) {
+      const missile = threatClass(event) === "missile";
       const rid = state.regionFeatureIds.get(event.region);
       if (rid != null) {
-        setFeatureActive("archive-regions", rid, true);
+        setFeatureActive("archive-regions", rid, true, missile);
         state.previousActiveRegionIds.add(rid);
       }
       if (event.scope !== "region") {
         const key = `${event.region}::${event.place}`;
         const id = state.placeFeatureIds.get(key);
         if (id != null) {
-          setFeatureActive("archive-places", id, true);
+          setFeatureActive("archive-places", id, true, missile);
           state.previousActivePlaceIds.add(id);
         }
       }
@@ -681,13 +754,14 @@ function renderMap(active, reports = []) {
     // visible even when no explicit START/END warning was published.
     for (const report of reports) {
       const formalSignal = report.signal_class === "formal_alert_signal";
+      const missile = threatClass(report) === "missile";
       const rid = state.regionFeatureIds.get(report.region);
-      if (rid != null && !state.previousActiveRegionIds.has(rid)) {
+      if (rid != null) {
         if (formalSignal) {
-          setFeatureActive("archive-regions", rid, true);
+          setFeatureActive("archive-regions", rid, true, missile);
           state.previousActiveRegionIds.add(rid);
         } else {
-          try { state.map.setFeatureState({ source: "archive-regions", id: rid }, { report: true }); } catch (_) {}
+          try { state.map.setFeatureState({ source: "archive-regions", id: rid }, missile ? { missileReport: true } : { report: true }); } catch (_) {}
           state.previousReportRegionIds.add(rid);
         }
       }
@@ -695,12 +769,12 @@ function renderMap(active, reports = []) {
       for (const place of mentioned) {
         const key = `${report.region}::${place.name || report.place}`;
         const id = state.placeFeatureIds.get(key);
-        if (id != null && !state.previousActivePlaceIds.has(id)) {
+        if (id != null) {
           if (formalSignal) {
-            setFeatureActive("archive-places", id, true);
+            setFeatureActive("archive-places", id, true, missile);
             state.previousActivePlaceIds.add(id);
           } else {
-            try { state.map.setFeatureState({ source: "archive-places", id }, { report: true }); } catch (_) {}
+            try { state.map.setFeatureState({ source: "archive-places", id }, missile ? { missileReport: true } : { report: true }); } catch (_) {}
             state.previousReportPlaceIds.add(id);
           }
         }
@@ -761,7 +835,11 @@ function sourceStatusText(region) {
     const health = String(s.health || (s.ok ? "legacy-ok" : "failed")).toUpperCase();
     const transport = s.transport ? ` · ${s.transport}` : "";
     const window = s.window_complete ? " · WINDOW OK" : (s.source_type === "telegram" ? " · WINDOW ?" : "");
-    const counts = `${s.posts ?? 0} posts · ${s.activity_posts ?? s.alert_posts ?? 0} UAV · ${s.events ?? 0} paired · ${s.reports ?? 0} signals`;
+    const activity = s.activity_posts ?? s.alert_posts ?? 0;
+    const uav = s.uav_activity_posts ?? null;
+    const missile = s.missile_activity_posts ?? null;
+    const threatCounts = uav == null && missile == null ? `${activity} ACTIVITY` : `${uav ?? 0} UAV · ${missile ?? 0} MISSILE`;
+    const counts = `${s.posts ?? 0} posts · ${threatCounts} · ${s.events ?? 0} paired · ${s.reports ?? 0} signals`;
     const err = s.error ? ` · ${s.error}` : "";
     const source = s.source_type === "telegram" ? ` @${s.source}` : "";
     return `${kind}${source} ${health}${transport}${window}: ${counts}${err}`;
@@ -825,11 +903,12 @@ function showRegionDetail(regionName) {
 }
 
 function showReportDetail(report) {
+  const missile = threatClass(report) === "missile";
   els.detailEyebrow.textContent = report.signal_class === "formal_alert_signal"
-    ? "UNPAIRED FORMAL ALERT START"
+    ? `UNPAIRED FORMAL ${missile ? "MISSILE" : "UAV"} ALERT START`
     : report.signal_class === "alert_clear_signal"
-      ? "UNPAIRED ALERT CLEAR SIGNAL"
-      : "LOCAL OFFICIAL UAV ACTIVITY";
+      ? `UNPAIRED ${missile ? "MISSILE" : "UAV"} ALERT CLEAR SIGNAL`
+      : `LOCAL OFFICIAL ${missile ? "MISSILE" : "UAV"} ACTIVITY`;
   els.detailTitle.textContent = report.place;
   els.detailBody.textContent = `${formatTime(Date.parse(report.at), "Europe/Moscow")} MSK\n${report.text || `${report.count ?? "—"} ${report.count_type || "reported"}`}`;
   els.detailSource.href = report.url;

@@ -13,7 +13,7 @@
 <body>
   <main class="app-shell">
     <section class="map-panel">
-      <div id="map" aria-label="历史无人机警报地图"></div>
+      <div id="map" aria-label="历史无人机与导弹活动地图"></div>
       <div class="map-grid" aria-hidden="true"></div>
 
       <header class="hud-header">
@@ -21,13 +21,14 @@
           <h1>DEEPSTRIKE / ALERT ARCHIVE</h1>
           <div id="dataStatus" class="hud-sub">LOADING ARCHIVE…</div>
         </div>
-        <div id="archiveLamp" class="archive-lamp" title="当前回放时刻存在警报"></div>
+        <div id="archiveLamp" class="archive-lamp" title="当前回放时刻存在活动或警报"></div>
       </header>
 
       <div class="map-legend" aria-hidden="true">
-        <span><i class="legend-dot city"></i>城市/市镇警报</span>
-        <span><i class="legend-dot report"></i>地方官方攻击/数量报告</span>
-        <span><i class="legend-region"></i>当前州级/父级警报</span>
+        <span><i class="legend-region uav-alert"></i>无人机正式警报</span>
+        <span><i class="legend-region uav-report"></i>无人机官方活动</span>
+        <span><i class="legend-region missile-alert"></i>导弹正式警报</span>
+        <span><i class="legend-region missile-report"></i>导弹官方活动</span>
       </div>
 
       <aside id="detailPanel" class="detail-panel" hidden>

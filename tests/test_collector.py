@@ -16,6 +16,8 @@ from collector.collect import (
     parse_telegram_html,
     text_kind,
     uav_activity_kind,
+    missile_text_kind,
+    missile_activity_kind,
     configure_incremental_window,
     FetchResult,
     source_status_row,
@@ -256,6 +258,55 @@ class CollectorTests(unittest.TestCase):
         }
         self.assertGreaterEqual(len(enabled), 67)
         self.assertTrue(required <= channels)
+
+    def test_v13_missile_activity_and_formal_pairing(self):
+        self.assertEqual(missile_text_kind('В регионе объявлена ракетная опасность.'), 'start')
+        self.assertEqual(missile_text_kind('Отбой ракетной опасности.'), 'end')
+        self.assertEqual(missile_activity_kind('ПВО сбила ракету над территорией области.'), 'air_defense_action')
+        self.assertEqual(missile_activity_kind('Обломки ракеты упали в городе.'), 'impact_or_debris')
+        self.assertIsNone(missile_activity_kind('Обсудили производство ракетных комплексов.'))
+
+        source = dict(self.source)
+        posts = [
+            Post('gov', 9101, datetime(2026,9,20,1,0,tzinfo=timezone.utc),
+                 'В Белгородской области объявлена ракетная опасность.', 'https://t.me/x/9101'),
+            Post('gov', 9102, datetime(2026,9,20,2,0,tzinfo=timezone.utc),
+                 'Отбой ракетной опасности в Белгородской области.', 'https://t.me/x/9102'),
+        ]
+        events, _ = pair_alerts(
+            posts, source,
+            datetime(2026,9,20,0,0,tzinfo=timezone.utc),
+            datetime(2026,9,21,0,0,tzinfo=timezone.utc),
+        )
+        missile = [e for e in events if e.get('threat_class') == 'missile']
+        self.assertEqual(len(missile), 1)
+        self.assertEqual(missile[0]['alert_type'], 'missile_alert')
+
+    def test_v13_missile_unpaired_signal_is_retained(self):
+        source = dict(self.source)
+        posts = [Post('gov', 9201, datetime(2026,9,20,1,0,tzinfo=timezone.utc),
+                      'Над Белгородом ПВО уничтожила ракету, обломки упали на окраине.', 'https://t.me/x/9201')]
+        reports = extract_reports(
+            posts, source,
+            datetime(2026,9,20,0,0,tzinfo=timezone.utc),
+            datetime(2026,9,21,0,0,tzinfo=timezone.utc),
+        )
+        missile = [r for r in reports if r.get('threat_class') == 'missile']
+        self.assertTrue(missile)
+        self.assertEqual(missile[0]['signal_class'], 'missile_activity_signal')
+
+    def test_v13_local_mod_summary_with_region_context_is_retained(self):
+        from collector.collect import mod_derived
+        cfg = json.loads((ROOT / 'data' / 'sources.json').read_text(encoding='utf-8'))
+        source = next(s for s in cfg['sources'] if s['channel'] == 'rgn_34')
+        local = Post('rgn_34', 9301, datetime(2026,9,20,1,0,tzinfo=timezone.utc),
+                     'По данным Минобороны России, над территорией Волгоградской области уничтожены БПЛА.',
+                     'https://t.me/x/9301')
+        generic = Post('rgn_34', 9302, datetime(2026,9,20,2,0,tzinfo=timezone.utc),
+                       'По данным Минобороны России уничтожены БПЛА в нескольких регионах.',
+                       'https://t.me/x/9302')
+        self.assertFalse(mod_derived(local, source))
+        self.assertTrue(mod_derived(generic, source))
 
     def test_v12_zero_post_public_html_is_not_fake_success(self):
         fetched = FetchResult(

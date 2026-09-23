@@ -150,6 +150,101 @@ NON_OPERATIONAL_UAV_PATTERNS = tuple(re.compile(p) for p in (
     r"\b(?:сельскохозяйствен\w*|доставк\w*|аэрофотосъем\w*)\b",
 ))
 
+MISSILE_START_PATTERNS = tuple(re.compile(p) for p in (
+    r"\bракетн\w*\s+(?:опасност\w*|угроз\w*)\b",
+    r"\b(?:опасност\w*|угроз\w*)\s+(?:ракетн\w*\s+(?:атак\w*|удар\w*)|применени\w*\s+ракетн\w*\s+вооружени\w*)\b",
+    r"\b(?:объявлен\w*|введен\w*|действует|сохраняется)\b.{0,100}\bракетн\w*.{0,50}\b(?:опасност\w*|угроз\w*)\b",
+))
+MISSILE_END_PATTERNS = tuple(re.compile(p) for p in (
+    r"\bотбой\b.{0,100}\bракетн\w*\s+(?:опасност\w*|угроз\w*)\b",
+    r"\b(?:снят|снята|снято|сняты|отменен|отменена|отменено|отменены|отмена)\b.{0,100}\bракетн\w*\s+(?:опасност\w*|угроз\w*)\b",
+    r"\bракетн\w*\s+(?:опасност\w*|угроз\w*).{0,100}\b(?:снят|снята|снято|сняты|отменен|отменена|отменено|отменены)\b",
+))
+MISSILE_REFERENCE_PATTERNS = tuple(re.compile(p) for p in (
+    r"\bракет\w*\b",
+    r"\bкрылат\w*\s+ракет\w*\b",
+    r"\bбаллистич\w*\s+ракет\w*\b",
+))
+MISSILE_OPERATIONAL_PATTERNS = tuple(re.compile(p) for p in (
+    r"\b(?:опасност\w*|угроз\w*|тревог\w*)\b",
+    r"\b(?:атак\w*|удар\w*|обстрел\w*|пуск\w*|запуск\w*)\b",
+    r"\b(?:летит|летят|летел\w*|движ\w*|направля\w*|приближа\w*|подлета\w*|подлет\w*|пролет\w*)\b",
+    r"\b(?:обнаруж\w*|зафиксир\w*|замеч\w*|выявл\w*|наблюда\w*|фиксиру\w*)\b",
+    r"\b(?:сбит\w*|уничтож\w*|перехват\w*|нейтрализ\w*|ликвидир\w*)\b",
+    r"\b(?:пво|про)\b.{0,100}\b(?:работа\w*|отража\w*|сбит\w*|уничтож\w*|перехват\w*)\b",
+    r"\b(?:работа\w*|отража\w*)\b.{0,100}\b(?:пво|про)\b",
+    r"\b(?:обломк\w*|падени\w*|прилет\w*|попадани\w*|взрыв\w*|поврежден\w*)\b",
+))
+NON_OPERATIONAL_MISSILE_PATTERNS = tuple(re.compile(p) for p in (
+    r"\b(?:производств\w*|разработк\w*|изготовлен\w*|сборк\w*|закупк\w*|контракт\w*)\b",
+    r"\b(?:выставк\w*|форум\w*|соревнован\w*|фестивал\w*|учебн\w*|учени\w*)\b",
+    r"\b(?:ракетн\w*\s+комплекс\w*|космическ\w*|носител\w*)\b",
+))
+
+
+def missile_text_kind(text: str) -> str | None:
+    n = normalize(text)
+    if any(p.search(n) for p in MISSILE_END_PATTERNS):
+        return "end"
+    if any(p.search(n) for p in MISSILE_START_PATTERNS):
+        return "start"
+    return None
+
+
+def has_missile_reference(text: str) -> bool:
+    n = normalize(text)
+    return any(p.search(n) for p in MISSILE_REFERENCE_PATTERNS)
+
+
+def missile_activity_kind(text: str) -> str | None:
+    n = normalize(text)
+    formal = missile_text_kind(text)
+    if formal == "start":
+        return "alert_start_signal"
+    if formal == "end":
+        return "alert_end_signal"
+    if not has_missile_reference(text):
+        return None
+    if any(p.search(n) for p in NON_OPERATIONAL_MISSILE_PATTERNS) and not any(p.search(n) for p in MISSILE_OPERATIONAL_PATTERNS):
+        return None
+    if not any(p.search(n) for p in MISSILE_OPERATIONAL_PATTERNS):
+        return None
+    if re.search(r"\b(?:обломк\w*|падени\w*|прилет\w*|попадани\w*|поврежден\w*)\b", n):
+        return "impact_or_debris"
+    if re.search(r"\b(?:сбит\w*|уничтож\w*|перехват\w*|нейтрализ\w*|ликвидир\w*)\b", n):
+        return "air_defense_action"
+    if re.search(r"\b(?:обнаруж\w*|зафиксир\w*|замеч\w*|выявл\w*|наблюда\w*)\b", n):
+        return "missile_detected"
+    if re.search(r"\b(?:летит|летят|летел\w*|движ\w*|направля\w*|приближа\w*|подлета\w*|подлет\w*|пролет\w*)\b", n):
+        return "missile_movement"
+    if re.search(r"\b(?:пуск\w*|запуск\w*)\b", n):
+        return "missile_launch"
+    if re.search(r"\b(?:атак\w*|удар\w*|обстрел\w*)\b", n):
+        return "missile_attack_activity"
+    return "official_missile_activity"
+
+
+def activity_signals(text: str) -> list[tuple[str, str]]:
+    out: list[tuple[str, str]] = []
+    uav = uav_activity_kind(text)
+    if uav is not None:
+        out.append(("uav", uav))
+    missile = missile_activity_kind(text)
+    if missile is not None:
+        out.append(("missile", missile))
+    return out
+
+
+def alert_threat_kinds(text: str) -> list[tuple[str, str]]:
+    out: list[tuple[str, str]] = []
+    uav = text_kind(text)
+    if uav is not None:
+        out.append(("uav", uav))
+    missile = missile_text_kind(text)
+    if missile is not None:
+        out.append(("missile", missile))
+    return out
+
 def has_uav_reference(text: str) -> bool:
     n = normalize(text)
     return any(p.search(n) for p in UAV_REFERENCE_PATTERNS) or "опасное небо" in n
@@ -349,6 +444,9 @@ TELEGRAM_ACTIVITY_QUERIES = (
     "опасное небо",
     "угроза подлета",
     "угроза подлёта",
+    "ракета",
+    "ракетная опасность",
+    "ракетная угроза",
 )
 
 
@@ -675,21 +773,38 @@ def alert_post_stats(posts: list[Post]) -> dict[str, int]:
     starts = 0
     ends = 0
     activity = 0
+    uav_activity = 0
+    missile_activity = 0
+    missile_starts = 0
+    missile_ends = 0
     for post in posts:
-        kind = text_kind(post.text)
-        if kind == "start":
+        uav_kind = text_kind(post.text)
+        missile_kind = missile_text_kind(post.text)
+        if uav_kind == "start" or missile_kind == "start":
             starts += 1
-        elif kind == "end":
+        if uav_kind == "end" or missile_kind == "end":
             ends += 1
-        if uav_activity_kind(post.text) is not None:
+        if missile_kind == "start":
+            missile_starts += 1
+        elif missile_kind == "end":
+            missile_ends += 1
+        signals = activity_signals(post.text)
+        if signals:
             activity += 1
+        if any(threat == "uav" for threat, _ in signals):
+            uav_activity += 1
+        if any(threat == "missile" for threat, _ in signals):
+            missile_activity += 1
     return {
         "alert_posts": starts + ends,
         "start_posts": starts,
         "end_posts": ends,
         "activity_posts": activity,
+        "uav_activity_posts": uav_activity,
+        "missile_activity_posts": missile_activity,
+        "missile_start_posts": missile_starts,
+        "missile_end_posts": missile_ends,
     }
-
 
 def alias_variants(value: str) -> list[str]:
     """Generate conservative Russian case variants for place aliases at parse time."""
@@ -783,20 +898,22 @@ def pair_alerts(posts: list[Post], source: dict[str, Any], window_start: datetim
     events: list[dict[str, Any]] = []
     unmatched: list[dict[str, Any]] = []
 
-    def key_for(place_name: str) -> str:
-        return f"{source['region']}::{place_name}"
+    def key_for(place_name: str, threat_class: str) -> str:
+        return f"{source['region']}::{threat_class}::{place_name}"
 
-    def open_one(place_name: str, scope: str, post: Post, precision: str = "exact", place_meta: dict[str, Any] | None = None):
-        key = key_for(place_name)
+    def open_one(place_name: str, scope: str, post: Post, threat_class: str,
+                 precision: str = "exact", place_meta: dict[str, Any] | None = None):
+        key = key_for(place_name, threat_class)
         bucket = open_alerts.setdefault(key, [])
-        # Official channels frequently repeat "danger remains in effect" while an
-        # alert is open. Treat alerts as state, not as a stack of repeated starts.
         if bucket:
             return
-        bucket.append({"post": post, "scope": scope, "precision": precision, "place_meta": place_meta or {}})
+        bucket.append({
+            "post": post, "scope": scope, "precision": precision,
+            "place_meta": place_meta or {}, "threat_class": threat_class,
+        })
 
-    def close_one(place_name: str, end_post: Post, reason: str = "direct"):
-        key = key_for(place_name)
+    def close_one(place_name: str, end_post: Post, threat_class: str, reason: str = "direct"):
+        key = key_for(place_name, threat_class)
         bucket = open_alerts.get(key) or []
         if not bucket:
             return
@@ -807,12 +924,16 @@ def pair_alerts(posts: list[Post], source: dict[str, Any], window_start: datetim
         if end_post.published_at < window_start or start_post.published_at > window_end:
             return
         events.append({
-            "id": stable_id(source.get("channel", source.get("source_id", "source")), str(start_post.post_id), str(end_post.post_id), place_name),
+            "id": stable_id(
+                source.get("channel", source.get("source_id", "source")),
+                str(start_post.post_id), str(end_post.post_id), place_name, threat_class,
+            ),
             "region": source["region"],
             "place": place_name,
             "scope": start_item["scope"],
             "precision": start_item.get("precision", "exact"),
-            "alert_type": "uav_alert",
+            "alert_type": f"{threat_class}_alert",
+            "threat_class": threat_class,
             "start": start_post.published_at.isoformat(),
             "end": end_post.published_at.isoformat(),
             "source_name": source["source_name"],
@@ -828,73 +949,85 @@ def pair_alerts(posts: list[Post], source: dict[str, Any], window_start: datetim
         })
 
     for post in posts:
-        kind = text_kind(post.text)
-        if not kind:
+        threat_kinds = alert_threat_kinds(post.text)
+        if not threat_kinds:
             continue
         n = post.normalized
         places = extract_places(post.text, source)
         region_message = is_region_message(post.text, source)
 
-        if kind == "start":
-            if region_message:
-                open_one(source["region"], "region", post, "exact_region")
-            for place in places:
-                open_one(place["name"], alert_scope(place), post, "exact_local", place)
-            if not region_message and not places:
-                if source.get("fallback_to_region_on_unresolved", False):
-                    open_one(source["region"], "region", post, "parent_region_fallback")
-                    unmatched.append({
-                        "type": "start_scope_fell_back_to_region",
-                        "region": source["region"], "url": post.url, "text": post.text,
-                    })
-                else:
-                    unmatched.append({"type": "unresolved_start_scope", "url": post.url, "text": post.text})
+        for threat_class, kind in threat_kinds:
+            if kind == "start":
+                if region_message:
+                    open_one(source["region"], "region", post, threat_class, "exact_region")
+                for place in places:
+                    open_one(place["name"], alert_scope(place), post, threat_class, "exact_local", place)
+                if not region_message and not places:
+                    if source.get("fallback_to_region_on_unresolved", False):
+                        open_one(source["region"], "region", post, threat_class, "parent_region_fallback")
+                        unmatched.append({
+                            "type": "start_scope_fell_back_to_region",
+                            "threat_class": threat_class,
+                            "region": source["region"], "url": post.url, "text": post.text,
+                        })
+                    else:
+                        unmatched.append({
+                            "type": "unresolved_start_scope", "threat_class": threat_class,
+                            "url": post.url, "text": post.text,
+                        })
 
-        elif kind == "end":
-            if any(p in n for p in CLOSE_ALL_LOCAL_PHRASES):
-                for key in list(open_alerts.keys()):
-                    if key.endswith(f"::{source['region']}"):
-                        continue
-                    while open_alerts.get(key):
-                        close_one(key.split("::", 1)[1], post, "all_local_clear")
-                continue
+            elif kind == "end":
+                if any(p in n for p in CLOSE_ALL_LOCAL_PHRASES):
+                    for key in list(open_alerts.keys()):
+                        _, key_threat, place_name = key.split("::", 2)
+                        if key_threat != threat_class or place_name == source["region"]:
+                            continue
+                        while open_alerts.get(key):
+                            close_one(place_name, post, threat_class, "all_local_clear")
+                    continue
 
-            if region_message:
-                close_one(source["region"], post, "regional_clear")
-                for key in list(open_alerts.keys()):
-                    if key.endswith(f"::{source['region']}"):
-                        continue
-                    while open_alerts.get(key):
-                        close_one(key.split("::", 1)[1], post, "regional_clear")
-            for place in places:
-                close_one(place["name"], post, "direct")
-            if not region_message and not places and source.get("fallback_to_region_on_unresolved", False):
-                close_one(source["region"], post, "parent_region_fallback_clear")
+                if region_message:
+                    close_one(source["region"], post, threat_class, "regional_clear")
+                    for key in list(open_alerts.keys()):
+                        _, key_threat, place_name = key.split("::", 2)
+                        if key_threat != threat_class or place_name == source["region"]:
+                            continue
+                        while open_alerts.get(key):
+                            close_one(place_name, post, threat_class, "regional_clear")
+                for place in places:
+                    close_one(place["name"], post, threat_class, "direct")
+                if not region_message and not places and source.get("fallback_to_region_on_unresolved", False):
+                    close_one(source["region"], post, threat_class, "parent_region_fallback_clear")
 
     for key, bucket in open_alerts.items():
+        _, threat_class, place_name = key.split("::", 2)
         for item in bucket:
             p: Post = item["post"]
             unmatched.append({
                 "type": "unmatched_start",
+                "threat_class": threat_class,
                 "region": source["region"],
-                "place": key.split("::", 1)[1],
+                "place": place_name,
                 "start": p.published_at.isoformat(),
                 "url": p.url,
                 "text": p.text,
             })
     return events, unmatched
 
-
-def mod_derived(post: Post) -> bool:
-    # Reject numbers that are merely copied/forwarded from the federal MOD, but
-    # do not reject a governor's own local report just because it says local PVO
-    # or MOD forces performed the interception.
+def mod_derived(post: Post, source: dict[str, Any] | None = None) -> bool:
+    # Forwarded federal MOD posts are provenance duplicates. A local authority's
+    # own post that says "по данным Минобороны" is retained when it also names
+    # the region or a configured local place; otherwise a national digest could
+    # be falsely attributed to the source's region.
     forwarded = normalize(post.forwarded_from or "")
     if "минобороны" in forwarded or "министерство обороны" in forwarded:
         return True
     text = normalize(post.text)
-    return any(marker in text for marker in MOD_DERIVED_MARKERS)
-
+    if not any(marker in text for marker in MOD_DERIVED_MARKERS):
+        return False
+    if source is not None and (is_region_message(post.text, source) or extract_places(post.text, source)):
+        return False
+    return True
 
 def sentence_split(text: str) -> list[str]:
     return [s.strip() for s in re.split(r"(?<=[.!?])\s+|\n+", text) if s.strip()]
@@ -956,16 +1089,24 @@ def extract_reports(posts: list[Post], source: dict[str, Any], window_start: dat
     for post in posts:
         if post.published_at < window_start or post.published_at > window_end:
             continue
-        if mod_derived(post):
+        if mod_derived(post, source):
             continue
+
+        whole_signals = activity_signals(post.text)
         npost = normalize(post.text)
-        whole_activity_kind = uav_activity_kind(post.text)
-        if whole_activity_kind is None and not any(token in npost for token in ("бпла", "беспилот", "дрон")):
+        if not whole_signals and not any(token in npost for token in ("бпла", "беспилот", "дрон", "ракет")):
             continue
-        produced_for_post = False
+
+        produced_threats: set[str] = set()
+
+        # Existing numeric extraction is UAV-specific. Preserve those detailed
+        # counts; missile activity is still retained below without requiring a count.
         for sentence in sentence_split(post.text):
             counts = classify_count_sentence(sentence)
             if not counts:
+                continue
+            uav_kind = uav_activity_kind(sentence) or next((kind for threat, kind in whole_signals if threat == "uav"), None)
+            if uav_kind is None:
                 continue
             mentioned = infer_report_places(sentence, source) or infer_report_places(post.text, source)
             primary_place = mentioned[0] if mentioned else None
@@ -978,11 +1119,12 @@ def extract_reports(posts: list[Post], source: dict[str, Any], window_start: dat
             ]
             for count, ctype, secondary_count, secondary_type, qualifier in counts:
                 reports.append({
-                    "id": stable_id(source.get("channel", source.get("source_id", "source")), str(post.post_id), place, ctype, str(count)),
+                    "id": stable_id(source.get("channel", source.get("source_id", "source")), str(post.post_id), place, ctype, str(count), "uav"),
                     "region": source["region"], "place": place, "scope": scope,
                     "at": post.published_at.isoformat(), "count": count, "count_type": ctype,
                     "signal_class": "uav_activity_signal",
-                    "activity_kind": uav_activity_kind(sentence) or whole_activity_kind or "official_uav_activity",
+                    "threat_class": "uav",
+                    "activity_kind": uav_kind,
                     "count_qualifier": qualifier, "secondary_count": secondary_count, "secondary_type": secondary_type,
                     "text": sentence, "source_name": source["source_name"], "url": post.url,
                     "source_kind": source.get("kind", "official"),
@@ -990,14 +1132,12 @@ def extract_reports(posts: list[Post], source: dict[str, Any], window_start: dat
                     "lon": primary_place.get("lon") if primary_place else None,
                     "mentioned_places": mentioned_places,
                 })
-                produced_for_post = True
-        # Display-first historical policy: any clearly operational UAV wording
-        # from an official local source is retained as a timestamped signal, even
-        # when START/END cannot be paired. Paired intervals still remain the
-        # authoritative red alert windows; these point signals prevent real local
-        # activity from disappearing merely because the wording is non-standard.
-        activity_kind = uav_activity_kind(post.text)
-        if not produced_for_post and activity_kind is not None:
+                produced_threats.add("uav")
+
+        # Display-first policy for both UAV and missile activity.
+        for threat_class, activity_kind in whole_signals:
+            if threat_class in produced_threats:
+                continue
             mentioned = infer_report_places(post.text, source)
             primary_place = mentioned[0] if mentioned else None
             place = primary_place["name"] if primary_place else source["region"]
@@ -1006,14 +1146,16 @@ def extract_reports(posts: list[Post], source: dict[str, Any], window_start: dat
             signal_class = (
                 "formal_alert_signal" if activity_kind == "alert_start_signal"
                 else "alert_clear_signal" if activity_kind == "alert_end_signal"
+                else "missile_activity_signal" if threat_class == "missile"
                 else "uav_activity_signal"
             )
             reports.append({
-                "id": stable_id(source.get("channel", source.get("source_id", "source")), str(post.post_id), place, activity_kind),
+                "id": stable_id(source.get("channel", source.get("source_id", "source")), str(post.post_id), place, activity_kind, threat_class),
                 "region": source["region"], "place": place, "scope": scope,
                 "at": post.published_at.isoformat(), "count": None, "count_type": display_type,
                 "activity_kind": activity_kind,
                 "signal_class": signal_class,
+                "threat_class": threat_class,
                 "count_qualifier": None, "secondary_count": None, "secondary_type": None,
                 "text": post.text, "source_name": source["source_name"], "url": post.url,
                 "source_kind": source.get("kind", "official"),
@@ -1024,6 +1166,7 @@ def extract_reports(posts: list[Post], source: dict[str, Any], window_start: dat
                      "lat": p.get("lat"), "lon": p.get("lon")} for p in mentioned[:120]
                 ],
             })
+
     unique = {r["id"]: r for r in reports}
     return sorted(unique.values(), key=lambda r: r["at"])
 
@@ -1182,6 +1325,7 @@ def collect(args) -> dict[str, Any]:
     regions_with_events = sorted({e["region"] for e in all_events})
     regions_with_alert_posts = sorted({s["region"] for s in statuses if s.get("alert_posts", 0) > 0})
     regions_with_activity_posts = sorted({s["region"] for s in statuses if s.get("activity_posts", 0) > 0})
+    regions_with_missile_activity = sorted({s["region"] for s in statuses if s.get("missile_activity_posts", 0) > 0})
     regions_with_any_record = sorted({e["region"] for e in all_events} | {r["region"] for r in all_reports})
     hi_res_regions_with_events = sorted({e["region"] for e in all_events if e.get("source_kind") == "telegram"})
     configured_hi_regions = {
@@ -1211,6 +1355,7 @@ def collect(args) -> dict[str, Any]:
             "mchs_regions_with_alert_posts": sum(1 for s in rss_status if s.get("alert_posts", 0) > 0),
             "regions_with_any_alert_posts": len(regions_with_alert_posts),
             "regions_with_activity_posts": len(regions_with_activity_posts),
+            "regions_with_missile_activity_posts": len(regions_with_missile_activity),
             "regions_with_any_record": len(regions_with_any_record),
             "regions_with_paired_alerts": len(regions_with_events),
             "high_resolution_sources_configured": len([s for s in source_cfg.get("sources", []) if s.get("enabled", False) and s.get("kind", "telegram") == "telegram"]),

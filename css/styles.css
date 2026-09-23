@@ -123,9 +123,11 @@ button, input, select { font: inherit; }
 }
 .map-legend span { display: flex; align-items: center; gap: 7px; }
 .legend-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--off); display: inline-block; }
-.legend-dot.city { background: var(--red); box-shadow: 0 0 8px rgba(255,66,88,.75); }
-.legend-dot.report { background: #ffb347; box-shadow: 0 0 8px rgba(255,179,71,.72); }
-.legend-region { width: 14px; height: 9px; border: 1px solid var(--cyan); background: rgba(57,216,255,.12); display: inline-block; }
+.legend-region { width: 14px; height: 9px; display: inline-block; }
+.legend-region.uav-alert { border: 1px solid #62e2ff; background: rgba(57,216,255,.17); }
+.legend-region.uav-report { border: 1px solid #ffc15a; background: rgba(255,179,71,.13); }
+.legend-region.missile-alert { border: 1px solid #ff6678; background: rgba(255,51,77,.24); }
+.legend-region.missile-report { border: 1px solid #ff9f4a; background: rgba(255,138,51,.16); }
 
 .detail-panel {
   position: absolute;
@@ -181,14 +183,15 @@ button, input, select { font: inherit; }
 .tick { position: absolute; top: -1px; width: 1px; height: 8px; background: #3e6d87; }
 .tick-label { position: absolute; top: 10px; transform: translateX(-50%); color: #5e7e91; font: 600 8px ui-monospace, monospace; white-space: nowrap; }
 .event-bars { position: absolute; left: 0; right: 0; top: 39px; height: 4px; }
-.event-bar { position: absolute; height: 3px; min-width: 2px; border-radius: 999px; background: rgba(255,66,88,.70); box-shadow: 0 0 5px rgba(255,66,88,.25); }
-.event-bar.region { background: rgba(57,216,255,.72); box-shadow: 0 0 5px rgba(57,216,255,.25); }
+.event-bar { position: absolute; height: 3px; min-width: 2px; border-radius: 999px; background: rgba(57,216,255,.72); box-shadow: 0 0 5px rgba(57,216,255,.25); }
+.event-bar.missile { background: rgba(255,51,77,.78); box-shadow: 0 0 6px rgba(255,51,77,.32); }
 .event-bar.fallback { opacity: .58; outline: 1px dashed rgba(57,216,255,.55); outline-offset: 1px; }
 .selection-band { position: absolute; top: 22px; height: 5px; border-radius: 999px; background: linear-gradient(90deg, rgba(57,216,255,.88), rgba(62,242,141,.88)); pointer-events: none; }
 .cumulative-band { position: absolute; top: 29px; height: 2px; width: 0; border-radius: 999px; background: rgba(255,186,82,.72); box-shadow: 0 0 6px rgba(255,186,82,.24); pointer-events: none; opacity: 0; }
 .cumulative-band.active { opacity: 1; }
 .report-dots { position: absolute; left: 0; right: 0; top: 20px; height: 12px; pointer-events: none; }
-.report-dot { position: absolute; width: 6px; height: 6px; transform: translateX(-50%); border-radius: 50%; background: var(--amber); box-shadow: 0 0 7px rgba(255,186,82,.8); }
+.report-dot { position: absolute; width: 6px; height: 6px; transform: translateX(-50%); border-radius: 50%; background: #ffb347; box-shadow: 0 0 7px rgba(255,179,71,.8); }
+.report-dot.missile { background: #ff8a33; box-shadow: 0 0 8px rgba(255,138,51,.85); }
 .dual-range { position: absolute; left: 0; right: 0; top: 12px; height: 30px; }
 .range { position: absolute; left: 0; top: 0; width: 100%; pointer-events: none; -webkit-appearance: none; appearance: none; background: transparent; }
 .range::-webkit-slider-runnable-track { height: 6px; background: transparent; }
