@@ -773,11 +773,25 @@ def fetch_mchs_posts_for_window(
 # ---------------------------------------------------------------------------
 
 def text_kind(text: str) -> str | None:
-    n = normalize(text)
-    if any(marker in n for marker in END_MARKERS) or any(p.search(n) for p in END_PATTERNS):
-        return "end"
-    if any(marker in n for marker in START_MARKERS) or any(p.search(n) for p in START_PATTERNS):
-        return "start"
+    # Evaluate sentence-by-sentence so a missile clear in one sentence cannot
+    # accidentally clear a UAV alert mentioned in another sentence.
+    chunks = [s.strip() for s in re.split(r"(?<=[.!?;])\\s+", str(text)) if s.strip()] or [str(text)]
+    for chunk in chunks:
+        n = normalize(chunk)
+
+        # Explicit continuation wording is a formal ongoing UAV state. This must
+        # win over a nearby clear verb that belongs to another threat type, e.g.
+        # "Ракетная опасность отменена, Беспилотная опасность сохраняется".
+        if (
+            re.search(r"\\bбеспилотн\\w*\\s+опасност\\w*.{0,60}\\b(?:сохраняется|действует)\\b", n)
+            or re.search(r"\\b(?:сохраняется|действует)\\b.{0,60}\\bбеспилотн\\w*\\s+опасност\\w*", n)
+        ):
+            return "start"
+
+        if any(marker in n for marker in END_MARKERS) or any(p.search(n) for p in END_PATTERNS):
+            return "end"
+        if any(marker in n for marker in START_MARKERS) or any(p.search(n) for p in START_PATTERNS):
+            return "start"
     return None
 
 

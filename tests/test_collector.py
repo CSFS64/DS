@@ -270,6 +270,33 @@ class CollectorTests(unittest.TestCase):
         # An official local post explicitly reporting a UAV remains visible even
         # if it uses wording outside the current operational regex families.
         self.assertEqual(uav_activity_kind('В районе сообщается о БПЛА.'), 'official_uav_activity')
+    def test_v13_mixed_missile_clear_uav_continues(self):
+        mixed = (
+            'Режим «Ракетная опасность» на территории Республики Татарстан отменен. '
+            'Он был введен сегодня рано утром. '
+            'Режим «Беспилотная опасность» сохраняется.'
+        )
+        self.assertEqual(text_kind(mixed), 'start')
+        self.assertEqual(missile_text_kind(mixed), 'end')
+
+        cfg = json.loads((ROOT / 'data' / 'sources.json').read_text(encoding='utf-8'))
+        source = next(s for s in cfg['sources'] if s['channel'] == 'nashtatarstan_official')
+        posts = [
+            Post('nashtatarstan_official', 9401, datetime(2026,9,20,1,0,tzinfo=timezone.utc),
+                 'В Татарстане введен режим «Ракетная опасность».', 'https://t.me/x/9401'),
+            Post('nashtatarstan_official', 9402, datetime(2026,9,20,1,5,tzinfo=timezone.utc),
+                 'В Татарстане введен режим «Беспилотная опасность».', 'https://t.me/x/9402'),
+            Post('nashtatarstan_official', 9403, datetime(2026,9,20,2,0,tzinfo=timezone.utc),
+                 mixed, 'https://t.me/x/9403'),
+        ]
+        events, unmatched = pair_alerts(
+            posts, source,
+            datetime(2026,9,20,0,0,tzinfo=timezone.utc),
+            datetime(2026,9,21,0,0,tzinfo=timezone.utc),
+        )
+        self.assertEqual(len([e for e in events if e.get('threat_class') == 'missile']), 1)
+        self.assertEqual(len([e for e in events if e.get('threat_class') == 'uav']), 0)
+        self.assertTrue(any(u.get('type') == 'unmatched_start' and u.get('threat_class') == 'uav' for u in unmatched))
     def test_v13_shot_down_russian_inflections(self):
         self.assertEqual(missile_activity_kind('ПВО сбила ракету над территорией области.'), 'air_defense_action')
         self.assertEqual(missile_activity_kind('Ракета сбита силами ПВО.'), 'air_defense_action')
