@@ -1606,6 +1606,88 @@ def merge_existing_archive(data: dict[str, Any], output_path: Path) -> dict[str,
     data["coverage"]["archive_regions_with_local_records"] = len({x for x in archive_local_regions if x})
     return data
 
+def reenrich_archive_places(data: dict[str, Any], source_cfg: dict[str, Any],
+                            city_cfg: dict[str, Any]) -> dict[str, Any]:
+    """Re-run place extraction on stored report text without re-fetching sources.
+
+    This is intentionally separate from network collection. When the place
+    catalog/parser improves, a normal incremental run can upgrade old region-only
+    reports to city/municipality precision using text already stored in
+    events.json; no 168-hour Telegram backfill is required.
+    """
+    by_region: dict[str, list[dict[str, Any]]] = {}
+    for place in [*(city_cfg.get("cities", []) or []), *(city_cfg.get("municipalities", []) or [])]:
+        region = place.get("region")
+        if region:
+            by_region.setdefault(region, []).append(place)
+
+    configured_places: dict[str, list[dict[str, Any]]] = {}
+    for source in source_cfg.get("sources", []) or []:
+        region = source.get("region")
+        if not region:
+            continue
+        configured_places.setdefault(region, []).extend(source.get("places", []) or [])
+
+    changed = 0
+    for report in data.get("reports", []) or []:
+        text = str(report.get("text") or "").strip()
+        region = report.get("region")
+        if not text or not region:
+            continue
+        source = {
+            "region": region,
+            "places": configured_places.get(region, []),
+            "_catalog_places": by_region.get(region, []),
+        }
+        places = extract_places(text, source)
+        if not places:
+            continue
+
+        primary = places[0]
+        new_scope = alert_scope(primary)
+        old_signature = (
+            report.get("place"), report.get("scope"),
+            tuple(p.get("name") for p in report.get("mentioned_places", []) or []),
+        )
+        report["place"] = primary["name"]
+        report["scope"] = new_scope
+        report["lat"] = primary.get("lat")
+        report["lon"] = primary.get("lon")
+        report["mentioned_places"] = [
+            {
+                "name": p["name"],
+                "label": p.get("label", p["name"]),
+                "type": p.get("type", "city"),
+                "lat": p.get("lat"),
+                "lon": p.get("lon"),
+            }
+            for p in places[:120]
+        ]
+        new_signature = (
+            report.get("place"), report.get("scope"),
+            tuple(p.get("name") for p in report.get("mentioned_places", []) or []),
+        )
+        if new_signature != old_signature:
+            changed += 1
+
+    archive_regions = {e.get("region") for e in data.get("events", []) if e.get("region")} | {
+        r.get("region") for r in data.get("reports", []) if r.get("region")
+    }
+    archive_local_regions = {
+        e.get("region") for e in data.get("events", [])
+        if e.get("region") and e.get("scope") in ("city", "municipality")
+    } | {
+        r.get("region") for r in data.get("reports", [])
+        if r.get("region") and (
+            r.get("scope") in ("city", "municipality") or (r.get("mentioned_places") or [])
+        )
+    }
+    data.setdefault("coverage", {})["archive_regions_with_records"] = len(archive_regions)
+    data["coverage"]["archive_regions_with_local_records"] = len(archive_local_regions)
+    data["coverage"]["reports_place_reenriched"] = changed
+    return data
+
+
 def configure_incremental_window(args) -> None:
     """For normal manual runs, collect exactly from the previous cursor to now.
 
@@ -1669,6 +1751,10 @@ def main():
 
     data = collect(args)
     data = merge_existing_archive(data, Path(args.output))
+    source_cfg = json.loads(Path(args.sources).read_text(encoding="utf-8"))
+    city_path = Path(args.cities)
+    city_cfg = json.loads(city_path.read_text(encoding="utf-8")) if city_path.exists() else {"cities": [], "municipalities": []}
+    data = reenrich_archive_places(data, source_cfg, city_cfg)
     if data["source_status"] and not any(s.get("ok") for s in data["source_status"]):
         raise RuntimeError("all configured sources failed; keeping the previous archive file")
 

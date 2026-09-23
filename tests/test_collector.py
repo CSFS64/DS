@@ -21,6 +21,7 @@ from collector.collect import (
     configure_incremental_window,
     FetchResult,
     source_status_row,
+    reenrich_archive_places,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -380,6 +381,30 @@ class CollectorTests(unittest.TestCase):
         )
         self.assertTrue(row['ok'])
         self.assertEqual(row['health'], 'quiet')
+
+    def test_v14_existing_region_report_is_reenriched_without_backfill(self):
+        data = {
+            'coverage': {},
+            'events': [],
+            'reports': [{
+                'id':'old-1', 'region':'Voronezh Oblast', 'place':'Voronezh Oblast',
+                'scope':'region', 'text':'Лискинский и Острогожский районы — тревога в связи с угрозой БПЛА.',
+                'mentioned_places': [],
+            }],
+        }
+        source_cfg = {'sources': []}
+        city_cfg = {
+            'cities': [],
+            'municipalities': [
+                {'name':'Liski District','label':'Лискинский район','region':'Voronezh Oblast','type':'municipality','lat':50.98,'lon':39.50,'aliases':['Лискинский район']},
+                {'name':'Ostrogozhsk District','label':'Острогожский район','region':'Voronezh Oblast','type':'municipality','lat':50.86,'lon':39.08,'aliases':['Острогожский район']},
+            ],
+        }
+        reenrich_archive_places(data, source_cfg, city_cfg)
+        report=data['reports'][0]
+        self.assertEqual(report['scope'], 'municipality')
+        self.assertEqual({p['name'] for p in report['mentioned_places']}, {'Liski District','Ostrogozhsk District'})
+        self.assertEqual(data['coverage']['reports_place_reenriched'], 1)
 
     def test_v14_administrative_district_case_variants(self):
         source = dict(self.source)
