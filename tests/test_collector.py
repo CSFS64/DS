@@ -270,6 +270,11 @@ class CollectorTests(unittest.TestCase):
         # An official local post explicitly reporting a UAV remains visible even
         # if it uses wording outside the current operational regex families.
         self.assertEqual(uav_activity_kind('В районе сообщается о БПЛА.'), 'official_uav_activity')
+    def test_v13_shot_down_russian_inflections(self):
+        self.assertEqual(missile_activity_kind('ПВО сбила ракету над территорией области.'), 'air_defense_action')
+        self.assertEqual(missile_activity_kind('Ракета сбита силами ПВО.'), 'air_defense_action')
+        self.assertEqual(uav_activity_kind('ПВО сбили два БПЛА над областью.'), 'air_defense_action')
+        self.assertEqual(uav_activity_kind('БПЛА сбиты силами ПВО.'), 'air_defense_action')
     def test_v13_missile_activity_and_formal_pairing(self):
         self.assertEqual(missile_text_kind('В регионе объявлена ракетная опасность.'), 'start')
         self.assertEqual(missile_text_kind('Отбой ракетной опасности.'), 'end')
