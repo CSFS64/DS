@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "Incremental keeps old history; backfill re-fetches a wider recent window"
+        description: "Incremental pulls only from the previous archive cursor to now; backfill is optional"
         required: false
         default: "incremental"
         type: choice
@@ -15,9 +15,6 @@ on:
         description: "Hours to re-fetch when mode=backfill or on the very first run"
         required: false
         default: "168"
-  schedule:
-    - cron: "17 */6 * * *"
-
 permissions:
   contents: write
 
@@ -54,8 +51,8 @@ jobs:
         env:
           LOOKBACK_HOURS: ${{ github.event.inputs.backfill_hours || '168' }}
           FULL_BACKFILL: ${{ github.event.inputs.mode == 'backfill' && '1' || '0' }}
-          INCREMENTAL_OVERLAP_HOURS: "18"
-          SAFETY_LAG_HOURS: "24"
+          INCREMENTAL_OVERLAP_HOURS: "0"
+          SAFETY_LAG_HOURS: "0"
           TELEGRAM_MAX_PAGES: "80"
           TELEGRAM_CONTEXT_HOURS: "48"
           TELEGRAM_MT_MAX_MESSAGES: "20000"

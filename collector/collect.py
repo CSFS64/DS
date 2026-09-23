@@ -7,10 +7,12 @@ Sources are deliberately separated into two layers:
      configured in data/regions.json. RSS is treated as a fallback/diagnostic layer,
      not as proof that every MChS mobile-app push is mirrored to the website feed.
 
-The collector enforces a minimum 24-hour archive lag. It never acts as a live alert
-monitor. START/END alerts are paired conservatively; if a valid official alert cannot
-be resolved to a configured city/municipality, it can be retained at parent-region
-precision rather than silently dropped.
+The collector is normally run manually and has no mandatory archive lag. It records
+a snapshot up to the time the workflow is launched; network/API and workflow latency
+mean it is still not a real-time alerting system. START/END alerts are paired
+conservatively; if a valid official alert cannot be resolved to a configured
+city/municipality, it can be retained at parent-region precision rather than silently
+dropped.
 """
 from __future__ import annotations
 
@@ -1251,8 +1253,8 @@ def collect(args) -> dict[str, Any]:
             "aliases": city.get("aliases") or [city.get("label") or city.get("name")],
         })
     now = datetime.now(timezone.utc)
-    window_end = now - timedelta(hours=args.safety_lag_hours)
-    window_start = window_end - timedelta(hours=args.lookback_hours)
+    window_end = getattr(args, "window_end_override", None) or (now - timedelta(hours=args.safety_lag_hours))
+    window_start = getattr(args, "window_start_override", None) or (window_end - timedelta(hours=args.lookback_hours))
 
     all_events: list[dict[str, Any]] = []
     all_reports: list[dict[str, Any]] = []
@@ -1489,20 +1491,24 @@ def merge_existing_archive(data: dict[str, Any], output_path: Path) -> dict[str,
     return data
 
 def configure_incremental_window(args) -> None:
-    """Shrink scheduled/manual incremental runs to only the new archive edge.
+    """For normal manual runs, collect exactly from the previous cursor to now.
 
-    Existing historical records remain in events.json.  For an incremental run
-    we collect from the previous safe window end minus a small overlap through
-    the newest safe cutoff.  The overlap lets START/END pairs that straddle two
-    runs be regenerated without re-fetching the full historical lookback.
+    Older records remain in events.json. Fetchers may read extra context before
+    window_start so a START just before the cursor can still pair with an END
+    after it, but reports before the cursor are not re-added. A backfill remains
+    available only when explicitly selected.
     """
     args.collection_mode = "backfill" if args.full_backfill else "incremental"
+    args.window_start_override = None
+    args.window_end_override = None
     if args.full_backfill:
         return
+
     out = Path(args.output)
     if not out.exists():
         args.collection_mode = "initial"
         return
+
     try:
         old = json.loads(out.read_text(encoding="utf-8"))
         previous_end = parse_iso(old.get("window_end", ""))
@@ -1511,9 +1517,13 @@ def configure_incremental_window(args) -> None:
         return
 
     target_end = datetime.now(timezone.utc) - timedelta(hours=args.safety_lag_hours)
-    delta_h = max(0.0, (target_end - previous_end).total_seconds() / 3600.0)
-    needed = int(delta_h + args.incremental_overlap_hours + 0.999)
-    args.lookback_hours = max(args.incremental_overlap_hours, needed, 6)
+    if previous_end > target_end:
+        previous_end = target_end
+
+    args.window_start_override = previous_end
+    args.window_end_override = target_end
+    args.lookback_hours = max(0.0, (target_end - previous_end).total_seconds() / 3600.0)
+    args.incremental_overlap_hours = 0
 
 
 def main():
@@ -1523,17 +1533,17 @@ def main():
     p.add_argument("--cities", default=str(DEFAULT_CITIES))
     p.add_argument("--output", default=str(DEFAULT_OUTPUT))
     p.add_argument("--lookback-hours", type=int, default=int(os.getenv("LOOKBACK_HOURS", "120")))
-    p.add_argument("--safety-lag-hours", type=int, default=int(os.getenv("SAFETY_LAG_HOURS", "24")))
+    p.add_argument("--safety-lag-hours", type=int, default=int(os.getenv("SAFETY_LAG_HOURS", "0")))
     p.add_argument("--max-pages", type=int, default=int(os.getenv("TELEGRAM_MAX_PAGES", "50")))
     p.add_argument("--context-hours", type=int, default=int(os.getenv("TELEGRAM_CONTEXT_HOURS", "48")))
-    p.add_argument("--incremental-overlap-hours", type=int, default=int(os.getenv("INCREMENTAL_OVERLAP_HOURS", "18")))
+    p.add_argument("--incremental-overlap-hours", type=int, default=int(os.getenv("INCREMENTAL_OVERLAP_HOURS", "0")))
     p.add_argument("--full-backfill", action="store_true", default=os.getenv("FULL_BACKFILL", "0") == "1")
     p.add_argument("--mchs-workers", type=int, default=int(os.getenv("MCHS_WORKERS", "8")))
     args = p.parse_args()
-    args.safety_lag_hours = max(24, args.safety_lag_hours)
-    args.lookback_hours = max(6, args.lookback_hours)
+    args.safety_lag_hours = max(0, args.safety_lag_hours)
+    args.lookback_hours = max(0, args.lookback_hours)
     args.context_hours = max(12, args.context_hours)
-    args.incremental_overlap_hours = max(6, args.incremental_overlap_hours)
+    args.incremental_overlap_hours = max(0, args.incremental_overlap_hours)
     configure_incremental_window(args)
     print(
         f"collection mode={args.collection_mode} lookback={args.lookback_hours}h "

@@ -194,26 +194,30 @@ class CollectorTests(unittest.TestCase):
             out = Path(td) / "events.json"
             from datetime import timedelta
             now = datetime.now(timezone.utc)
-            # Previous safe cutoff roughly six hours behind the new one.
-            previous_end = now - timedelta(hours=30)
+            previous_end = now - timedelta(hours=6)
             out.write_text(json.dumps({"window_end": previous_end.isoformat()}), encoding="utf-8")
             args = Namespace(
-                output=str(out), safety_lag_hours=24, lookback_hours=168,
+                output=str(out), safety_lag_hours=0, lookback_hours=168,
                 incremental_overlap_hours=18, full_backfill=False,
             )
             configure_incremental_window(args)
             self.assertEqual(args.collection_mode, "incremental")
-            self.assertGreaterEqual(args.lookback_hours, 23)
-            self.assertLess(args.lookback_hours, 40)
+            self.assertEqual(args.window_start_override, previous_end)
+            self.assertGreater(args.window_end_override, previous_end)
+            self.assertEqual(args.incremental_overlap_hours, 0)
+            self.assertGreater(args.lookback_hours, 5.9)
+            self.assertLess(args.lookback_hours, 6.1)
 
     def test_v9_backfill_keeps_requested_window(self):
         args = Namespace(
-            output="missing.json", safety_lag_hours=24, lookback_hours=168,
-            incremental_overlap_hours=18, full_backfill=True,
+            output="missing.json", safety_lag_hours=0, lookback_hours=168,
+            incremental_overlap_hours=0, full_backfill=True,
         )
         configure_incremental_window(args)
         self.assertEqual(args.collection_mode, "backfill")
         self.assertEqual(args.lookback_hours, 168)
+        self.assertIsNone(args.window_start_override)
+        self.assertIsNone(args.window_end_override)
 
     def test_v10_broad_alert_wording(self):
         self.assertEqual(text_kind('На территории города Пензы объявлен режим «Воздушная опасность».'), 'start')
