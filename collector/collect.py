@@ -796,7 +796,7 @@ def fetch_mchs_posts_for_window(
 def text_kind(text: str) -> str | None:
     # Evaluate sentence-by-sentence so a missile clear in one sentence cannot
     # accidentally clear a UAV alert mentioned in another sentence.
-    chunks = [s.strip() for s in re.split(r"(?<=[.!?;])\\s+", str(text)) if s.strip()] or [str(text)]
+    chunks = [s.strip() for s in re.split(r"(?<=[.!?;])\s+", str(text)) if s.strip()] or [str(text)]
     for chunk in chunks:
         n = normalize(chunk)
 
