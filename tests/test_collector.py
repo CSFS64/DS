@@ -23,6 +23,8 @@ from collector.collect import (
     source_status_row,
     reenrich_archive_places,
     merge_existing_archive,
+    revalidate_archive_reports,
+    fetch_posts_mtproto_for_window,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -552,6 +554,94 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(len(reports), 1)
         names = {p['name'] for p in reports[0]['mentioned_places']}
         self.assertEqual(names, {'Alpha','Beta'})
+
+
+    def test_v16_non_operational_mentions_do_not_light_map(self):
+        uav_false_positives = [
+            'Якобы губернатор заявил, что защитить регион от атак украинских беспилотников невозможно. Это дипфейк.',
+            'Не снимайте и не публикуйте в соцсетях БПЛА и их обломки; в регионе действует запрет на распространение таких материалов.',
+            'Участникам предстоит проверить навыки управления БПЛА в рамках соревнования.',
+            'Университет займётся искусственным интеллектом в беспилотных авиационных системах.',
+        ]
+        for text in uav_false_positives:
+            with self.subTest(text=text):
+                self.assertIsNone(uav_activity_kind(text))
+
+        self.assertIsNone(missile_activity_kind(
+            'На предприятии производят комплектующие для внутренних деталей ракет и тару для приборов на орбиту.'
+        ))
+
+    def test_v16_operational_wording_still_survives_stricter_filter(self):
+        self.assertEqual(
+            uav_activity_kind('В районе сообщается о БПЛА.'),
+            'official_uav_activity',
+        )
+        self.assertEqual(
+            uav_activity_kind('Из-за падения обломков БПЛА произошло возгорание в лесном массиве.'),
+            'impact_or_debris',
+        )
+        self.assertEqual(
+            uav_activity_kind('Военные отражают атаку, работает ПВО; уничтожаются вражеские БПЛА.'),
+            'air_defense_action',
+        )
+        self.assertEqual(
+            uav_activity_kind('ОПАСНОСТЬ АТАКИ БПЛА. Не публикуйте работу ПВО.'),
+            'alert_start_signal',
+        )
+
+    def test_v16_revalidation_removes_old_false_positive_without_backfill(self):
+        data = {
+            'coverage': {},
+            'events': [],
+            'reports': [{
+                'id': 'false-uav',
+                'region': 'Ulyanovsk Oblast',
+                'place': 'Ulyanovsk Oblast',
+                'scope': 'region',
+                'at': '2026-09-23T13:04:46+00:00',
+                'signal_class': 'uav_activity_signal',
+                'threat_class': 'uav',
+                'activity_kind': 'uav_attack_activity',
+                'count': None,
+                'text': 'Якобы губернатор заявил, что защитить регион от атак украинских беспилотников невозможно. Это дипфейк.',
+            }],
+        }
+        out = revalidate_archive_reports(data)
+        self.assertEqual(out['reports'], [])
+        self.assertEqual(out['coverage']['reports_revalidated_removed'], 1)
+
+    def test_v16_cached_mtproto_peer_still_works_during_resolve_floodwait(self):
+        class FakeClient:
+            _archive_resolve_flooded = True
+            _archive_resolve_wait_seconds = 33739
+
+            def get_input_entity(self, channel):
+                raise AssertionError('cached peer must not resolve username')
+
+            def iter_messages(self, entity, offset_date=None, limit=None):
+                self.entity = entity
+                return iter(())
+
+        cache = {
+            'example_channel': {
+                'peer_type': 'channel',
+                'id': 123456789,
+                'access_hash': 987654321,
+                'username': 'example_channel',
+                'source': 'test',
+            }
+        }
+        result = fetch_posts_mtproto_for_window(
+            FakeClient(),
+            'example_channel',
+            datetime(2026, 9, 23, 0, 0, tzinfo=timezone.utc),
+            datetime(2026, 9, 24, 0, 0, tzinfo=timezone.utc),
+            peer_cache=cache,
+        )
+        self.assertTrue(result.transport_ok)
+        self.assertEqual(result.transport, 'telegram_mtproto')
+        self.assertTrue(result.mtproto_peer_cache_hit)
+        self.assertFalse(result.mtproto_peer_resolved)
 
 if __name__ == "__main__":
     unittest.main()
