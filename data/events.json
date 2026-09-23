@@ -53,7 +53,8 @@
     "archive_regions_with_local_records": 22,
     "reports_revalidated_removed": 27,
     "reports_revalidated_reclassified": 7,
-    "reports_place_reenriched": 384
+    "reports_place_reenriched": 384,
+    "archive_manual_repairs": 2
   },
   "events": [
     {
@@ -2707,31 +2708,38 @@
       ]
     },
     {
-      "id": "a29efb0b9eccac95",
+      "id": "252b33b99e7601cb",
       "region": "Belgorod Oblast",
-      "place": "Valuyskiy Rayon",
-      "scope": "municipality",
+      "place": "Grayvoron",
+      "scope": "city",
       "at": "2026-09-15T05:40:57+00:00",
-      "count": 14,
-      "count_type": "destroyed_or_suppressed",
+      "count": 51,
+      "count_type": "attacked",
       "signal_class": "uav_activity_signal",
       "activity_kind": "air_defense_action",
       "count_qualifier": null,
       "secondary_count": null,
       "secondary_type": null,
-      "text": "📍 Над Валуйским округом сбиты и подавлены 14 беспилотников.",
+      "text": "📍 В Грайворонском округе по городу Грайворон, посёлку Горьковский, сёлам Безымено, Глотово, Доброе, Дроновка, Новостроевка-Первая, Новостроевка-Вторая, Пороз, Почаево и Сподарюшино выпущено 14 боеприпасов в ходе 3 обстрелов, 3 раза сброшены 5 взрывных устройств с БПЛА и нанесены удары 51 беспилотника, 29 из которых сбиты.",
       "source_name": "Оперштаб Белгородской области",
       "url": "https://t.me/operativno31/14661",
       "source_kind": "telegram",
-      "lat": 50.18959,
-      "lon": 38.04775,
+      "lat": 50.4767,
+      "lon": 35.6773,
       "mentioned_places": [
         {
-          "name": "Valuyskiy Rayon",
-          "label": "Valuyskiy Rayon",
+          "name": "Grayvoron",
+          "label": "Грайворон",
+          "type": "city",
+          "lat": 50.4767,
+          "lon": 35.6773
+        },
+        {
+          "name": "Grayvoronskiy Rayon",
+          "label": "Grayvoronskiy Rayon",
           "type": "municipality",
-          "lat": 50.18959,
-          "lon": 38.04775
+          "lat": 50.55955,
+          "lon": 35.64185
         }
       ]
     },
@@ -2765,38 +2773,31 @@
       ]
     },
     {
-      "id": "252b33b99e7601cb",
+      "id": "a29efb0b9eccac95",
       "region": "Belgorod Oblast",
-      "place": "Grayvoron",
-      "scope": "city",
+      "place": "Valuyskiy Rayon",
+      "scope": "municipality",
       "at": "2026-09-15T05:40:57+00:00",
-      "count": 51,
-      "count_type": "attacked",
+      "count": 14,
+      "count_type": "destroyed_or_suppressed",
       "signal_class": "uav_activity_signal",
       "activity_kind": "air_defense_action",
       "count_qualifier": null,
       "secondary_count": null,
       "secondary_type": null,
-      "text": "📍 В Грайворонском округе по городу Грайворон, посёлку Горьковский, сёлам Безымено, Глотово, Доброе, Дроновка, Новостроевка-Первая, Новостроевка-Вторая, Пороз, Почаево и Сподарюшино выпущено 14 боеприпасов в ходе 3 обстрелов, 3 раза сброшены 5 взрывных устройств с БПЛА и нанесены удары 51 беспилотника, 29 из которых сбиты.",
+      "text": "📍 Над Валуйским округом сбиты и подавлены 14 беспилотников.",
       "source_name": "Оперштаб Белгородской области",
       "url": "https://t.me/operativno31/14661",
       "source_kind": "telegram",
-      "lat": 50.4767,
-      "lon": 35.6773,
+      "lat": 50.18959,
+      "lon": 38.04775,
       "mentioned_places": [
         {
-          "name": "Grayvoron",
-          "label": "Грайворон",
-          "type": "city",
-          "lat": 50.4767,
-          "lon": 35.6773
-        },
-        {
-          "name": "Grayvoronskiy Rayon",
-          "label": "Grayvoronskiy Rayon",
+          "name": "Valuyskiy Rayon",
+          "label": "Valuyskiy Rayon",
           "type": "municipality",
-          "lat": 50.55955,
-          "lon": 35.64185
+          "lat": 50.18959,
+          "lon": 38.04775
         }
       ]
     },
@@ -4457,7 +4458,7 @@
           "label": "Starooskolsky Urban Okrug",
           "type": "municipality",
           "lat": 51.25,
-          "lon": 38.0
+          "lon": 38
         },
         {
           "name": "Yakovlevskiy Rayon",
@@ -5384,7 +5385,7 @@
           "label": "Starooskolsky Urban Okrug",
           "type": "municipality",
           "lat": 51.25,
-          "lon": 38.0
+          "lon": 38
         },
         {
           "name": "Valuyskiy Rayon",
@@ -5871,7 +5872,7 @@
           "label": "Korenevskiy Rayon",
           "type": "municipality",
           "lat": 51.41667,
-          "lon": 35.0
+          "lon": 35
         },
         {
           "name": "Oboyanskiy Rayon",
@@ -5984,6 +5985,50 @@
       ]
     },
     {
+      "id": "a32350a45a16d951",
+      "region": "Belgorod Oblast",
+      "place": "Belgorodsky District",
+      "scope": "municipality",
+      "at": "2026-09-17T06:36:50+00:00",
+      "count": 19,
+      "count_type": "attacked",
+      "signal_class": "uav_activity_signal",
+      "threat_class": "uav",
+      "activity_kind": "air_defense_action",
+      "count_qualifier": null,
+      "secondary_count": null,
+      "secondary_type": null,
+      "text": "📍 В Белгородском округе по посёлку Октябрьский, сёлам Красный Октябрь, Николаевка, Чайки, хутору Водяной нанесены удары 19 беспилотниками, 15 из которых подавлены и сбиты.",
+      "source_name": "Оперштаб Белгородской области",
+      "url": "https://t.me/operativno31/14688",
+      "source_kind": "telegram",
+      "lat": 50.73,
+      "lon": 36.55,
+      "mentioned_places": [
+        {
+          "name": "Belgorodsky District",
+          "label": "Белгородский р-н",
+          "type": "municipality",
+          "lat": 50.73,
+          "lon": 36.55
+        },
+        {
+          "name": "Oktyabr'skiy",
+          "label": "Oktyabr’skiy",
+          "type": "city",
+          "lat": 50.44521,
+          "lon": 36.36066
+        },
+        {
+          "name": "Belgorodskiy Rayon",
+          "label": "Belgorodskiy Rayon",
+          "type": "municipality",
+          "lat": 50.5196,
+          "lon": 36.52133
+        }
+      ]
+    },
+    {
       "id": "7df6302220797d3c",
       "region": "Belgorod Oblast",
       "place": "Borisovskiy Rayon",
@@ -6054,50 +6099,6 @@
           "type": "municipality",
           "lat": 50.55955,
           "lon": 35.64185
-        }
-      ]
-    },
-    {
-      "id": "a32350a45a16d951",
-      "region": "Belgorod Oblast",
-      "place": "Belgorodsky District",
-      "scope": "municipality",
-      "at": "2026-09-17T06:36:50+00:00",
-      "count": 19,
-      "count_type": "attacked",
-      "signal_class": "uav_activity_signal",
-      "threat_class": "uav",
-      "activity_kind": "air_defense_action",
-      "count_qualifier": null,
-      "secondary_count": null,
-      "secondary_type": null,
-      "text": "📍 В Белгородском округе по посёлку Октябрьский, сёлам Красный Октябрь, Николаевка, Чайки, хутору Водяной нанесены удары 19 беспилотниками, 15 из которых подавлены и сбиты.",
-      "source_name": "Оперштаб Белгородской области",
-      "url": "https://t.me/operativno31/14688",
-      "source_kind": "telegram",
-      "lat": 50.73,
-      "lon": 36.55,
-      "mentioned_places": [
-        {
-          "name": "Belgorodsky District",
-          "label": "Белгородский р-н",
-          "type": "municipality",
-          "lat": 50.73,
-          "lon": 36.55
-        },
-        {
-          "name": "Oktyabr'skiy",
-          "label": "Oktyabr’skiy",
-          "type": "city",
-          "lat": 50.44521,
-          "lon": 36.36066
-        },
-        {
-          "name": "Belgorodskiy Rayon",
-          "label": "Belgorodskiy Rayon",
-          "type": "municipality",
-          "lat": 50.5196,
-          "lon": 36.52133
         }
       ]
     },
@@ -6339,14 +6340,14 @@
       "url": "https://t.me/pavelmalkov_official/7261",
       "source_kind": "telegram",
       "lat": 54.33333,
-      "lon": 42.0,
+      "lon": 42,
       "mentioned_places": [
         {
           "name": "Sasovsky District",
           "label": "Sasovsky District",
           "type": "municipality",
           "lat": 54.33333,
-          "lon": 42.0
+          "lon": 42
         }
       ]
     },
@@ -8810,7 +8811,7 @@
           "label": "Korenevskiy Rayon",
           "type": "municipality",
           "lat": 51.41667,
-          "lon": 35.0
+          "lon": 35
         }
       ]
     },
@@ -10260,7 +10261,7 @@
           "label": "Korenevskiy Rayon",
           "type": "municipality",
           "lat": 51.41667,
-          "lon": 35.0
+          "lon": 35
         }
       ]
     },
@@ -16130,7 +16131,7 @@
           "label": "Starooskolsky Urban Okrug",
           "type": "municipality",
           "lat": 51.25,
-          "lon": 38.0
+          "lon": 38
         },
         {
           "name": "Veydelevskiy Rayon",
@@ -18563,7 +18564,7 @@
           "label": "Starooskolsky Urban Okrug",
           "type": "municipality",
           "lat": 51.25,
-          "lon": 38.0
+          "lon": 38
         }
       ]
     },
@@ -19244,7 +19245,7 @@
           "label": "Starooskolsky Urban Okrug",
           "type": "municipality",
           "lat": 51.25,
-          "lon": 38.0
+          "lon": 38
         },
         {
           "name": "Valuyskiy Rayon",
@@ -19796,6 +19797,57 @@
       ]
     },
     {
+      "id": "1a35a11492ef134a",
+      "region": "Belgorod Oblast",
+      "place": "Belgorodsky District",
+      "scope": "municipality",
+      "at": "2026-09-21T06:20:31+00:00",
+      "count": 26,
+      "count_type": "attacked",
+      "signal_class": "uav_activity_signal",
+      "threat_class": "uav",
+      "activity_kind": "air_defense_action",
+      "count_qualifier": null,
+      "secondary_count": null,
+      "secondary_type": null,
+      "text": "🖥 Информация о нанесённых ВСУ ударах по нашему региону за прошедшие сутки (часть 1): 📍 В Белгородском округе по посёлкам Малиновка, Октябрьский, сёлам Бессоновка, Бочковка, Весёлая Лопань, Карнауховка, Нижний Ольшанец, Никольское, Отрадное, Севрюково, Чайки нанесены удары 26 беспилотниками, 13 из которых подавлены и сбиты.",
+      "source_name": "Оперштаб Белгородской области",
+      "url": "https://t.me/operativno31/14833",
+      "source_kind": "telegram",
+      "lat": 50.73,
+      "lon": 36.55,
+      "mentioned_places": [
+        {
+          "name": "Belgorodsky District",
+          "label": "Белгородский р-н",
+          "type": "municipality",
+          "lat": 50.73,
+          "lon": 36.55
+        },
+        {
+          "name": "Oktyabr'skiy",
+          "label": "Oktyabr’skiy",
+          "type": "city",
+          "lat": 50.44521,
+          "lon": 36.36066
+        },
+        {
+          "name": "Bessonovka",
+          "label": "Bessonovka",
+          "type": "city",
+          "lat": 50.52644,
+          "lon": 36.30107
+        },
+        {
+          "name": "Belgorodskiy Rayon",
+          "label": "Belgorodskiy Rayon",
+          "type": "municipality",
+          "lat": 50.5196,
+          "lon": 36.52133
+        }
+      ]
+    },
+    {
       "id": "a9e1c9b58e26f3b4",
       "region": "Belgorod Oblast",
       "place": "Borisovka",
@@ -19924,57 +19976,6 @@
           "type": "municipality",
           "lat": 50.55955,
           "lon": 35.64185
-        }
-      ]
-    },
-    {
-      "id": "1a35a11492ef134a",
-      "region": "Belgorod Oblast",
-      "place": "Belgorodsky District",
-      "scope": "municipality",
-      "at": "2026-09-21T06:20:31+00:00",
-      "count": 26,
-      "count_type": "attacked",
-      "signal_class": "uav_activity_signal",
-      "threat_class": "uav",
-      "activity_kind": "air_defense_action",
-      "count_qualifier": null,
-      "secondary_count": null,
-      "secondary_type": null,
-      "text": "🖥 Информация о нанесённых ВСУ ударах по нашему региону за прошедшие сутки (часть 1): 📍 В Белгородском округе по посёлкам Малиновка, Октябрьский, сёлам Бессоновка, Бочковка, Весёлая Лопань, Карнауховка, Нижний Ольшанец, Никольское, Отрадное, Севрюково, Чайки нанесены удары 26 беспилотниками, 13 из которых подавлены и сбиты.",
-      "source_name": "Оперштаб Белгородской области",
-      "url": "https://t.me/operativno31/14833",
-      "source_kind": "telegram",
-      "lat": 50.73,
-      "lon": 36.55,
-      "mentioned_places": [
-        {
-          "name": "Belgorodsky District",
-          "label": "Белгородский р-н",
-          "type": "municipality",
-          "lat": 50.73,
-          "lon": 36.55
-        },
-        {
-          "name": "Oktyabr'skiy",
-          "label": "Oktyabr’skiy",
-          "type": "city",
-          "lat": 50.44521,
-          "lon": 36.36066
-        },
-        {
-          "name": "Bessonovka",
-          "label": "Bessonovka",
-          "type": "city",
-          "lat": 50.52644,
-          "lon": 36.30107
-        },
-        {
-          "name": "Belgorodskiy Rayon",
-          "label": "Belgorodskiy Rayon",
-          "type": "municipality",
-          "lat": 50.5196,
-          "lon": 36.52133
         }
       ]
     },
@@ -21643,7 +21644,7 @@
           "label": "Starooskolsky Urban Okrug",
           "type": "municipality",
           "lat": 51.25,
-          "lon": 38.0
+          "lon": 38
         },
         {
           "name": "Veydelevskiy Rayon",
@@ -22604,7 +22605,7 @@
           "label": "Starooskolsky Urban Okrug",
           "type": "municipality",
           "lat": 51.25,
-          "lon": 38.0
+          "lon": 38
         },
         {
           "name": "Veydelevskiy Rayon",
@@ -25932,11 +25933,11 @@
       ]
     },
     {
-      "id": "596bea7f9f9147de",
-      "region": "Ulyanovsk Oblast",
-      "place": "Gorodskoy Okrug Ul'yanovsk",
-      "scope": "municipality",
-      "at": "2026-09-23T13:04:46+00:00",
+      "id": "e114cea54b3e588a",
+      "region": "Kursk Oblast",
+      "place": "Kursk",
+      "scope": "city",
+      "at": "2026-09-23T12:53:23+00:00",
       "count": null,
       "count_type": "official_activity",
       "activity_kind": "uav_attack_activity",
@@ -25945,26 +25946,19 @@
       "count_qualifier": null,
       "secondary_count": null,
       "secondary_type": null,
-      "text": "❗️ Украинская пропаганда продолжает «пугать» россиян новым налогом В ульяновских соцсетях — очередной дипфейк. Якобы Губернатор Алексей Русских выступил с заявлением, что защитить регион от атак украинских беспилотников невозможно. А восстанавливать инфраструктуру будут за счет специального налога. Искусные фейкоделы снова прокололись, и вот настоящие факты: На видео действительно губернатор Ульяновской области Алексей Русских, но говорит он не о новом налоге, а об итогах рабочей поездки в Карсунский район 18 марта 2026 года. Фейк о новом налоге уже опровергли ранее: поправки в налоговое законодательство не предполагают новых сборов с населения, а касаются порядка учета расходов бизнеса. Компании, которые тратят средства на защиту своих объектов от БПЛА и на восстановление после атак, смогут учитывать эти затраты при налогообложении. Как пояснил статс-секретарь-заместитель министра финансов Алексей Сазанов, речь идет об учете этих расходов, а не о компенсациях. В очередной раз обращаемся к администраторам сообществ: прежде чем публиковать предложенную информацию, проверяйте ее достоверность. Жителей Ульяновской области просим быть бдительными и доверять только проверенным источникам. Официальные аккаунты Губернатора Алексея Русских: • https://t.me/Russkih_Aleksey • https://vk.com/russkihay • https://ok.ru/russkih • https://max.ru/Russkih_Aleksey ❤️ ЦУР Ульяновской области в MAX",
-      "source_name": "Правительство Ульяновской области",
-      "url": "https://t.me/ulgovru/23954",
+      "text": "⚡️ В результате атаки ВСУ на Курск ранен 50-летний мужчина. Губернатор Курской области Александр Хинштейн: «Вражеский дрон ударил по дому в частном секторе города. В результате атаки повреждены дом, гараж, автомобиль и магазин. Было небольшое возгорание. Роман Леонидович в это время находился в машине, в результате у него акубаротравма, закрытая черепно-мозговая травма, сотрясение головного мозга, ушиб левого плеча. Госпитализируем его в облбольницу. Наши врачи сделают всё возможное, чтобы поставить его на ноги». #губернатор46 🇷🇺 Курская область на связи в MAX",
+      "source_name": "Оперштаб Курской области",
+      "url": "https://t.me/gubernator_46/19366",
       "source_kind": "telegram",
-      "lat": 54.30642,
-      "lon": 48.33661,
+      "lat": 51.7304,
+      "lon": 36.1926,
       "mentioned_places": [
         {
-          "name": "Gorodskoy Okrug Ul'yanovsk",
-          "label": "Gorodskoy Okrug Ul’yanovsk",
-          "type": "municipality",
-          "lat": 54.30642,
-          "lon": 48.33661
-        },
-        {
-          "name": "Karsunskiy Rayon",
-          "label": "Karsunskiy Rayon",
-          "type": "municipality",
-          "lat": 54.24865,
-          "lon": 46.93779
+          "name": "Kursk",
+          "label": "Курск",
+          "type": "city",
+          "lat": 51.7304,
+          "lon": 36.1926
         }
       ]
     },
