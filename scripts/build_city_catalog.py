@@ -11,7 +11,7 @@ OUT = ROOT / 'data' / 'cities.json'
 RU_URL = 'https://download.geonames.org/export/dump/RU.zip'
 ADMIN1_URL = 'https://download.geonames.org/export/dump/admin1CodesASCII.txt'
 ADMIN2_URL = 'https://download.geonames.org/export/dump/admin2Codes.txt'
-UA = 'DeepstrikeArchivePlaceCatalog/2.0 (historical archive)'
+UA = 'DeepstrikeArchivePlaceCatalog/3.0 (historical archive)'
 
 STOP = {
     'republic','oblast','krai','kray','region','autonomous','okrug','district','federal','city','of','the',
@@ -90,16 +90,30 @@ def main():
     with zipfile.ZipFile(io.BytesIO(raw)) as z:
         name=next(n for n in z.namelist() if n.upper().endswith('RU.TXT'))
         txt=z.read(name).decode('utf-8','replace')
-    city_rows=[]; admin2_points=defaultdict(list); unmapped=set()
+    city_rows=[]; admin2_points=defaultdict(list); admin2_features={}; unmapped=set()
     for line in txt.splitlines():
         c=line.split('\t')
-        if len(c)<19 or c[8]!='RU' or c[6]!='P': continue
+        if len(c)<19 or c[8]!='RU': continue
         try: lat=float(c[4]);lon=float(c[5]);pop=int(c[14] or 0)
         except Exception: continue
         a1=c[10].strip(); a2=c[11].strip(); arow=admin1.get(a1)
         region=best_region(arow[0],arow[1],regions) if arow else None
         if not region: unmapped.add(a1); continue
-        fcode=c[7]; name=c[1].strip(); ascii_name=c[2].strip(); alt=c[3].split(',') if c[3] else []
+        fclass=c[6]; fcode=c[7]; name=c[1].strip(); ascii_name=c[2].strip(); alt=c[3].split(',') if c[3] else []
+
+        # GeoNames' admin2Codes list often contains transliterated labels only
+        # and many districts have no populated-place row carrying the ADM2 code.
+        # Keep the actual ADM2 feature: it supplies coordinates and, crucially,
+        # alternate Russian names such as "Богучарский район".
+        if fclass=='A' and fcode=='ADM2' and a2:
+            admin2_features[f'RU.{a1}.{a2}']={
+                'id':int(c[0]), 'name':name, 'ascii_name':ascii_name, 'alt':alt,
+                'lat':lat, 'lon':lon, 'region':region, 'feature_code':fcode,
+            }
+            continue
+
+        if fclass!='P':
+            continue
         if a2: admin2_points[f'RU.{a1}.{a2}'].append((lat,lon,max(pop,1),fcode,name,ascii_name,region))
         if pop < args.min_population and not fcode.startswith('PPLA'): continue
         city_rows.append({
@@ -109,24 +123,54 @@ def main():
         })
     city_rows.sort(key=lambda x:(x['region'],-x['population'],x['name']))
     municipalities=[]
-    for code,(native,ascii_name) in admin2.items():
-        pts=admin2_points.get(code)
-        if not pts: continue
-        # Prefer an ADM2 seat when GeoNames provides one; otherwise use a population-weighted centroid.
-        seats=[x for x in pts if x[3]=='PPLA2']
-        if seats:
-            lat,lon,pop,_,_,_,region=max(seats,key=lambda x:x[2])
+    all_admin2_codes=sorted(set(admin2) | set(admin2_features) | set(admin2_points))
+    for code in all_admin2_codes:
+        native,ascii_name=admin2.get(code,('',''))
+        feat=admin2_features.get(code)
+        pts=admin2_points.get(code) or []
+
+        if feat:
+            lat=feat['lat']; lon=feat['lon']; region=feat['region']
+            pop=max((x[2] for x in pts),default=0)
+        elif pts:
+            seats=[x for x in pts if x[3]=='PPLA2']
+            if seats:
+                lat,lon,pop,_,_,_,region=max(seats,key=lambda x:x[2])
+            else:
+                region=pts[0][6]; weights=[max(1,math.sqrt(x[2])) for x in pts]; sw=sum(weights)
+                lat=sum(x[0]*w for x,w in zip(pts,weights))/sw
+                lon=sum(x[1]*w for x,w in zip(pts,weights))/sw
+                pop=max(x[2] for x in pts)
         else:
-            region=pts[0][6]; weights=[max(1,math.sqrt(x[2])) for x in pts]; sw=sum(weights)
-            lat=sum(x[0]*w for x,w in zip(pts,weights))/sw;lon=sum(x[1]*w for x,w in zip(pts,weights))/sw;pop=max(x[2] for x in pts)
+            continue
+
         vals=[native,ascii_name]
-        # Common official wording adds район / округ; keep both full and bare aliases.
-        bare=re.sub(r'\b(?:район|округ|муниципальный|городской)\b',' ',native or '',flags=re.I)
-        vals.extend([bare.strip()])
-        aliases=aliases_for(*vals,limit=28)
-        municipalities.append({'id':code,'name':ascii_name or native,'label':native,'region':region,'type':'municipality','lat':lat,'lon':lon,'population':pop,'aliases':aliases})
+        if feat:
+            vals.extend([feat.get('name',''),feat.get('ascii_name',''),feat.get('alt') or []])
+
+        # Retain full administrative names plus conservative bare forms.
+        # The collector generates case variants (район -> районе, adjective
+        # -ский -> -ском etc.) at parse time.
+        expanded=[]
+        for value in vals:
+            if isinstance(value,list):
+                expanded.extend(value)
+            elif value:
+                expanded.append(value)
+        for value in list(expanded):
+            bare=re.sub(r'\b(?:район|округ|муниципальный|городской|муниципальное образование)\b',' ',str(value),flags=re.I)
+            bare=' '.join(bare.split())
+            if len(bare)>=4:
+                expanded.append(bare)
+        aliases=aliases_for(expanded,limit=80)
+        label=(feat.get('name') if feat else None) or native or ascii_name
+        canonical=(feat.get('ascii_name') if feat else None) or ascii_name or label
+        municipalities.append({
+            'id':code,'name':canonical,'label':label,'region':region,'type':'municipality',
+            'lat':lat,'lon':lon,'population':pop,'feature_code':'ADM2','aliases':aliases
+        })
     municipalities.sort(key=lambda x:(x['region'],x['label']))
-    payload={'schema_version':3,'source':'GeoNames RU + admin1/admin2','license':'CC BY 4.0','source_url':RU_URL,'country':'RU','count':len(city_rows),'municipality_count':len(municipalities),'cities':city_rows,'municipalities':municipalities}
+    payload={'schema_version':4,'source':'GeoNames RU populated places + direct ADM2 features + admin1/admin2 codes','license':'CC BY 4.0','source_url':RU_URL,'country':'RU','count':len(city_rows),'municipality_count':len(municipalities),'cities':city_rows,'municipalities':municipalities}
     path=Path(args.output);path.parent.mkdir(parents=True,exist_ok=True);path.write_text(json.dumps(payload,ensure_ascii=False,separators=(',',':'))+'\n',encoding='utf-8')
     print(f'wrote {path}: {len(city_rows)} populated places/admin seats + {len(municipalities)} ADM2 representatives')
     if unmapped: print('unmapped admin1 codes:',sorted(unmapped)[:20])

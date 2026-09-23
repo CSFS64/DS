@@ -381,6 +381,55 @@ class CollectorTests(unittest.TestCase):
         self.assertTrue(row['ok'])
         self.assertEqual(row['health'], 'quiet')
 
+    def test_v14_administrative_district_case_variants(self):
+        source = dict(self.source)
+        source['_catalog_places'] = [
+            {
+                'name':'Klintsy District', 'label':'Клинцовский район',
+                'type':'municipality', 'lat':52.76, 'lon':32.24,
+                'aliases':['Клинцовский район'],
+            },
+            {
+                'name':'Starodub Municipal Okrug', 'label':'Стародубский муниципальный округ',
+                'type':'municipality', 'lat':52.58, 'lon':32.76,
+                'aliases':['Стародубский муниципальный округ'],
+            },
+            {
+                'name':'Boguchar District', 'label':'Богучарский район',
+                'type':'municipality', 'lat':49.93, 'lon':40.55,
+                'aliases':['Богучарский район'],
+            },
+        ]
+        text = (
+            'БПЛА обнаружены в Клинцовском районе, '
+            'Стародубском муниципальном округе и Богучарском районе.'
+        )
+        places = extract_places(text, source)
+        self.assertEqual(
+            {p['name'] for p in places},
+            {'Klintsy District','Starodub Municipal Okrug','Boguchar District'},
+        )
+
+    def test_v14_multi_district_report_keeps_all_places(self):
+        source = dict(self.source)
+        source['_catalog_places'] = [
+            {'name':'Liski District','label':'Лискинский район','type':'municipality','lat':50.98,'lon':39.50,'aliases':['Лискинский район']},
+            {'name':'Ostrogozhsk District','label':'Острогожский район','type':'municipality','lat':50.86,'lon':39.08,'aliases':['Острогожский район']},
+        ]
+        posts = [Post(
+            'gov', 9501, datetime(2026,9,20,1,0,tzinfo=timezone.utc),
+            'Лискинский и Острогожский районы — тревога в связи с угрозой непосредственного удара БПЛА.',
+            'https://t.me/gov/9501'
+        )]
+        reports = extract_reports(
+            posts, source,
+            datetime(2026,9,20,0,0,tzinfo=timezone.utc),
+            datetime(2026,9,21,0,0,tzinfo=timezone.utc),
+        )
+        self.assertTrue(reports)
+        names={p['name'] for p in reports[0]['mentioned_places']}
+        self.assertEqual(names, {'Liski District','Ostrogozhsk District'})
+
     def test_v10_countless_multi_place_activity_is_retained(self):
         source = dict(self.source)
         source['_catalog_places'] = [

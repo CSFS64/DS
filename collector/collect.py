@@ -860,6 +860,67 @@ def alert_post_stats(posts: list[Post]) -> dict[str, int]:
         "missile_end_posts": missile_ends,
     }
 
+ADMIN_NOUN_CASES = {
+    "район": ("районе", "района", "району", "районом"),
+    "округ": ("округе", "округа", "округу", "округом"),
+    "город": ("городе", "города", "городу", "городом"),
+    "поселок": ("поселке", "поселка", "поселку", "поселком"),
+    "посёлок": ("посёлке", "посёлка", "посёлку", "посёлком"),
+    "село": ("селе", "села", "селу", "селом"),
+    "станица": ("станице", "станицы", "станицу", "станицей"),
+    "деревня": ("деревне", "деревни", "деревню", "деревней"),
+}
+
+def _ru_adjective_case(word: str, case: str) -> str:
+    """Inflect common Russian administrative adjectives conservatively."""
+    lw = word.lower().replace("ё", "е")
+    suffixes = (
+        ("ский", {"prep": "ском", "gen": "ского", "dat": "скому", "inst": "ским"}),
+        ("цкий", {"prep": "цком", "gen": "цкого", "dat": "цкому", "inst": "цким"}),
+        ("ый", {"prep": "ом", "gen": "ого", "dat": "ому", "inst": "ым"}),
+        ("ой", {"prep": "ом", "gen": "ого", "dat": "ому", "inst": "ым"}),
+        ("ий", {"prep": "ем", "gen": "его", "dat": "ему", "inst": "им"}),
+        ("ая", {"prep": "ой", "gen": "ой", "dat": "ой", "inst": "ой"}),
+        ("яя", {"prep": "ей", "gen": "ей", "dat": "ей", "inst": "ей"}),
+    )
+    for suffix, endings in suffixes:
+        if lw.endswith(suffix):
+            repl = endings.get(case)
+            if repl:
+                return word[:-len(suffix)] + repl
+    return word
+
+def administrative_alias_variants(value: str) -> list[str]:
+    """Generate phrase-level cases such as 'Клинцовском районе'.
+
+    Official notices often name districts/okrugs adjectivally rather than using
+    the settlement name itself. GeoNames ADM2 aliases give us the nominative
+    phrase; these variants cover the common prepositional/genitive/dative forms.
+    """
+    raw = str(value or "").strip()
+    if not raw or not re.search(r"[А-Яа-яЁё]", raw):
+        return [raw] if raw else []
+
+    words = raw.split()
+    lowered = [w.lower().replace("ё", "е").strip(".,:;()[]{}«»\"'") for w in words]
+    admin_idx = next((i for i, w in enumerate(lowered) if w in ADMIN_NOUN_CASES), None)
+    if admin_idx is None:
+        return [raw]
+
+    out = [raw]
+    cases = ("prep", "gen", "dat", "inst")
+    noun_key = lowered[admin_idx]
+    noun_forms = ADMIN_NOUN_CASES[noun_key]
+    for case, noun_form in zip(cases, noun_forms):
+        variant = list(words)
+        variant[admin_idx] = noun_form
+        # Inflect adjectives that belong to the administrative phrase. This
+        # handles e.g. Стародубский муниципальный округ -> ... округе.
+        for i in range(admin_idx):
+            variant[i] = _ru_adjective_case(variant[i], case)
+        out.append(" ".join(variant))
+    return list(dict.fromkeys(out))
+
 def alias_variants(value: str) -> list[str]:
     """Generate conservative Russian case variants for place aliases at parse time."""
     raw = str(value or "").strip()
@@ -867,31 +928,30 @@ def alias_variants(value: str) -> list[str]:
         return []
     out = [raw]
     words = raw.split()
-    if not words or not re.search(r"[А-Яа-яЁё]", words[-1]):
-        return out
-    w = words[-1]
-    lw = w.lower().replace("ё", "е")
-    base = words[:-1]
-    def add(last: str):
-        out.append(" ".join([*base, last]))
-    if lw.endswith("а") and len(w) > 3:
-        stem = w[:-1]
-        for ending in ("е", "ы", "у", "ой"):
-            add(stem + ending)
-    elif lw.endswith("я") and len(w) > 3:
-        stem = w[:-1]
-        for ending in ("е", "и", "ю", "ей"):
-            add(stem + ending)
-    elif lw.endswith("ь") and len(w) > 3:
-        stem = w[:-1]
-        for ending in ("и", "ью"):
-            add(stem + ending)
-    elif not lw.endswith(("ово", "ево", "ино", "ы", "и")) and re.search(r"[бвгджзклмнпрстфхцчшщ]$", lw):
-        for ending in ("е", "а", "у", "ом"):
-            add(w + ending)
-    # Common feminine genitive -зы/-сы etc. can be missed when a manually
-    # configured alias only contains nominative; the -а rule above covers it.
-    return list(dict.fromkeys(out))
+    if words and re.search(r"[А-Яа-яЁё]", words[-1]):
+        w = words[-1]
+        lw = w.lower().replace("ё", "е")
+        base = words[:-1]
+        def add(last: str):
+            out.append(" ".join([*base, last]))
+        if lw.endswith("а") and len(w) > 3:
+            stem = w[:-1]
+            for ending in ("е", "ы", "у", "ой"):
+                add(stem + ending)
+        elif lw.endswith("я") and len(w) > 3:
+            stem = w[:-1]
+            for ending in ("е", "и", "ю", "ей"):
+                add(stem + ending)
+        elif lw.endswith("ь") and len(w) > 3:
+            stem = w[:-1]
+            for ending in ("и", "ью"):
+                add(stem + ending)
+        elif not lw.endswith(("ово", "ево", "ино", "ы", "и")) and re.search(r"[бвгджзклмнпрстфхцчшщ]$", lw):
+            for ending in ("е", "а", "у", "ом"):
+                add(w + ending)
+    for variant in list(out):
+        out.extend(administrative_alias_variants(variant))
+    return list(dict.fromkeys(v for v in out if v))
 
 
 def extract_places(text: str, source: dict[str, Any]) -> list[dict[str, Any]]:
