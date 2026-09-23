@@ -22,6 +22,7 @@ import os
 import re
 import sys
 import time
+from urllib.parse import quote_plus
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -34,6 +35,13 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
+
+try:
+    from telethon.sync import TelegramClient
+    from telethon.sessions import StringSession
+except Exception:  # optional; public HTML fallback remains available
+    TelegramClient = None
+    StringSession = None
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SOURCES = ROOT / "data" / "sources.json"
@@ -234,6 +242,18 @@ class Post:
         return normalize(self.text)
 
 
+@dataclass
+class FetchResult:
+    posts: list[Post]
+    transport: str
+    transport_ok: bool = True
+    window_complete: bool = False
+    error: str | None = None
+    oldest: datetime | None = None
+    newest: datetime | None = None
+    raw_items: int = 0
+
+
 def normalize(text: str) -> str:
     value = str(text).lower().replace("ё", "е")
     # Normalize quote/dash/punctuation variants used by regional alert templates.
@@ -264,10 +284,20 @@ def strip_html(value: str) -> str:
 # Telegram public-page collector
 # ---------------------------------------------------------------------------
 
-def fetch_page(session: requests.Session, channel: str, before: int | None = None) -> str:
+def fetch_page(
+    session: requests.Session,
+    channel: str,
+    before: int | None = None,
+    query: str | None = None,
+) -> str:
     url = f"https://t.me/s/{channel}"
+    params = []
     if before:
-        url += f"?before={before}"
+        params.append(f"before={int(before)}")
+    if query:
+        params.append("q=" + quote_plus(query))
+    if params:
+        url += "?" + "&".join(params)
     r = session.get(url, timeout=30)
     r.raise_for_status()
     return r.text
@@ -307,7 +337,57 @@ def parse_telegram_html(html: str, channel: str) -> list[Post]:
     return posts
 
 
-def fetch_posts_for_window(
+# Public Telegram channel search is useful for high-volume government channels:
+# it lets us find relevant historical posts without paging through every unrelated
+# press release.  Search is only a supplementary path; chronological paging is
+# still retained and every accepted record remains a link to the original post.
+TELEGRAM_ACTIVITY_QUERIES = (
+    "БПЛА",
+    "беспилот",
+    "дрон",
+    "воздушная опасность",
+    "опасное небо",
+    "угроза подлета",
+    "угроза подлёта",
+)
+
+
+def _page_into_dict(all_posts: dict[int, Post], page: list[Post]) -> None:
+    for post in page:
+        all_posts[int(post.post_id)] = post
+
+
+def _paginate_telegram(
+    session: requests.Session,
+    channel: str,
+    context_start: datetime,
+    end_utc: datetime,
+    max_pages: int,
+    query: str | None = None,
+) -> dict[int, Post]:
+    out: dict[int, Post] = {}
+    before: int | None = None
+    for _ in range(max_pages):
+        page = parse_telegram_html(fetch_page(session, channel, before, query=query), channel)
+        if not page:
+            break
+        _page_into_dict(out, page)
+
+        # Do NOT stop merely because one anomalously old item exists on a page.
+        # Stop only after the whole page has moved older than the context window.
+        newest = max(p.published_at for p in page)
+        if newest < context_start:
+            break
+
+        min_id = min(int(p.post_id) for p in page)
+        if before is not None and min_id >= before:
+            break
+        before = min_id
+        time.sleep(0.10)
+    return out
+
+
+def fetch_posts_html_for_window(
     session: requests.Session,
     channel: str,
     start_utc: datetime,
@@ -317,28 +397,207 @@ def fetch_posts_for_window(
 ) -> list[Post]:
     context_start = start_utc - timedelta(hours=max(12, context_hours))
     all_posts: dict[int, Post] = {}
-    before: int | None = None
 
-    for _ in range(max_pages):
-        page = parse_telegram_html(fetch_page(session, channel, before), channel)
-        if not page:
-            break
-        for post in page:
-            all_posts[int(post.post_id)] = post
-        oldest = min(page, key=lambda p: p.published_at)
-        if oldest.published_at <= context_start:
-            break
-        min_id = min(int(p.post_id) for p in page)
-        if before == min_id:
-            break
-        before = min_id
-        time.sleep(0.15)
+    # 1) Chronological history remains the authoritative crawl.
+    all_posts.update(_paginate_telegram(
+        session, channel, context_start, end_utc, max_pages=max_pages, query=None
+    ))
+
+    # 2) Recall-oriented search passes catch UAV posts in channels that publish
+    # hundreds of unrelated items.  Search pages are cheap enough that we can
+    # use several wording families and deduplicate by Telegram post id.
+    search_pages = max(3, min(12, max_pages // 4))
+    for query in TELEGRAM_ACTIVITY_QUERIES:
+        try:
+            all_posts.update(_paginate_telegram(
+                session, channel, context_start, end_utc,
+                max_pages=search_pages, query=query,
+            ))
+        except Exception:
+            # Supplementary search failure must not discard chronological data.
+            pass
 
     return sorted(
         (p for p in all_posts.values() if context_start <= p.published_at <= end_utc),
         key=lambda p: (p.published_at, str(p.post_id)),
     )
 
+
+# ---------------------------------------------------------------------------
+# Reliable Telegram transport + source-health diagnostics
+# ---------------------------------------------------------------------------
+
+def _fetch_result(posts: list[Post], context_start: datetime, *, transport: str,
+                  transport_ok: bool = True, window_complete: bool = False,
+                  error: str | None = None, raw_items: int | None = None) -> FetchResult:
+    posts = sorted(posts, key=lambda p: (p.published_at, str(p.post_id)))
+    return FetchResult(
+        posts=posts,
+        transport=transport,
+        transport_ok=transport_ok,
+        window_complete=window_complete,
+        error=error,
+        oldest=posts[0].published_at if posts else None,
+        newest=posts[-1].published_at if posts else None,
+        raw_items=len(posts) if raw_items is None else raw_items,
+    )
+
+
+def make_telegram_mtproto_client():
+    """Return an authenticated read-only Telegram client when secrets exist.
+
+    Public t.me HTML is not a reliable history API: GitHub-hosted requests can
+    return a perfectly valid HTTP page with zero parseable messages.  MTProto
+    is therefore the preferred transport.  A StringSession keeps the login
+    credential in GitHub Secrets rather than in the repository.
+    """
+    api_id = (os.getenv("TELEGRAM_API_ID") or "").strip()
+    api_hash = (os.getenv("TELEGRAM_API_HASH") or "").strip()
+    session_string = (os.getenv("TELEGRAM_SESSION") or "").strip()
+    if not (api_id and api_hash and session_string):
+        return None
+    if TelegramClient is None or StringSession is None:
+        raise RuntimeError("Telethon is not installed but Telegram MTProto secrets are configured")
+    client = TelegramClient(StringSession(session_string), int(api_id), api_hash)
+    client.connect()
+    if not client.is_user_authorized():
+        client.disconnect()
+        raise RuntimeError("TELEGRAM_SESSION is present but is not authorized")
+    return client
+
+
+def fetch_posts_mtproto_for_window(client, channel: str, start_utc: datetime,
+                                    end_utc: datetime, context_hours: int = 48,
+                                    max_messages: int = 20000) -> FetchResult:
+    context_start = start_utc - timedelta(hours=max(12, context_hours))
+    entity = client.get_entity(channel)
+    posts: list[Post] = []
+    scanned = 0
+    reached_old_edge = False
+
+    # iter_messages walks newest -> oldest. offset_date prevents collecting
+    # messages newer than the deliberately delayed archive cutoff.
+    for msg in client.iter_messages(
+        entity,
+        offset_date=end_utc + timedelta(seconds=1),
+        limit=max_messages,
+    ):
+        scanned += 1
+        if not getattr(msg, "date", None):
+            continue
+        dt = msg.date.astimezone(timezone.utc) if msg.date.tzinfo else msg.date.replace(tzinfo=timezone.utc)
+        if dt < context_start:
+            reached_old_edge = True
+            break
+        text = (getattr(msg, "message", None) or "").strip()
+        if not text:
+            continue
+        fwd_name = None
+        fwd = getattr(msg, "fwd_from", None)
+        if fwd is not None:
+            fwd_name = getattr(fwd, "from_name", None)
+        posts.append(Post(
+            channel=channel,
+            post_id=int(msg.id),
+            published_at=dt,
+            text=text,
+            url=f"https://t.me/{channel}/{int(msg.id)}",
+            forwarded_from=fwd_name,
+        ))
+
+    # If fewer than max_messages exist before end_utc, iter_messages exhausted
+    # the channel and we also know the requested old edge was covered.
+    complete = reached_old_edge or scanned < max_messages
+    return _fetch_result(
+        posts,
+        context_start,
+        transport="telegram_mtproto",
+        window_complete=complete,
+        raw_items=scanned,
+    )
+
+
+def fetch_telegram_with_fallback(session: requests.Session, channel: str,
+                                 start_utc: datetime, end_utc: datetime,
+                                 max_pages: int, context_hours: int,
+                                 mt_client=None) -> FetchResult:
+    errors: list[str] = []
+    if mt_client is not None:
+        try:
+            return fetch_posts_mtproto_for_window(
+                mt_client, channel, start_utc, end_utc,
+                context_hours=context_hours,
+                max_messages=int(os.getenv("TELEGRAM_MT_MAX_MESSAGES", "20000")),
+            )
+        except Exception as exc:
+            errors.append(f"mtproto: {exc}")
+
+    context_start = start_utc - timedelta(hours=max(12, context_hours))
+    try:
+        posts = fetch_posts_html_for_window(
+            session, channel, start_utc, end_utc,
+            max_pages=max_pages, context_hours=context_hours,
+        )
+    except Exception as exc:
+        errors.append(f"html: {exc}")
+        return _fetch_result([], context_start, transport="telegram_public_html",
+                             transport_ok=False, window_complete=False,
+                             error="; ".join(errors))
+
+    # This is the v11 root-cause fix: HTTP 200 with zero parsed Telegram
+    # messages is NOT a successful source fetch.
+    if not posts:
+        errors.append("public Telegram page returned zero parseable messages")
+        return _fetch_result([], context_start, transport="telegram_public_html",
+                             transport_ok=False, window_complete=False,
+                             error="; ".join(errors))
+
+    oldest = min(p.published_at for p in posts)
+    complete = oldest <= context_start + timedelta(hours=2)
+    return _fetch_result(posts, context_start, transport="telegram_public_html",
+                         transport_ok=True, window_complete=complete,
+                         error="; ".join(errors) if errors else None)
+
+
+def source_status_row(source_type: str, source_name: str, region: str,
+                      fetched: FetchResult, events, reports, alert_stats,
+                      *, source_layer: str = "official_local",
+                      expected_active: bool = True) -> dict[str, Any]:
+    if not expected_active and not fetched.posts:
+        health = "inactive"
+    elif fetched.transport == "telegram_mtproto" and fetched.transport_ok and fetched.window_complete and not fetched.posts:
+        health = "quiet"  # authenticated history was read; no posts in this window
+    elif not fetched.transport_ok:
+        health = "failed"
+    elif fetched.window_complete:
+        health = "healthy"
+    else:
+        health = "degraded"
+
+    # An HTML source expected to be active but returning no parsed history is a
+    # failure, not evidence that the region had no UAV activity.
+    ok = health in {"healthy", "degraded", "quiet"}
+    return {
+        "source_type": source_type,
+        "source": source_name,
+        "region": region,
+        "source_layer": source_layer,
+        "expected_active": bool(expected_active),
+        "ok": ok,
+        "health": health,
+        "transport": fetched.transport,
+        "transport_ok": fetched.transport_ok,
+        "window_complete": fetched.window_complete,
+        "posts": len(fetched.posts),
+        "raw_items": fetched.raw_items,
+        "oldest_post": fetched.oldest.isoformat() if fetched.oldest else None,
+        "newest_post": fetched.newest.isoformat() if fetched.newest else None,
+        "error": fetched.error,
+        "events": len(events),
+        "reports": len(reports),
+        **alert_stats,
+        **({"error": fetched.error} if fetched.error else {}),
+    }
 
 # ---------------------------------------------------------------------------
 # Official MChS regional RSS fallback
@@ -805,36 +1064,70 @@ def collect(args) -> dict[str, Any]:
     all_unmatched: list[dict[str, Any]] = []
     statuses: list[dict[str, Any]] = []
 
-    # High-resolution Telegram feeds first.
+    # High-resolution official source stack first.  Multiple independent sources
+    # per region are intentional (governor/government + emergency/ops channels).
+    # MTProto is preferred; public Telegram HTML is only a fallback.
     session = make_session()
-    for source0 in source_cfg.get("sources", []):
-        if not source0.get("enabled", False):
-            continue
-        source = dict(source0)
-        source["_catalog_places"] = cities_by_region.get(source.get("region", ""), [])
-        channel = source["channel"]
-        try:
-            posts = fetch_posts_for_window(
-                session, channel, window_start, window_end,
-                max_pages=args.max_pages, context_hours=args.context_hours,
-            )
-            events, unmatched = pair_alerts(posts, source, window_start, window_end)
-            reports = extract_reports(posts, source, window_start, window_end)
-            all_events.extend(events); all_reports.extend(reports); all_unmatched.extend(unmatched)
-            alert_stats = alert_post_stats(posts)
-            statuses.append({
-                "source_type": "telegram", "source": channel, "region": source["region"], "ok": True,
-                "posts": len(posts), "events": len(events), "reports": len(reports), **alert_stats,
-            })
-            print(
-                f"telegram {channel}: posts={len(posts)} alerts={alert_stats['alert_posts']} "
-                f"starts={alert_stats['start_posts']} ends={alert_stats['end_posts']} "
-                f"events={len(events)} reports={len(reports)}",
-                file=sys.stderr,
-            )
-        except Exception as exc:
-            statuses.append({"source_type": "telegram", "source": channel, "region": source["region"], "ok": False, "error": str(exc)})
-            print(f"telegram {channel}: ERROR {exc}", file=sys.stderr)
+    mt_client = None
+    mtproto_enabled = False
+    mtproto_error = None
+    try:
+        mt_client = make_telegram_mtproto_client()
+        mtproto_enabled = mt_client is not None
+    except Exception as exc:
+        mtproto_error = str(exc)
+        print(f"telegram MTProto setup ERROR: {exc}; falling back to public HTML", file=sys.stderr)
+
+    try:
+        for source0 in source_cfg.get("sources", []):
+            if not source0.get("enabled", False):
+                continue
+            source = dict(source0)
+            if source.get("kind", "telegram") != "telegram":
+                continue
+            source["_catalog_places"] = cities_by_region.get(source.get("region", ""), [])
+            channel = source["channel"]
+            try:
+                fetched = fetch_telegram_with_fallback(
+                    session, channel, window_start, window_end,
+                    max_pages=args.max_pages, context_hours=args.context_hours,
+                    mt_client=mt_client,
+                )
+                posts = fetched.posts
+                events, unmatched = pair_alerts(posts, source, window_start, window_end)
+                reports = extract_reports(posts, source, window_start, window_end)
+                all_events.extend(events); all_reports.extend(reports); all_unmatched.extend(unmatched)
+                alert_stats = alert_post_stats(posts)
+                row = source_status_row(
+                    "telegram", channel, source["region"], fetched, events, reports, alert_stats,
+                    source_layer=source.get("source_layer", "official_local"),
+                    expected_active=source.get("expected_active", True),
+                )
+                statuses.append(row)
+                print(
+                    f"telegram {channel}: health={row['health']} transport={row['transport']} "
+                    f"posts={len(posts)} alerts={alert_stats['alert_posts']} "
+                    f"starts={alert_stats['start_posts']} ends={alert_stats['end_posts']} "
+                    f"events={len(events)} reports={len(reports)}",
+                    file=sys.stderr,
+                )
+            except Exception as exc:
+                statuses.append({
+                    "source_type": "telegram", "source": channel, "region": source["region"],
+                    "source_layer": source.get("source_layer", "official_local"),
+                    "expected_active": source.get("expected_active", True),
+                    "ok": False, "health": "failed", "transport": "unknown",
+                    "transport_ok": False, "window_complete": False, "posts": 0,
+                    "events": 0, "reports": 0, "alert_posts": 0, "start_posts": 0,
+                    "end_posts": 0, "activity_posts": 0, "error": str(exc),
+                })
+                print(f"telegram {channel}: ERROR {exc}", file=sys.stderr)
+    finally:
+        if mt_client is not None:
+            try:
+                mt_client.disconnect()
+            except Exception:
+                pass
 
     # Nationwide official region-level RSS fallback. One request per region, in a
     # bounded worker pool so a slow regional site does not block the entire job.
@@ -860,12 +1153,21 @@ def collect(args) -> dict[str, Any]:
                 all_events.extend(events); all_reports.extend(reports); all_unmatched.extend(unmatched)
                 alert_stats = alert_post_stats(posts)
                 statuses.append({
-                    "source_type": "mchs_rss", "source": region["mchs_rss_url"], "region": region["region"], "ok": True,
-                    "posts": len(posts), "events": len(events), "reports": len(reports), **alert_stats,
+                    "source_type": "mchs_rss", "source": region["mchs_rss_url"], "region": region["region"],
+                    "source_layer": "auxiliary_rss", "ok": True,
+                    "health": "auxiliary", "transport": "mchs_rss", "transport_ok": True,
+                    "window_complete": False, "posts": len(posts),
+                    "oldest_post": min((p.published_at for p in posts), default=None).isoformat() if posts else None,
+                    "newest_post": max((p.published_at for p in posts), default=None).isoformat() if posts else None,
+                    "events": len(events), "reports": len(reports), **alert_stats,
                 })
             except Exception as exc:
                 statuses.append({
-                    "source_type": "mchs_rss", "source": region.get("mchs_rss_url"), "region": region["region"], "ok": False,
+                    "source_type": "mchs_rss", "source": region.get("mchs_rss_url"), "region": region["region"],
+                    "source_layer": "auxiliary_rss", "ok": False, "health": "failed",
+                    "transport": "mchs_rss", "transport_ok": False, "window_complete": False,
+                    "posts": 0, "events": 0, "reports": 0, "alert_posts": 0,
+                    "start_posts": 0, "end_posts": 0, "activity_posts": 0,
                     "error": str(exc),
                 })
 
@@ -882,8 +1184,18 @@ def collect(args) -> dict[str, Any]:
     regions_with_activity_posts = sorted({s["region"] for s in statuses if s.get("activity_posts", 0) > 0})
     regions_with_any_record = sorted({e["region"] for e in all_events} | {r["region"] for r in all_reports})
     hi_res_regions_with_events = sorted({e["region"] for e in all_events if e.get("source_kind") == "telegram"})
+    configured_hi_regions = {
+        s.get("region") for s in source_cfg.get("sources", [])
+        if s.get("enabled", False) and s.get("kind", "telegram") == "telegram" and s.get("region")
+    }
+    transport_ok_hi_regions = {s.get("region") for s in telegram_status if s.get("transport_ok")}
+    activity_hi_regions = {s.get("region") for s in telegram_status if s.get("activity_posts", 0) > 0}
+    failed_hi_regions = {
+        region for region in configured_hi_regions
+        if not any(s.get("region") == region and s.get("transport_ok") for s in telegram_status)
+    }
     return {
-        "schema_version": 4,
+        "schema_version": 5,
         "generated_at": now.isoformat(),
         "safety_lag_hours": args.safety_lag_hours,
         "window_start": window_start.isoformat(),
@@ -901,11 +1213,21 @@ def collect(args) -> dict[str, Any]:
             "regions_with_activity_posts": len(regions_with_activity_posts),
             "regions_with_any_record": len(regions_with_any_record),
             "regions_with_paired_alerts": len(regions_with_events),
-            "high_resolution_sources_configured": len([s for s in source_cfg.get("sources", []) if s.get("enabled", False)]),
+            "high_resolution_sources_configured": len([s for s in source_cfg.get("sources", []) if s.get("enabled", False) and s.get("kind", "telegram") == "telegram"]),
+            "high_resolution_regions_configured": len(configured_hi_regions),
+            "high_resolution_regions_transport_ok": len(transport_ok_hi_regions),
+            "high_resolution_regions_failed": len(failed_hi_regions),
+            "high_resolution_regions_with_activity_posts": len(activity_hi_regions),
             "high_resolution_sources_ok": sum(1 for s in telegram_status if s.get("ok")),
+            "high_resolution_sources_healthy": sum(1 for s in telegram_status if s.get("health") == "healthy"),
+            "high_resolution_sources_degraded": sum(1 for s in telegram_status if s.get("health") == "degraded"),
+            "high_resolution_sources_failed": sum(1 for s in telegram_status if s.get("health") == "failed"),
+            "high_resolution_sources_quiet": sum(1 for s in telegram_status if s.get("health") == "quiet"),
             "high_resolution_sources_with_alert_posts": sum(1 for s in telegram_status if s.get("alert_posts", 0) > 0),
             "high_resolution_sources_with_activity_posts": sum(1 for s in telegram_status if s.get("activity_posts", 0) > 0),
             "high_resolution_regions_with_events": len(hi_res_regions_with_events),
+            "telegram_mtproto_enabled": mtproto_enabled,
+            "telegram_mtproto_error": mtproto_error,
             "city_catalog_count": len(city_cfg.get("cities", [])),
             "municipality_catalog_count": len(city_cfg.get("municipalities", [])),
             "unmatched_starts": sum(1 for u in all_unmatched if u.get("type") == "unmatched_start"),
@@ -929,6 +1251,8 @@ def merge_existing_archive(data: dict[str, Any], output_path: Path) -> dict[str,
     if not output_path.exists():
         data["coverage"]["archive_events_total"] = len(data.get("events", []))
         data["coverage"]["archive_reports_total"] = len(data.get("reports", []))
+        data["coverage"]["archive_regions_with_records"] = len({e.get("region") for e in data.get("events", []) if e.get("region")} | {r.get("region") for r in data.get("reports", []) if r.get("region")})
+        data["coverage"]["archive_regions_with_local_records"] = len({e.get("region") for e in data.get("events", []) if e.get("region") and e.get("scope") in ("city","municipality")} | {r.get("region") for r in data.get("reports", []) if r.get("region") and (r.get("scope") in ("city","municipality") or (r.get("mentioned_places") or []))})
         return data
     try:
         old = json.loads(output_path.read_text(encoding="utf-8"))
@@ -961,6 +1285,10 @@ def merge_existing_archive(data: dict[str, Any], output_path: Path) -> dict[str,
     )
     data["coverage"]["archive_events_total"] = len(data["events"])
     data["coverage"]["archive_reports_total"] = len(data["reports"])
+    archive_regions = {e.get("region") for e in data["events"] if e.get("region")} | {r.get("region") for r in data["reports"] if r.get("region")}
+    archive_local_regions = {e.get("region") for e in data["events"] if e.get("scope") in ("city","municipality")} | {r.get("region") for r in data["reports"] if r.get("scope") in ("city","municipality") or (r.get("mentioned_places") or [])}
+    data["coverage"]["archive_regions_with_records"] = len(archive_regions)
+    data["coverage"]["archive_regions_with_local_records"] = len({x for x in archive_local_regions if x})
     return data
 
 def configure_incremental_window(args) -> None:

@@ -1,5 +1,5 @@
 {
-  "version": 5,
+  "version": 8,
   "sources": [
     {
       "region": "Belgorod Oblast",
@@ -104,7 +104,10 @@
         "белгородская область",
         "белгородской области"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Kursk Oblast",
@@ -162,7 +165,10 @@
         "курская область",
         "курской области"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Voronezh Oblast",
@@ -267,7 +273,10 @@
         "воронежская область",
         "воронежской области"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Lipetsk Oblast",
@@ -315,7 +324,10 @@
         "липецкая область",
         "липецкой области"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Tula Oblast",
@@ -363,7 +375,10 @@
           ]
         }
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Republic of Tatarstan",
@@ -507,7 +522,10 @@
           ]
         }
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Penza Oblast",
@@ -566,7 +584,10 @@
           ]
         }
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Republic of Bashkortostan",
@@ -615,7 +636,10 @@
           ]
         }
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Samara Oblast",
@@ -685,7 +709,10 @@
           ]
         }
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Moscow",
@@ -723,7 +750,10 @@
         "москва",
         "город москва"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Moscow Oblast",
@@ -886,7 +916,10 @@
         "подмосковье",
         "московском регионе"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Bryansk Oblast",
@@ -922,7 +955,10 @@
         "брянская область",
         "брянской области"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Yaroslavl Oblast",
@@ -958,7 +994,10 @@
         "ярославская область",
         "ярославской области"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Ryazan Oblast",
@@ -994,7 +1033,10 @@
         "рязанская область",
         "рязанской области"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Vladimir Oblast",
@@ -1031,7 +1073,10 @@
         "владимирская область",
         "владимирской области"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Oryol Oblast",
@@ -1069,7 +1114,10 @@
         "орловская область",
         "орловской области"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Kaluga Oblast",
@@ -1118,7 +1166,10 @@
         "калужская область",
         "калужской области"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Nizhny Novgorod Oblast",
@@ -1185,7 +1236,10 @@
         "нижегородская область",
         "нижегородской области"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Ivanovo Oblast",
@@ -1242,7 +1296,10 @@
         "ивановская область",
         "ивановской области"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Smolensk Oblast",
@@ -1297,7 +1354,10 @@
         "смоленская область",
         "смоленской области"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Saratov Oblast",
@@ -1350,7 +1410,10 @@
         "саратовская область",
         "саратовской области"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Tambov Oblast",
@@ -1393,7 +1456,10 @@
         "тамбовская область",
         "тамбовской области"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Republic of Mordovia",
@@ -1427,7 +1493,10 @@
         "мордовии",
         "мордовия"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Ulyanovsk Oblast",
@@ -1470,7 +1539,10 @@
         "ульяновская область",
         "ульяновской области"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Rostov Oblast",
@@ -1524,7 +1596,10 @@
         "ростовская область",
         "ростовской области"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Krasnodar Krai",
@@ -1599,7 +1674,10 @@
         "краснодарский край",
         "краснодарском крае"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Chuvash Republic",
@@ -1643,7 +1721,10 @@
         "чувашской республике",
         "чувашии"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Volgograd Oblast",
@@ -1697,7 +1778,10 @@
         "волгоградская область",
         "волгоградской области"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Orenburg Oblast",
@@ -1740,7 +1824,10 @@
         "оренбургская область",
         "оренбургской области"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Udmurt Republic",
@@ -1773,7 +1860,10 @@
         "удмуртии",
         "удмуртия"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Perm Krai",
@@ -1829,7 +1919,10 @@
         "пермского края",
         "прикамье"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Chelyabinsk Oblast",
@@ -1872,7 +1965,10 @@
         "челябинская область",
         "челябинской области"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Tver Oblast",
@@ -1928,7 +2024,10 @@
         "тверской области",
         "верхневолжье"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Novgorod Oblast",
@@ -1961,7 +2060,10 @@
         "новгородская область",
         "новгородской области"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Vologda Oblast",
@@ -2005,7 +2107,10 @@
         "вологодская область",
         "вологодской области"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Pskov Oblast",
@@ -2037,7 +2142,10 @@
         "псковская область",
         "псковской области"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Astrakhan Oblast",
@@ -2069,7 +2177,10 @@
         "астраханская область",
         "астраханской области"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Kurgan Oblast",
@@ -2101,7 +2212,10 @@
         "курганская область",
         "курганской области"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Leningrad Oblast",
@@ -2183,7 +2297,10 @@
         "ленобласть",
         "ленобласти"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
     },
     {
       "region": "Sverdlovsk Oblast",
@@ -2226,7 +2343,768 @@
         "свердловская область",
         "свердловской области"
       ],
-      "verified_official": true
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
+    },
+    {
+      "region": "Republic of Bashkortostan",
+      "region_label": "Республика Башкортостан",
+      "region_center": [
+        54.74,
+        55.97
+      ],
+      "channel": "ugz_ufa",
+      "source_name": "Управление гражданской защиты г. Уфы",
+      "source_url": "https://t.me/ugz_ufa",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": false,
+      "verified_official": true,
+      "region_aliases": [
+        "республика башкортостан",
+        "башкортостан",
+        "башкирия"
+      ],
+      "places": [
+        {
+          "name": "Ufa",
+          "label": "Уфа",
+          "type": "city",
+          "lat": 54.7388,
+          "lon": 55.9721,
+          "aliases": [
+            "уфа",
+            "уфе",
+            "уфы",
+            "город уфа",
+            "г. уфа"
+          ]
+        }
+      ],
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
+    },
+    {
+      "region": "Krasnodar Krai",
+      "region_label": "Краснодарский край",
+      "region_center": [
+        45.1,
+        39.0
+      ],
+      "channel": "officialsochi",
+      "source_name": "Сочи Официальный",
+      "source_url": "https://t.me/officialsochi",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": false,
+      "verified_official": true,
+      "region_aliases": [
+        "краснодарский край",
+        "краснодарского края"
+      ],
+      "places": [
+        {
+          "name": "Sochi",
+          "label": "Сочи",
+          "type": "city",
+          "lat": 43.5855,
+          "lon": 39.7231,
+          "aliases": [
+            "сочи",
+            "город сочи",
+            "г. сочи"
+          ]
+        }
+      ],
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
+    },
+    {
+      "region": "Krasnodar Krai",
+      "region_label": "Краснодарский край",
+      "region_center": [
+        45.1,
+        39.0
+      ],
+      "channel": "anapaofficial",
+      "source_name": "Мэрия Анапы",
+      "source_url": "https://t.me/anapaofficial",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": false,
+      "verified_official": true,
+      "region_aliases": [
+        "краснодарский край",
+        "краснодарского края"
+      ],
+      "places": [
+        {
+          "name": "Anapa",
+          "label": "Анапа",
+          "type": "city",
+          "lat": 44.8948,
+          "lon": 37.3163,
+          "aliases": [
+            "анапа",
+            "анапе",
+            "анапы",
+            "город анапа",
+            "г. анапа"
+          ]
+        }
+      ],
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
+    },
+    {
+      "region": "Republic of Adygea",
+      "region_label": "Республика Адыгея",
+      "region_center": [
+        44.61,
+        40.11
+      ],
+      "channel": "adygheya_gov",
+      "source_name": "Правительство Республики Адыгея",
+      "source_url": "https://t.me/adygheya_gov",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "verified_official": true,
+      "region_aliases": [
+        "республика адыгея",
+        "адыгея",
+        "адыгеи"
+      ],
+      "places": [],
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
+    },
+    {
+      "region": "Kirov Oblast",
+      "region_label": "Кировская область",
+      "region_center": [
+        58.6,
+        49.65
+      ],
+      "channel": "kirovreg43",
+      "source_name": "Правительство Кировской области",
+      "source_url": "https://t.me/kirovreg43",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "verified_official": true,
+      "region_aliases": [
+        "кировская область",
+        "кировской области"
+      ],
+      "places": [],
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
+    },
+    {
+      "region": "Kaliningrad Oblast",
+      "region_label": "Калининградская область",
+      "region_center": [
+        54.71,
+        20.51
+      ],
+      "channel": "government_kgd",
+      "source_name": "Правительство Калининградской области",
+      "source_url": "https://t.me/government_kgd",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "verified_official": true,
+      "region_aliases": [
+        "калининградская область",
+        "калининградской области"
+      ],
+      "places": [],
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
+    },
+    {
+      "region": "Saint Petersburg",
+      "region_label": "Санкт-Петербург",
+      "region_center": [
+        59.94,
+        30.31
+      ],
+      "channel": "spbprav",
+      "source_name": "Правительство Санкт-Петербурга",
+      "source_url": "https://t.me/spbprav",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "verified_official": true,
+      "region_aliases": [
+        "санкт петербург",
+        "санкт-петербург",
+        "петербург",
+        "петербурге"
+      ],
+      "places": [
+        {
+          "name": "Saint Petersburg",
+          "label": "Санкт-Петербург",
+          "type": "city",
+          "lat": 59.9343,
+          "lon": 30.3351,
+          "aliases": [
+            "санкт петербург",
+            "санкт-петербург",
+            "петербург",
+            "петербурге"
+          ]
+        }
+      ],
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
+    },
+    {
+      "region": "Sevastopol",
+      "region_label": "Севастополь",
+      "region_center": [
+        44.61,
+        33.53
+      ],
+      "channel": "razvozhaev",
+      "source_name": "Михаил Развожаев — губернатор Севастополя",
+      "source_url": "https://t.me/razvozhaev",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "verified_official": true,
+      "region_aliases": [
+        "севастополь",
+        "севастополе"
+      ],
+      "places": [
+        {
+          "name": "Sevastopol",
+          "label": "Севастополь",
+          "type": "city",
+          "lat": 44.6167,
+          "lon": 33.5254,
+          "aliases": [
+            "севастополь",
+            "севастополе"
+          ]
+        }
+      ],
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
+    },
+    {
+      "region": "Crimea",
+      "region_label": "Республика Крым",
+      "region_center": [
+        45.3,
+        34.2
+      ],
+      "channel": "Aksenov82",
+      "source_name": "Сергей Аксёнов — Глава Республики Крым",
+      "source_url": "https://t.me/Aksenov82",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "verified_official": true,
+      "region_aliases": [
+        "республика крым",
+        "крым",
+        "крыму"
+      ],
+      "places": [],
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
+    },
+    {
+      "region": "Oryol Oblast",
+      "region_label": "Орловская область",
+      "channel": "mchs_orel",
+      "source_name": "МЧС Орловской области",
+      "source_url": "https://t.me/mchs_orel",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "Орловская область",
+        "Oryol Oblast",
+        "Orel Oblast"
+      ],
+      "verified_official": true,
+      "source_layer": "official_emergency",
+      "priority": 1,
+      "expected_active": true,
+      "max_url": "https://max.ru/id5753035851_gos"
+    },
+    {
+      "region": "Bryansk Oblast",
+      "region_label": "Брянская область",
+      "channel": "mchs_bryansk",
+      "source_name": "МЧС Брянской области",
+      "source_url": "https://t.me/mchs_bryansk",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "Брянская область",
+        "Bryansk Oblast"
+      ],
+      "verified_official": true,
+      "source_layer": "official_emergency",
+      "priority": 1,
+      "expected_active": true,
+      "max_url": "https://max.ru/mchs_bryansk"
+    },
+    {
+      "region": "Lipetsk Oblast",
+      "region_label": "Липецкая область",
+      "channel": "gumchs48",
+      "source_name": "МЧС Липецкой области",
+      "source_url": "https://t.me/gumchs48",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "Липецкая область",
+        "Lipetsk Oblast"
+      ],
+      "verified_official": true,
+      "source_layer": "official_alert",
+      "priority": 1,
+      "expected_active": true,
+      "max_url": "https://max.ru/gumchs48"
+    },
+    {
+      "region": "Lipetsk Oblast",
+      "region_label": "Липецкая область",
+      "channel": "lipobl",
+      "source_name": "Правительство Липецкой области",
+      "source_url": "https://t.me/lipobl",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "Липецкая область",
+        "Lipetsk Oblast"
+      ],
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 2,
+      "expected_active": true
+    },
+    {
+      "region": "Ryazan Oblast",
+      "region_label": "Рязанская область",
+      "channel": "pavelmalkov_official",
+      "source_name": "Павел Малков — губернатор Рязанской области",
+      "source_url": "https://t.me/pavelmalkov_official",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "Рязанская область",
+        "Ryazan Oblast"
+      ],
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 1,
+      "expected_active": true
+    },
+    {
+      "region": "Tambov Oblast",
+      "region_label": "Тамбовская область",
+      "channel": "PervyshovEA",
+      "source_name": "Евгений Первышов — глава Тамбовской области",
+      "source_url": "https://t.me/PervyshovEA",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "Тамбовская область",
+        "Tambov Oblast"
+      ],
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 1,
+      "expected_active": true
+    },
+    {
+      "region": "Tambov Oblast",
+      "region_label": "Тамбовская область",
+      "channel": "gu_mchs_tambov",
+      "source_name": "МЧС Тамбовской области",
+      "source_url": "https://t.me/gu_mchs_tambov",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "Тамбовская область",
+        "Tambov Oblast"
+      ],
+      "verified_official": true,
+      "source_layer": "official_emergency",
+      "priority": 1,
+      "expected_active": true
+    },
+    {
+      "region": "Moscow Oblast",
+      "region_label": "Московская область",
+      "channel": "mchs_mo",
+      "source_name": "МЧС Московской области",
+      "source_url": "https://t.me/mchs_mo",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "Московская область",
+        "Moscow Oblast"
+      ],
+      "verified_official": true,
+      "source_layer": "official_emergency",
+      "priority": 1,
+      "expected_active": true
+    },
+    {
+      "region": "Nizhny Novgorod Oblast",
+      "region_label": "Нижегородская область",
+      "channel": "mchs52",
+      "source_name": "МЧС Нижегородской области",
+      "source_url": "https://t.me/mchs52",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "Нижегородская область",
+        "Nizhny Novgorod Oblast"
+      ],
+      "verified_official": true,
+      "source_layer": "official_emergency",
+      "priority": 3,
+      "expected_active": false,
+      "max_url": "https://max.ru/mchs52"
+    },
+    {
+      "region": "Mari El Republic",
+      "region_label": "Республика Марий Эл",
+      "channel": "govrme12",
+      "source_name": "Правительство Республики Марий Эл",
+      "source_url": "https://t.me/govrme12",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "Республика Марий Эл",
+        "Mari El Republic",
+        "Mari El"
+      ],
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 1,
+      "expected_active": true
+    },
+    {
+      "region": "Mari El Republic",
+      "region_label": "Республика Марий Эл",
+      "channel": "mchs12gov",
+      "source_name": "МЧС Республики Марий Эл",
+      "source_url": "https://t.me/mchs12gov",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "Республика Марий Эл",
+        "Mari El Republic",
+        "Mari El"
+      ],
+      "verified_official": true,
+      "source_layer": "official_emergency",
+      "priority": 1,
+      "expected_active": true,
+      "max_url": "https://max.ru/id1215098830_gos"
+    },
+    {
+      "region": "Ulyanovsk Oblast",
+      "region_label": "Ульяновская область",
+      "channel": "mchs_ulyanovsk",
+      "source_name": "МЧС Ульяновской области",
+      "source_url": "https://t.me/mchs_ulyanovsk",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "Ульяновская область",
+        "Ulyanovsk Oblast"
+      ],
+      "verified_official": true,
+      "source_layer": "official_emergency",
+      "priority": 1,
+      "expected_active": true,
+      "max_url": "https://max.ru/id7325050261_gos"
+    },
+    {
+      "region": "Volgograd Oblast",
+      "region_label": "Волгоградская область",
+      "channel": "mchs34",
+      "source_name": "МЧС Волгоградской области",
+      "source_url": "https://t.me/mchs34",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "Волгоградская область",
+        "Volgograd Oblast"
+      ],
+      "verified_official": true,
+      "source_layer": "official_emergency",
+      "priority": 1,
+      "expected_active": true,
+      "max_url": "https://max.ru/id3444118546_gos"
+    },
+    {
+      "region": "Volgograd Oblast",
+      "region_label": "Волгоградская область",
+      "channel": "volgadmin",
+      "source_name": "Администрация Волгограда",
+      "source_url": "https://t.me/volgadmin",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [
+        {
+          "name": "Volgograd",
+          "label": "Волгоград",
+          "type": "city",
+          "lat": 48.708,
+          "lon": 44.5133,
+          "aliases": [
+            "волгоград",
+            "волгограде",
+            "г. волгоград",
+            "город волгоград"
+          ]
+        }
+      ],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "Волгоградская область",
+        "Volgograd Oblast"
+      ],
+      "verified_official": true,
+      "source_layer": "official_municipal",
+      "priority": 1,
+      "expected_active": true
+    },
+    {
+      "region": "Rostov Oblast",
+      "region_label": "Ростовская область",
+      "channel": "Yuri_Slusar",
+      "source_name": "Юрий Слюсарь — губернатор Ростовской области",
+      "source_url": "https://t.me/Yuri_Slusar",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "Ростовская область",
+        "Rostov Oblast"
+      ],
+      "verified_official": true,
+      "source_layer": "official_local",
+      "priority": 1,
+      "expected_active": true,
+      "max_url": "https://max.ru/Yuri_Slusar"
+    },
+    {
+      "region": "Rostov Oblast",
+      "region_label": "Ростовская область",
+      "channel": "mchs_rostov",
+      "source_name": "МЧС Ростовской области",
+      "source_url": "https://t.me/mchs_rostov",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "Ростовская область",
+        "Rostov Oblast"
+      ],
+      "verified_official": true,
+      "source_layer": "official_emergency",
+      "priority": 2,
+      "expected_active": true,
+      "max_url": "https://max.ru/id6164228703_gos"
+    },
+    {
+      "region": "Krasnodar Krai",
+      "region_label": "Краснодарский край",
+      "channel": "opershtab23",
+      "source_name": "Оперативный штаб Краснодарского края",
+      "source_url": "https://t.me/opershtab23",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "Краснодарский край",
+        "Krasnodar Krai"
+      ],
+      "verified_official": true,
+      "source_layer": "official_alert",
+      "priority": 1,
+      "expected_active": true
+    },
+    {
+      "region": "Krasnodar Krai",
+      "region_label": "Краснодарский край",
+      "channel": "mchs_kuban",
+      "source_name": "МЧС Краснодарского края",
+      "source_url": "https://t.me/mchs_kuban",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "Краснодарский край",
+        "Krasnodar Krai"
+      ],
+      "verified_official": true,
+      "source_layer": "official_emergency",
+      "priority": 2,
+      "expected_active": true,
+      "max_url": "https://max.ru/id2309090290_gos"
     }
   ],
   "notes": [

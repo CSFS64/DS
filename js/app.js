@@ -181,17 +181,43 @@ function updateDataStatus() {
     new Set((state.archive.events || []).map(e => e.region)).size,
   );
   const regionsWithRecords = coverageNumber(
-    "regions_with_any_record",
+    "archive_regions_with_records",
+    coverageNumber(
+      "regions_with_any_record",
+      new Set([
+        ...(state.archive.events || []).map(e => e.region),
+        ...(state.archive.reports || []).map(r => r.region),
+      ]).size,
+    ),
+  );
+  const regionsWithLocalRecords = coverageNumber(
+    "archive_regions_with_local_records",
     new Set([
-      ...(state.archive.events || []).map(e => e.region),
-      ...(state.archive.reports || []).map(r => r.region),
+      ...(state.archive.events || []).filter(e => ["city","municipality"].includes(e.scope)).map(e => e.region),
+      ...(state.archive.reports || []).filter(r => ["city","municipality"].includes(r.scope) || (r.mentioned_places || []).length).map(r => r.region),
     ]).size,
   );
-  const rssAlertCapable = coverageNumber(
-    "mchs_regions_with_alert_posts",
-    (state.archive.source_status || []).filter(s => s.source_type === "mchs_rss" && (s.alert_posts || 0) > 0).length,
+  const rssHttpOk = coverageNumber(
+    "region_feeds_http_ok",
+    (state.archive.source_status || []).filter(s => s.source_type === "mchs_rss" && s.transport_ok).length,
   );
-  const hiCfg = (state.sources.sources || []).filter(s => s.enabled).length;
+  const hiCfg = (state.sources.sources || []).filter(s => s.enabled && (s.kind || "telegram") === "telegram").length;
+  const hiHealthy = coverageNumber(
+    "high_resolution_sources_healthy",
+    (state.archive.source_status || []).filter(s => s.source_type === "telegram" && s.health === "healthy").length,
+  );
+  const hiRegionCfg = coverageNumber(
+    "high_resolution_regions_configured",
+    new Set((state.archive.source_status || []).filter(s => s.source_type === "telegram").map(s => s.region)).size,
+  );
+  const hiRegionOk = coverageNumber(
+    "high_resolution_regions_transport_ok",
+    new Set((state.archive.source_status || []).filter(s => s.source_type === "telegram" && s.transport_ok).map(s => s.region)).size,
+  );
+  const hiFailed = coverageNumber(
+    "high_resolution_sources_failed",
+    (state.archive.source_status || []).filter(s => s.source_type === "telegram" && s.health === "failed").length,
+  );
   const hiAlertCapable = coverageNumber(
     "high_resolution_sources_with_alert_posts",
     (state.archive.source_status || []).filter(s => s.source_type === "telegram" && (s.alert_posts || 0) > 0).length,
@@ -208,9 +234,14 @@ function updateDataStatus() {
   els.dataStatus.textContent = [
     `${state.archive.events.length} PAIRED`,
     `${regionsWithRecords}/${configured} REGIONS WITH RECORDS`,
+    `${regionsWithLocalRecords}/${configured} LOCAL-REGIONS`,
     `${regionsWithEvents}/${configured} PAIRED-REGIONS`,
-    `${rssAlertCapable}/${configured} RSS ALERT-CAPABLE`,
-    `${hiActivityCapable}/${hiCfg} HIGH-RES ACTIVITY`,
+    `${hiRegionCfg}/${configured} HIGH-RES REGIONS`,
+    `${hiRegionOk}/${hiRegionCfg || 0} REGION FETCH OK`,
+    `${hiFailed} SOURCE FETCH FAILED`,
+    `${hiActivityCapable}/${hiCfg} CURRENT HIGH-RES ACTIVITY`,
+    `${state.archive.coverage?.telegram_mtproto_enabled ? "MTPROTO ON" : "MTPROTO OFF"}`,
+    `${rssHttpOk}/${configured} RSS AUX HTTP`,
     `${coverageNumber("city_catalog_count", state.cities?.cities?.length || 0)} CITIES`,
     `${coverageNumber("municipality_catalog_count", state.cities?.municipalities?.length || 0)} DISTRICTS`,
     `${unmatched} UNMATCHED`,
@@ -724,11 +755,16 @@ function stopPlayback() {
 
 function sourceStatusText(region) {
   const rows = (state.archive.source_status || []).filter(s => s.region === region);
-  if (!rows.length) return "Collector status: no status row in this snapshot";
+  if (!rows.length) return "Collector status: no source-status row in this snapshot";
   return rows.map(s => {
-    const kind = s.source_type === "telegram" ? "HIGH-RES" : "MChS RSS";
-    if (!s.ok) return `${kind}: ERROR`;
-    return `${kind}: ${s.activity_posts ?? s.alert_posts ?? "?"} UAV activity posts · ${s.events ?? 0} paired · ${s.reports ?? 0} signals`;
+    const kind = s.source_type === "telegram" ? "HIGH-RES" : "RSS AUX";
+    const health = String(s.health || (s.ok ? "legacy-ok" : "failed")).toUpperCase();
+    const transport = s.transport ? ` · ${s.transport}` : "";
+    const window = s.window_complete ? " · WINDOW OK" : (s.source_type === "telegram" ? " · WINDOW ?" : "");
+    const counts = `${s.posts ?? 0} posts · ${s.activity_posts ?? s.alert_posts ?? 0} UAV · ${s.events ?? 0} paired · ${s.reports ?? 0} signals`;
+    const err = s.error ? ` · ${s.error}` : "";
+    const source = s.source_type === "telegram" ? ` @${s.source}` : "";
+    return `${kind}${source} ${health}${transport}${window}: ${counts}${err}`;
   }).join("\n");
 }
 

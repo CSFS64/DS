@@ -17,6 +17,8 @@ from collector.collect import (
     text_kind,
     uav_activity_kind,
     configure_incremental_window,
+    FetchResult,
+    source_status_row,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -240,6 +242,45 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(reports[0]['count_type'], 'alert_start_signal')
         self.assertEqual(reports[0]['signal_class'], 'formal_alert_signal')
         self.assertEqual(reports[0]['place'], 'Penza')
+
+    def test_v12_multi_source_stack_for_known_gap_regions(self):
+        cfg = json.loads((ROOT / 'data' / 'sources.json').read_text(encoding='utf-8'))
+        enabled = [s for s in cfg['sources'] if s.get('enabled')]
+        channels = {s['channel'] for s in enabled}
+        required = {
+            'mchs_orel', 'mchs_bryansk', 'gumchs48', 'lipobl',
+            'pavelmalkov_official', 'PervyshovEA', 'gu_mchs_tambov',
+            'mchs_mo', 'govrme12', 'mchs12gov', 'mchs_ulyanovsk',
+            'mchs34', 'volgadmin', 'Yuri_Slusar', 'mchs_rostov',
+            'opershtab23', 'mchs_kuban',
+        }
+        self.assertGreaterEqual(len(enabled), 67)
+        self.assertTrue(required <= channels)
+
+    def test_v12_zero_post_public_html_is_not_fake_success(self):
+        fetched = FetchResult(
+            posts=[], transport='telegram_public_html', transport_ok=False,
+            window_complete=False, error='public Telegram page returned zero parseable messages'
+        )
+        row = source_status_row(
+            'telegram', 'tmbcan', 'Tambov Oblast', fetched, [], [],
+            {'alert_posts': 0, 'start_posts': 0, 'end_posts': 0, 'activity_posts': 0}
+        )
+        self.assertFalse(row['ok'])
+        self.assertEqual(row['health'], 'failed')
+        self.assertEqual(row['posts'], 0)
+
+    def test_v12_authenticated_complete_zero_post_window_can_be_quiet(self):
+        fetched = FetchResult(
+            posts=[], transport='telegram_mtproto', transport_ok=True,
+            window_complete=True
+        )
+        row = source_status_row(
+            'telegram', 'example', 'Example Oblast', fetched, [], [],
+            {'alert_posts': 0, 'start_posts': 0, 'end_posts': 0, 'activity_posts': 0}
+        )
+        self.assertTrue(row['ok'])
+        self.assertEqual(row['health'], 'quiet')
 
     def test_v10_countless_multi_place_activity_is_retained(self):
         source = dict(self.source)

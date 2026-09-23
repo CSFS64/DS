@@ -1,4 +1,4 @@
-# Deepstrike Alert Archive — v5
+# Deepstrike Alert Archive — v12
 
 Responsive GitHub Pages archive for **delayed historical** regional UAV-alert records from official local sources.
 
@@ -162,3 +162,11 @@ See `README_V9.md`. v9 hides inactive archive point markers, removes post-clear 
 ## v10 parser behavior
 
 v10 prioritizes retaining official local UAV activity instead of discarding posts that do not form a perfect START/END pair. See `README_V10.md` for the activity classes and display semantics.
+
+## v11 source-recall update
+
+v11 adds Telegram public-search recall passes, fixes the municipality catalog to consume actual GeoNames A.ADM2 features, lowers the hidden place dictionary threshold to 500 residents, and adds several verified municipal/regional official channels. See `README_V11.md`.
+
+## v12 source-layer reliability update
+
+v12 replaces public Telegram HTML as the preferred history transport with optional authenticated Telegram MTProto, supports multiple official sources per region, marks zero-message public-page fetches as failures instead of false success, treats MChS RSS as auxiliary, and adds Action source-health summaries. See `README_V12.md` for the one-time Telegram secret setup.
