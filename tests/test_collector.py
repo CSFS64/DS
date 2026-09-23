@@ -22,6 +22,7 @@ from collector.collect import (
     FetchResult,
     source_status_row,
     reenrich_archive_places,
+    merge_existing_archive,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -381,6 +382,82 @@ class CollectorTests(unittest.TestCase):
         )
         self.assertTrue(row['ok'])
         self.assertEqual(row['health'], 'quiet')
+
+    def test_v15_fallback_backfill_cannot_replace_mtproto_record(self):
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / 'events.json'
+            old_report = {
+                'id':'same-id', 'region':'Belgorod Oblast', 'place':'Belgorod',
+                'scope':'city', 'at':'2026-09-20T10:00:00+00:00',
+                'text':'high quality', 'source_kind':'telegram',
+                'source_id':'operativno31', 'url':'https://t.me/operativno31/100',
+                'transport':'telegram_mtproto', 'transport_quality':30,
+            }
+            out.write_text(json.dumps({'reports':[old_report], 'events':[]}), encoding='utf-8')
+            new_report = dict(old_report)
+            new_report.update({'text':'fallback replacement', 'transport':'telegram_public_html', 'transport_quality':10})
+            data = {
+                'window_start':'2026-09-19T00:00:00+00:00',
+                'coverage':{}, 'events':[], 'reports':[new_report],
+                'source_status':[{
+                    'source_type':'telegram', 'source':'operativno31',
+                    'transport':'telegram_public_html', 'transport_ok':True,
+                }],
+            }
+            merged = merge_existing_archive(data, out)
+            self.assertEqual(len(merged['reports']), 1)
+            self.assertEqual(merged['reports'][0]['text'], 'high quality')
+            self.assertEqual(merged['reports'][0]['transport'], 'telegram_mtproto')
+            self.assertGreaterEqual(merged['coverage']['protected_higher_quality_records'], 1)
+
+    def test_v15_fallback_backfill_preserves_missing_legacy_telegram_record(self):
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / 'events.json'
+            old_report = {
+                'id':'legacy-id', 'region':'Voronezh Oblast', 'place':'Voronezh Oblast',
+                'scope':'region', 'at':'2026-09-20T10:00:00+00:00',
+                'text':'legacy record', 'source_kind':'telegram',
+                'url':'https://t.me/gusev_36/100',
+            }
+            out.write_text(json.dumps({'reports':[old_report], 'events':[]}), encoding='utf-8')
+            data = {
+                'window_start':'2026-09-19T00:00:00+00:00',
+                'coverage':{}, 'events':[], 'reports':[],
+                'source_status':[{
+                    'source_type':'telegram', 'source':'gusev_36',
+                    'transport':'telegram_public_html', 'transport_ok':True,
+                }],
+            }
+            merged = merge_existing_archive(data, out)
+            self.assertEqual([r['id'] for r in merged['reports']], ['legacy-id'])
+
+    def test_v15_mtproto_backfill_can_replace_legacy_record(self):
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / 'events.json'
+            old_report = {
+                'id':'same-id', 'region':'Voronezh Oblast', 'place':'Voronezh Oblast',
+                'scope':'region', 'at':'2026-09-20T10:00:00+00:00',
+                'text':'legacy', 'source_kind':'telegram',
+                'url':'https://t.me/gusev_36/100',
+            }
+            out.write_text(json.dumps({'reports':[old_report], 'events':[]}), encoding='utf-8')
+            new_report = dict(old_report)
+            new_report.update({
+                'text':'mtproto replacement', 'source_id':'gusev_36',
+                'transport':'telegram_mtproto', 'transport_quality':30,
+            })
+            data = {
+                'window_start':'2026-09-19T00:00:00+00:00',
+                'coverage':{}, 'events':[], 'reports':[new_report],
+                'source_status':[{
+                    'source_type':'telegram', 'source':'gusev_36',
+                    'transport':'telegram_mtproto', 'transport_ok':True,
+                }],
+            }
+            merged = merge_existing_archive(data, out)
+            self.assertEqual(len(merged['reports']), 1)
+            self.assertEqual(merged['reports'][0]['text'], 'mtproto replacement')
+            self.assertEqual(merged['reports'][0]['transport'], 'telegram_mtproto')
 
     def test_v14_existing_region_report_is_reenriched_without_backfill(self):
         data = {

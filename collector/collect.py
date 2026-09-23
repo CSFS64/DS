@@ -1356,6 +1356,55 @@ def mchs_source(region_cfg: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+TRANSPORT_QUALITY = {
+    "telegram_mtproto": 30,
+    # Legacy Telegram records predate per-record provenance. Treat them as
+    # better than HTML fallback so a degraded backfill can never erase them.
+    "legacy_telegram_unknown": 20,
+    "telegram_public_html": 10,
+    "mchs_rss": 5,
+    "unknown": 0,
+}
+
+def transport_quality(transport: str | None, source_kind: str | None = None) -> int:
+    if transport:
+        return TRANSPORT_QUALITY.get(str(transport), 0)
+    if source_kind == "telegram":
+        return TRANSPORT_QUALITY["legacy_telegram_unknown"]
+    if source_kind == "mchs_rss":
+        return TRANSPORT_QUALITY["mchs_rss"]
+    return 0
+
+def record_source_id(record: dict[str, Any]) -> str | None:
+    source_id = record.get("source_id")
+    if source_id:
+        return str(source_id)
+    # Legacy Telegram records did not store source_id; recover the channel from
+    # the message/source URL so source-level transport protection still works.
+    for field in ("url", "start_url", "end_url", "source_url"):
+        value = str(record.get(field) or "")
+        m = re.search(r"(?:https?://)?t\.me/(?:s/)?([^/?#]+)", value)
+        if m:
+            return m.group(1)
+    return None
+
+def annotate_provenance(records: list[dict[str, Any]], source: dict[str, Any],
+                        transport: str, window_complete: bool) -> None:
+    source_id = str(source.get("channel") or source.get("source_id") or "")
+    quality = transport_quality(transport, source.get("kind"))
+    for record in records:
+        record["source_id"] = source_id
+        record["transport"] = transport
+        record["transport_quality"] = quality
+        record["transport_window_complete"] = bool(window_complete)
+
+def record_quality(record: dict[str, Any]) -> int:
+    stored = record.get("transport_quality")
+    if isinstance(stored, (int, float)):
+        return int(stored)
+    return transport_quality(record.get("transport"), record.get("source_kind"))
+
+
 def collect(args) -> dict[str, Any]:
     source_cfg = json.loads(Path(args.sources).read_text(encoding="utf-8"))
     region_cfg = json.loads(Path(args.regions).read_text(encoding="utf-8"))
@@ -1409,6 +1458,8 @@ def collect(args) -> dict[str, Any]:
                 posts = fetched.posts
                 events, unmatched = pair_alerts(posts, source, window_start, window_end)
                 reports = extract_reports(posts, source, window_start, window_end)
+                annotate_provenance(events, source, fetched.transport, fetched.window_complete)
+                annotate_provenance(reports, source, fetched.transport, fetched.window_complete)
                 all_events.extend(events); all_reports.extend(reports); all_unmatched.extend(unmatched)
                 alert_stats = alert_post_stats(posts)
                 row = source_status_row(
@@ -1455,6 +1506,8 @@ def collect(args) -> dict[str, Any]:
         )
         events, unmatched = pair_alerts(posts, source, window_start, window_end)
         reports = extract_reports(posts, source, window_start, window_end)
+        annotate_provenance(events, source, "mchs_rss", False)
+        annotate_provenance(reports, source, "mchs_rss", False)
         return region, posts, events, reports, unmatched
 
     with ThreadPoolExecutor(max_workers=max(1, args.mchs_workers)) as pool:
@@ -1509,7 +1562,7 @@ def collect(args) -> dict[str, Any]:
         if not any(s.get("region") == region and s.get("transport_ok") for s in telegram_status)
     }
     return {
-        "schema_version": 5,
+        "schema_version": 6,
         "generated_at": now.isoformat(),
         "safety_lag_hours": args.safety_lag_hours,
         "window_start": window_start.isoformat(),
@@ -1556,48 +1609,98 @@ def collect(args) -> dict[str, Any]:
 
 
 def merge_existing_archive(data: dict[str, Any], output_path: Path) -> dict[str, Any]:
-    """Keep older historical records while regenerating the current window.
+    """Merge a new collection window without downgrading historical provenance.
 
-    The collector used to replace events.json with only the newest lookback
-    window.  That is unsuitable for an archive.  Records before the current
-    window are retained; the overlapping window is regenerated from sources so
-    parser fixes can correct recent history.
+    A lower-quality transport (especially public Telegram HTML fallback) may add
+    new records, but it must never delete or replace records previously obtained
+    through MTProto. Legacy Telegram records without transport metadata are also
+    protected from HTML fallback, because their exact provenance cannot be
+    reconstructed safely.
+
+    A later MTProto backfill is allowed to replace legacy/fallback records.
     """
     if not output_path.exists():
         data["coverage"]["archive_events_total"] = len(data.get("events", []))
         data["coverage"]["archive_reports_total"] = len(data.get("reports", []))
-        data["coverage"]["archive_regions_with_records"] = len({e.get("region") for e in data.get("events", []) if e.get("region")} | {r.get("region") for r in data.get("reports", []) if r.get("region")})
-        data["coverage"]["archive_regions_with_local_records"] = len({e.get("region") for e in data.get("events", []) if e.get("region") and e.get("scope") in ("city","municipality")} | {r.get("region") for r in data.get("reports", []) if r.get("region") and (r.get("scope") in ("city","municipality") or (r.get("mentioned_places") or []))})
+        data["coverage"]["archive_regions_with_records"] = len(
+            {e.get("region") for e in data.get("events", []) if e.get("region")}
+            | {r.get("region") for r in data.get("reports", []) if r.get("region")}
+        )
+        data["coverage"]["archive_regions_with_local_records"] = len(
+            {e.get("region") for e in data.get("events", []) if e.get("region") and e.get("scope") in ("city","municipality")}
+            | {r.get("region") for r in data.get("reports", []) if r.get("region") and (r.get("scope") in ("city","municipality") or (r.get("mentioned_places") or []))}
+        )
+        data["coverage"]["protected_higher_quality_records"] = 0
         return data
+
     try:
         old = json.loads(output_path.read_text(encoding="utf-8"))
         cutoff = parse_iso(data["window_start"])
     except Exception:
         return data
 
-    keep_events = []
-    for e in old.get("events", []):
+    status_by_source: dict[str, dict[str, Any]] = {}
+    for status in data.get("source_status", []) or []:
+        source = status.get("source")
+        if source:
+            status_by_source[str(source)] = status
+
+    def current_source_quality(record: dict[str, Any]) -> int:
+        source_id = record_source_id(record)
+        status = status_by_source.get(source_id or "")
+        if status is None:
+            return 0
+        return transport_quality(status.get("transport"), record.get("source_kind"))
+
+    protected = 0
+
+    def old_record_should_survive(record: dict[str, Any], time_field: str) -> bool:
+        nonlocal protected
         try:
-            if parse_iso(e.get("end") or e.get("start")) < cutoff:
-                keep_events.append(e)
+            timestamp = parse_iso(record.get(time_field))
         except Exception:
-            pass
-    keep_reports = []
-    for r in old.get("reports", []):
-        try:
-            if parse_iso(r.get("at")) < cutoff:
-                keep_reports.append(r)
-        except Exception:
-            pass
+            return False
+        if timestamp < cutoff:
+            return True
+
+        old_quality = record_quality(record)
+        new_quality = current_source_quality(record)
+        if old_quality > new_quality:
+            protected += 1
+            return True
+        return False
+
+    keep_events = [
+        e for e in old.get("events", [])
+        if old_record_should_survive(e, "end" if e.get("end") else "start")
+    ]
+    keep_reports = [
+        r for r in old.get("reports", [])
+        if old_record_should_survive(r, "at")
+    ]
+
+    def prefer_higher_quality(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        chosen: dict[str, dict[str, Any]] = {}
+        for record in records:
+            rid = record.get("id")
+            if not rid:
+                continue
+            existing = chosen.get(rid)
+            # Equal quality prefers the later/newer item in the input list.
+            if existing is None or record_quality(record) >= record_quality(existing):
+                chosen[rid] = record
+        return list(chosen.values())
 
     data["events"] = sorted(
-        {e["id"]: e for e in [*keep_events, *data.get("events", [])]}.values(),
+        prefer_higher_quality([*keep_events, *data.get("events", [])]),
         key=lambda e: (e.get("start", ""), e.get("region", ""), e.get("place", "")),
     )
     data["reports"] = sorted(
-        {r["id"]: r for r in [*keep_reports, *data.get("reports", [])]}.values(),
+        prefer_higher_quality([*keep_reports, *data.get("reports", [])]),
         key=lambda r: (r.get("at", ""), r.get("region", ""), r.get("place", "")),
     )
+
+    data["coverage"]["protected_higher_quality_records"] = protected
     data["coverage"]["archive_events_total"] = len(data["events"])
     data["coverage"]["archive_reports_total"] = len(data["reports"])
     archive_regions = {e.get("region") for e in data["events"] if e.get("region")} | {r.get("region") for r in data["reports"] if r.get("region")}
