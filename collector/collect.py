@@ -652,29 +652,32 @@ def _store_input_peer(peer_cache: dict[str, dict[str, Any]], channel: str, peer,
                       *, source: str) -> bool:
     key = _channel_cache_key(channel)
     entry: dict[str, Any] | None = None
-    if InputPeerChannel is not None and isinstance(peer, InputPeerChannel):
-        entry = {
-            "peer_type": "channel",
-            "id": int(peer.channel_id),
-            "access_hash": int(peer.access_hash),
-            "username": key,
-            "source": source,
-        }
-    elif InputPeerUser is not None and isinstance(peer, InputPeerUser):
-        entry = {
-            "peer_type": "user",
-            "id": int(peer.user_id),
-            "access_hash": int(peer.access_hash),
-            "username": key,
-            "source": source,
-        }
-    elif InputPeerChat is not None and isinstance(peer, InputPeerChat):
-        entry = {
-            "peer_type": "chat",
-            "id": int(peer.chat_id),
-            "username": key,
-            "source": source,
-        }
+    try:
+        if InputPeerChannel is not None and isinstance(peer, InputPeerChannel):
+            entry = {
+                "peer_type": "channel",
+                "id": int(peer.channel_id),
+                "access_hash": int(peer.access_hash),
+                "username": key,
+                "source": source,
+            }
+        elif InputPeerUser is not None and isinstance(peer, InputPeerUser):
+            entry = {
+                "peer_type": "user",
+                "id": int(peer.user_id),
+                "access_hash": int(peer.access_hash),
+                "username": key,
+                "source": source,
+            }
+        elif InputPeerChat is not None and isinstance(peer, InputPeerChat):
+            entry = {
+                "peer_type": "chat",
+                "id": int(peer.chat_id),
+                "username": key,
+                "source": source,
+            }
+    except (TypeError, ValueError):
+        return False
     if entry is None:
         return False
     changed = peer_cache.get(key) != entry
