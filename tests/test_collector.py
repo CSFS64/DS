@@ -1,5 +1,7 @@
 import json
 import unittest
+import tempfile
+from argparse import Namespace
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -13,6 +15,7 @@ from collector.collect import (
     parse_mchs_rss,
     parse_telegram_html,
     text_kind,
+    configure_incremental_window,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -180,6 +183,32 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(len(reports), 1)
         self.assertEqual(reports[0]['count_type'], 'official_activity')
         self.assertEqual(reports[0]['place'], 'Cherepovets')
+
+    def test_v9_incremental_window_uses_previous_cursor(self):
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "events.json"
+            from datetime import timedelta
+            now = datetime.now(timezone.utc)
+            # Previous safe cutoff roughly six hours behind the new one.
+            previous_end = now - timedelta(hours=30)
+            out.write_text(json.dumps({"window_end": previous_end.isoformat()}), encoding="utf-8")
+            args = Namespace(
+                output=str(out), safety_lag_hours=24, lookback_hours=168,
+                incremental_overlap_hours=18, full_backfill=False,
+            )
+            configure_incremental_window(args)
+            self.assertEqual(args.collection_mode, "incremental")
+            self.assertGreaterEqual(args.lookback_hours, 23)
+            self.assertLess(args.lookback_hours, 40)
+
+    def test_v9_backfill_keeps_requested_window(self):
+        args = Namespace(
+            output="missing.json", safety_lag_hours=24, lookback_hours=168,
+            incremental_overlap_hours=18, full_backfill=True,
+        )
+        configure_incremental_window(args)
+        self.assertEqual(args.collection_mode, "backfill")
+        self.assertEqual(args.lookback_hours, 168)
 
 if __name__ == "__main__":
     unittest.main()

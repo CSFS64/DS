@@ -22,8 +22,9 @@ const state = {
   previousActivePlaceIds: new Set(),
   previousReportRegionIds: new Set(),
   previousReportPlaceIds: new Set(),
-  previousRecentRegionIds: new Set(),
   currentMs: 0,
+  cumulativeMs: 0,
+  viewMode: "realtime",
   timelineStartMs: 0,
   timelineEndMs: 0,
   timer: null,
@@ -34,8 +35,9 @@ const els = {
   dataStatus: $("dataStatus"), archiveLamp: $("archiveLamp"), detailPanel: $("detailPanel"),
   detailClose: $("detailClose"), detailEyebrow: $("detailEyebrow"), detailTitle: $("detailTitle"),
   detailBody: $("detailBody"), detailSource: $("detailSource"), dateStart: $("dateStart"), dateEnd: $("dateEnd"),
-  tickLayer: $("tickLayer"), eventBars: $("eventBars"), selectionBand: $("selectionBand"), reportDots: $("reportDots"),
-  rangeStart: $("rangeStart"), rangeEnd: $("rangeEnd"), handleStart: $("handleStart"), handleEnd: $("handleEnd"),
+  tickLayer: $("tickLayer"), eventBars: $("eventBars"), selectionBand: $("selectionBand"), cumulativeBand: $("cumulativeBand"), reportDots: $("reportDots"),
+  rangeStart: $("rangeStart"), rangeEnd: $("rangeEnd"), rangeCumulative: $("rangeCumulative"),
+  handleStart: $("handleStart"), handleEnd: $("handleEnd"), handleCumulative: $("handleCumulative"),
   playButton: $("playButton"), scrubber: $("scrubber"), currentTimeLabel: $("currentTimeLabel"), speedSelect: $("speedSelect"),
   clockMoscow: $("clockMoscow"), clockKyiv: $("clockKyiv"), clockBeijing: $("clockBeijing"),
 };
@@ -341,8 +343,8 @@ function installArchiveLayers() {
       type: "fill",
       source: "archive-regions",
       paint: {
-        "fill-color": ["case", ["boolean", ["feature-state", "active"], false], "#39d8ff", ["boolean", ["feature-state", "report"], false], "#ffb347", ["boolean", ["feature-state", "recent"], false], "#2d9fba", "#39d8ff"],
-        "fill-opacity": ["case", ["boolean", ["feature-state", "active"], false], 0.17, ["boolean", ["feature-state", "report"], false], 0.09, ["boolean", ["feature-state", "recent"], false], 0.055, 0.0],
+        "fill-color": ["case", ["boolean", ["feature-state", "active"], false], "#39d8ff", ["boolean", ["feature-state", "report"], false], "#ffb347", "#39d8ff"],
+        "fill-opacity": ["case", ["boolean", ["feature-state", "active"], false], 0.17, ["boolean", ["feature-state", "report"], false], 0.09, 0.0],
       },
     }, beforeId);
     state.map.addLayer({
@@ -350,9 +352,9 @@ function installArchiveLayers() {
       type: "line",
       source: "archive-regions",
       paint: {
-        "line-color": ["case", ["boolean", ["feature-state", "active"], false], "#62e2ff", ["boolean", ["feature-state", "report"], false], "#ffc15a", ["boolean", ["feature-state", "recent"], false], "#2f7e93", "#31566a"],
-        "line-width": ["case", ["boolean", ["feature-state", "active"], false], 2.2, ["boolean", ["feature-state", "report"], false], 1.6, ["boolean", ["feature-state", "recent"], false], 1.15, 0.65],
-        "line-opacity": ["case", ["boolean", ["feature-state", "active"], false], 0.95, ["boolean", ["feature-state", "report"], false], 0.85, ["boolean", ["feature-state", "recent"], false], 0.52, 0.25],
+        "line-color": ["case", ["boolean", ["feature-state", "active"], false], "#62e2ff", ["boolean", ["feature-state", "report"], false], "#ffc15a", "#31566a"],
+        "line-width": ["case", ["boolean", ["feature-state", "active"], false], 2.2, ["boolean", ["feature-state", "report"], false], 1.6, 0.65],
+        "line-opacity": ["case", ["boolean", ["feature-state", "active"], false], 0.95, ["boolean", ["feature-state", "report"], false], 0.85, 0.25],
       },
     }, beforeId);
   }
@@ -377,7 +379,8 @@ function installArchiveLayers() {
       "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 2.4, 7, 4.2, 11, 5.5],
       "circle-color": ["case", ["boolean", ["feature-state", "active"], false], "#ff4258", ["boolean", ["feature-state", "report"], false], "#ffb347", "#506571"],
       "circle-stroke-color": ["case", ["boolean", ["feature-state", "active"], false], "#ffd8dc", ["boolean", ["feature-state", "report"], false], "#ffe0a8", "#99aeb9"],
-      "circle-stroke-width": ["case", ["boolean", ["feature-state", "active"], false], 1.6, ["boolean", ["feature-state", "report"], false], 1.3, 0.8],
+      "circle-stroke-width": ["case", ["boolean", ["feature-state", "active"], false], 1.6, ["boolean", ["feature-state", "report"], false], 1.3, 0],
+      "circle-stroke-opacity": ["case", ["boolean", ["feature-state", "active"], false], 1, ["boolean", ["feature-state", "report"], false], 1, 0],
       "circle-opacity": ["case", ["boolean", ["feature-state", "active"], false], 1, ["boolean", ["feature-state", "report"], false], 0.95, 0],
     },
   });
@@ -437,7 +440,17 @@ function wireControls() {
   els.dateEnd.addEventListener("change", rebuildTimeline);
   els.rangeStart.addEventListener("input", () => updateSelection("start"));
   els.rangeEnd.addEventListener("input", () => updateSelection("end"));
+  els.rangeCumulative.addEventListener("input", () => {
+    stopPlayback();
+    state.viewMode = "cumulative";
+    state.cumulativeMs = timelineMsFromRange(+els.rangeCumulative.value);
+    state.cumulativeMs = Math.min(Math.max(state.cumulativeMs, selectionStartMs()), selectionEndMs());
+    state.currentMs = state.cumulativeMs;
+    updateCumulativeHandle();
+    render();
+  });
   els.scrubber.addEventListener("input", () => {
+    state.viewMode = "realtime";
     state.currentMs = selectionStartMs() + (selectionEndMs() - selectionStartMs()) * (+els.scrubber.value / 1000);
     render();
   });
@@ -452,7 +465,10 @@ function rebuildTimeline() {
   state.timelineEndMs = parseMoscowDate(els.dateEnd.value, true);
   els.rangeStart.value = 0;
   els.rangeEnd.value = 1000;
+  els.rangeCumulative.value = 0;
   state.currentMs = state.timelineStartMs;
+  state.cumulativeMs = state.timelineStartMs;
+  state.viewMode = "realtime";
   buildTicks();
   buildEventBars();
   buildReportDots();
@@ -479,7 +495,23 @@ function updateSelection(changed) {
   els.handleStart.textContent = formatTime(timelineMsFromRange(a), "Europe/Moscow");
   els.handleEnd.textContent = formatTime(timelineMsFromRange(b), "Europe/Moscow");
   state.currentMs = Math.min(Math.max(state.currentMs, selectionStartMs()), selectionEndMs());
+  state.cumulativeMs = Math.min(Math.max(state.cumulativeMs || selectionStartMs(), selectionStartMs()), selectionEndMs());
+  const cp = (state.cumulativeMs - state.timelineStartMs) / (state.timelineEndMs - state.timelineStartMs);
+  els.rangeCumulative.value = Math.round(Math.min(1, Math.max(0, cp)) * 1000);
+  updateCumulativeHandle();
   render();
+}
+
+function updateCumulativeHandle() {
+  const raw = +els.rangeCumulative.value;
+  const startPct = +els.rangeStart.value / 10;
+  const endPct = +els.rangeEnd.value / 10;
+  const pct = Math.min(endPct, Math.max(startPct, raw / 10));
+  els.handleCumulative.style.left = `${pct}%`;
+  els.handleCumulative.textContent = `Σ ${formatTime(state.cumulativeMs || timelineMsFromRange(raw), "Europe/Moscow")}`;
+  els.cumulativeBand.style.left = `${startPct}%`;
+  els.cumulativeBand.style.width = `${Math.max(0, pct - startPct)}%`;
+  els.cumulativeBand.classList.toggle("active", state.viewMode === "cumulative");
 }
 
 function buildTicks() {
@@ -537,12 +569,20 @@ function activeReports() {
   return (state.archive.reports || []).filter(r => Math.abs(state.currentMs - Date.parse(r.at)) <= span);
 }
 
+function cumulativeEvents() {
+  const start = selectionStartMs();
+  const end = Math.min(Math.max(state.cumulativeMs, start), selectionEndMs());
+  return (state.archive.events || []).filter(e => Date.parse(e.end) >= start && Date.parse(e.start) <= end);
+}
+
 function render() {
-  const active = activeEvents();
-  const reports = activeReports();
+  const cumulative = state.viewMode === "cumulative";
+  const active = cumulative ? cumulativeEvents() : activeEvents();
+  const reports = cumulative ? [] : activeReports();
   renderMap(active, reports);
-  renderClocks(active);
+  renderClocks(active, reports);
   renderScrubber();
+  updateCumulativeHandle();
 }
 
 function setFeatureActive(source, id, active) {
@@ -560,14 +600,10 @@ function renderMap(active, reports = []) {
     for (const id of state.previousReportPlaceIds) {
       try { state.map.setFeatureState({ source: "archive-places", id }, { report: false }); } catch (_) {}
     }
-    for (const id of state.previousRecentRegionIds) {
-      try { state.map.setFeatureState({ source: "archive-regions", id }, { recent: false }); } catch (_) {}
-    }
     state.previousActiveRegionIds.clear();
     state.previousActivePlaceIds.clear();
     state.previousReportRegionIds.clear();
     state.previousReportPlaceIds.clear();
-    state.previousRecentRegionIds.clear();
 
     // Hierarchy rule: a local alert necessarily means its parent region is active.
     // The city/municipality dot gives precision; the region fill gives containment.
@@ -587,19 +623,6 @@ function renderMap(active, reports = []) {
       }
     }
 
-
-    // Rolling historical trace: regions that had a formal official alert during
-    // the previous six hours remain faintly outlined. This visualizes the
-    // sequence of *reported* alerts without inventing an inferred flight path.
-    const recentCutoff = state.currentMs - 6 * 3600000;
-    for (const event of (state.archive.events || [])) {
-      const s = Date.parse(event.start), e = Date.parse(event.end);
-      if (e < recentCutoff || s > state.currentMs) continue;
-      const rid = state.regionFeatureIds.get(event.region);
-      if (rid == null || state.previousActiveRegionIds.has(rid)) continue;
-      try { state.map.setFeatureState({ source: "archive-regions", id: rid }, { recent: true }); } catch (_) {}
-      state.previousRecentRegionIds.add(rid);
-    }
 
     // Official local reports are shown as amber activity, not mislabelled as a
     // formal alert. This makes Moscow-style governor/mayor incident reporting
@@ -624,12 +647,18 @@ function renderMap(active, reports = []) {
   els.archiveLamp.classList.toggle("on", active.length > 0 || reports.length > 0);
 }
 
-function renderClocks(active) {
+function renderClocks(active, reports = []) {
   els.clockMoscow.textContent = formatTime(state.currentMs, "Europe/Moscow");
   els.clockKyiv.textContent = formatTime(state.currentMs, "Europe/Kyiv");
   els.clockBeijing.textContent = formatTime(state.currentMs, "Asia/Shanghai");
-  const reportCount = activeReports().length;
-  els.currentTimeLabel.textContent = `${formatTime(state.currentMs, "Europe/Moscow")} MSK · ${active.length} ALERT${active.length === 1 ? "" : "S"} · ${reportCount} REPORT${reportCount === 1 ? "" : "S"}`;
+  if (state.viewMode === "cumulative") {
+    const regionCount = new Set(active.map(e => e.region)).size;
+    const placeCount = new Set(active.filter(e => e.scope !== "region").map(e => `${e.region}::${e.place}`)).size;
+    els.currentTimeLabel.textContent = `Σ START → ${formatTime(state.cumulativeMs, "Europe/Moscow")} MSK · ${regionCount} REGIONS · ${placeCount} LOCAL`;
+  } else {
+    const reportCount = reports.length;
+    els.currentTimeLabel.textContent = `${formatTime(state.currentMs, "Europe/Moscow")} MSK · ${active.length} ALERT${active.length === 1 ? "" : "S"} · ${reportCount} REPORT${reportCount === 1 ? "" : "S"}`;
+  }
 }
 
 function renderScrubber() {
@@ -640,6 +669,7 @@ function renderScrubber() {
 
 function togglePlayback() {
   if (state.timer) { stopPlayback(); return; }
+  state.viewMode = "realtime";
   const start = selectionStartMs(), end = selectionEndMs();
   if (state.currentMs >= end) state.currentMs = start;
   els.playButton.classList.add("is-playing"); els.playButton.textContent = "Ⅱ PAUSE";

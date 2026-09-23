@@ -28,7 +28,6 @@
         <span><i class="legend-dot city"></i>城市/市镇警报</span>
         <span><i class="legend-dot report"></i>地方官方攻击/数量报告</span>
         <span><i class="legend-region"></i>当前州级/父级警报</span>
-        <span><i class="legend-region recent"></i>近6h官方警报痕迹</span>
       </div>
 
       <aside id="detailPanel" class="detail-panel" hidden>
@@ -51,13 +50,16 @@
           <div id="tickLayer" class="tick-layer"></div>
           <div id="eventBars" class="event-bars"></div>
           <div id="selectionBand" class="selection-band"></div>
+          <div id="cumulativeBand" class="cumulative-band"></div>
           <div id="reportDots" class="report-dots"></div>
           <div class="dual-range">
             <input id="rangeStart" class="range range-start" type="range" min="0" max="1000" value="0" step="1" aria-label="回放开始时间">
             <input id="rangeEnd" class="range range-end" type="range" min="0" max="1000" value="1000" step="1" aria-label="回放结束时间">
+            <input id="rangeCumulative" class="range range-cumulative" type="range" min="0" max="1000" value="0" step="1" aria-label="累计观察指针">
           </div>
           <div id="handleStart" class="handle-label handle-start"></div>
           <div id="handleEnd" class="handle-label handle-end"></div>
+          <div id="handleCumulative" class="handle-label handle-cumulative"></div>
         </div>
 
         <label class="date-control end-date">

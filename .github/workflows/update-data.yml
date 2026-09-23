@@ -3,12 +3,20 @@ name: Update delayed archive data
 on:
   workflow_dispatch:
     inputs:
-      lookback_hours:
-        description: "Archive window before the 24h safety lag"
+      mode:
+        description: "Incremental keeps old history; backfill re-fetches a wider recent window"
         required: false
-        default: "120"
+        default: "incremental"
+        type: choice
+        options:
+          - incremental
+          - backfill
+      backfill_hours:
+        description: "Hours to re-fetch when mode=backfill or on the very first run"
+        required: false
+        default: "168"
   schedule:
-    - cron: "17 10 * * *"
+    - cron: "17 */6 * * *"
 
 permissions:
   contents: write
@@ -44,9 +52,12 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Collect official delayed records
         env:
-          LOOKBACK_HOURS: ${{ github.event.inputs.lookback_hours || '120' }}
+          LOOKBACK_HOURS: ${{ github.event.inputs.backfill_hours || '168' }}
+          FULL_BACKFILL: ${{ github.event.inputs.mode == 'backfill' && '1' || '0' }}
+          INCREMENTAL_OVERLAP_HOURS: "18"
           SAFETY_LAG_HOURS: "24"
-          TELEGRAM_MAX_PAGES: "80"
+          TELEGRAM_MAX_PAGES: "50"
+          TELEGRAM_CONTEXT_HOURS: "48"
         run: python collector/collect.py
       - name: Commit archive and catalog
         shell: bash

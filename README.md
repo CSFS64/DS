@@ -154,3 +154,7 @@ The data Action defaults to a 48-hour collection window ending at least 24 hours
 - `attacked`, `detected`, `destroyed`, `shot down`, and `suppressed` UAV counts are kept as different categories.
 - Posts explicitly attributed/forwarded from the Russian Ministry of Defence are excluded from local-count extraction.
 - OpenFreeMap's public instance is convenient and keyless but does not offer an SLA. The alert overlay and archive data remain independent of the basemap service.
+
+## v9 update
+
+See `README_V9.md`. v9 hides inactive archive point markers, removes post-clear region trails, adds a cumulative `Σ` timeline pointer, and changes scheduled data collection to incremental updates (new safe archive edge + overlap) instead of re-fetching the full lookback on every run.

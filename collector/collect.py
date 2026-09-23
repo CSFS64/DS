@@ -231,8 +231,9 @@ def fetch_posts_for_window(
     start_utc: datetime,
     end_utc: datetime,
     max_pages: int = 18,
+    context_hours: int = 48,
 ) -> list[Post]:
-    context_start = start_utc - timedelta(hours=96)
+    context_start = start_utc - timedelta(hours=max(12, context_hours))
     all_posts: dict[int, Post] = {}
     before: int | None = None
 
@@ -304,8 +305,9 @@ def fetch_mchs_posts_for_window(
     region_cfg: dict[str, Any],
     start_utc: datetime,
     end_utc: datetime,
+    context_hours: int = 48,
 ) -> list[Post]:
-    context_start = start_utc - timedelta(hours=96)
+    context_start = start_utc - timedelta(hours=max(12, context_hours))
     r = session.get(region_cfg["mchs_rss_url"], timeout=18)
     r.raise_for_status()
     posts = parse_mchs_rss(r.text, region_cfg)
@@ -683,7 +685,10 @@ def collect(args) -> dict[str, Any]:
         source["_catalog_places"] = cities_by_region.get(source.get("region", ""), [])
         channel = source["channel"]
         try:
-            posts = fetch_posts_for_window(session, channel, window_start, window_end, max_pages=args.max_pages)
+            posts = fetch_posts_for_window(
+                session, channel, window_start, window_end,
+                max_pages=args.max_pages, context_hours=args.context_hours,
+            )
             events, unmatched = pair_alerts(posts, source, window_start, window_end)
             reports = extract_reports(posts, source, window_start, window_end)
             all_events.extend(events); all_reports.extend(reports); all_unmatched.extend(unmatched)
@@ -710,7 +715,9 @@ def collect(args) -> dict[str, Any]:
         local_session = make_session()
         source = mchs_source(region)
         source["_catalog_places"] = cities_by_region.get(region.get("region", ""), [])
-        posts = fetch_mchs_posts_for_window(local_session, region, window_start, window_end)
+        posts = fetch_mchs_posts_for_window(
+            local_session, region, window_start, window_end, context_hours=args.context_hours
+        )
         events, unmatched = pair_alerts(posts, source, window_start, window_end)
         reports = extract_reports(posts, source, window_start, window_end)
         return region, posts, events, reports, unmatched
@@ -750,6 +757,9 @@ def collect(args) -> dict[str, Any]:
         "safety_lag_hours": args.safety_lag_hours,
         "window_start": window_start.isoformat(),
         "window_end": window_end.isoformat(),
+        "collection_mode": getattr(args, "collection_mode", "backfill"),
+        "effective_lookback_hours": args.lookback_hours,
+        "incremental_overlap_hours": getattr(args, "incremental_overlap_hours", None),
         "coverage": {
             "regions_configured": len(enabled_regions),
             # Legacy HTTP-health metric retained for old frontends.
@@ -819,6 +829,34 @@ def merge_existing_archive(data: dict[str, Any], output_path: Path) -> dict[str,
     data["coverage"]["archive_reports_total"] = len(data["reports"])
     return data
 
+def configure_incremental_window(args) -> None:
+    """Shrink scheduled/manual incremental runs to only the new archive edge.
+
+    Existing historical records remain in events.json.  For an incremental run
+    we collect from the previous safe window end minus a small overlap through
+    the newest safe cutoff.  The overlap lets START/END pairs that straddle two
+    runs be regenerated without re-fetching the full historical lookback.
+    """
+    args.collection_mode = "backfill" if args.full_backfill else "incremental"
+    if args.full_backfill:
+        return
+    out = Path(args.output)
+    if not out.exists():
+        args.collection_mode = "initial"
+        return
+    try:
+        old = json.loads(out.read_text(encoding="utf-8"))
+        previous_end = parse_iso(old.get("window_end", ""))
+    except Exception:
+        args.collection_mode = "initial"
+        return
+
+    target_end = datetime.now(timezone.utc) - timedelta(hours=args.safety_lag_hours)
+    delta_h = max(0.0, (target_end - previous_end).total_seconds() / 3600.0)
+    needed = int(delta_h + args.incremental_overlap_hours + 0.999)
+    args.lookback_hours = max(args.incremental_overlap_hours, needed, 6)
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--sources", default=str(DEFAULT_SOURCES))
@@ -827,11 +865,22 @@ def main():
     p.add_argument("--output", default=str(DEFAULT_OUTPUT))
     p.add_argument("--lookback-hours", type=int, default=int(os.getenv("LOOKBACK_HOURS", "120")))
     p.add_argument("--safety-lag-hours", type=int, default=int(os.getenv("SAFETY_LAG_HOURS", "24")))
-    p.add_argument("--max-pages", type=int, default=int(os.getenv("TELEGRAM_MAX_PAGES", "80")))
+    p.add_argument("--max-pages", type=int, default=int(os.getenv("TELEGRAM_MAX_PAGES", "50")))
+    p.add_argument("--context-hours", type=int, default=int(os.getenv("TELEGRAM_CONTEXT_HOURS", "48")))
+    p.add_argument("--incremental-overlap-hours", type=int, default=int(os.getenv("INCREMENTAL_OVERLAP_HOURS", "18")))
+    p.add_argument("--full-backfill", action="store_true", default=os.getenv("FULL_BACKFILL", "0") == "1")
     p.add_argument("--mchs-workers", type=int, default=int(os.getenv("MCHS_WORKERS", "8")))
     args = p.parse_args()
     args.safety_lag_hours = max(24, args.safety_lag_hours)
-    args.lookback_hours = max(24, args.lookback_hours)
+    args.lookback_hours = max(6, args.lookback_hours)
+    args.context_hours = max(12, args.context_hours)
+    args.incremental_overlap_hours = max(6, args.incremental_overlap_hours)
+    configure_incremental_window(args)
+    print(
+        f"collection mode={args.collection_mode} lookback={args.lookback_hours}h "
+        f"overlap={args.incremental_overlap_hours}h lag={args.safety_lag_hours}h",
+        file=sys.stderr,
+    )
 
     data = collect(args)
     data = merge_existing_archive(data, Path(args.output))
