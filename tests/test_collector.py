@@ -610,6 +610,48 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(out['reports'], [])
         self.assertEqual(out['coverage']['reports_revalidated_removed'], 1)
 
+    def test_v17_whole_post_debunk_overrides_later_attack_wording(self):
+        text = (
+            'Украинская пропаганда продолжает пугать россиян новым налогом. '
+            'В ульяновских соцсетях — очередной дипфейк. '
+            'Якобы губернатор заявил, что защитить регион от атак украинских беспилотников невозможно. '
+            'Фейк уже опровергли. Компании, которые тратят средства на защиту объектов от БПЛА '
+            'и на восстановление после атак, смогут учитывать эти затраты при налогообложении.'
+        )
+        self.assertIsNone(uav_activity_kind(text))
+
+    def test_v17_uav_strike_wording_is_operational(self):
+        self.assertEqual(
+            uav_activity_kind('Вражеский дрон ударил по дому в частном секторе города.'),
+            'uav_attack_activity',
+        )
+        self.assertEqual(
+            uav_activity_kind('БПЛА нанес удар по объекту инфраструктуры.'),
+            'uav_attack_activity',
+        )
+
+    def test_v17_revalidation_keeps_real_uav_strike(self):
+        data = {
+            'coverage': {},
+            'events': [],
+            'reports': [{
+                'id': 'kursk-strike',
+                'region': 'Kursk Oblast',
+                'place': 'Kursk',
+                'scope': 'city',
+                'at': '2026-09-23T12:53:23+00:00',
+                'signal_class': 'uav_activity_signal',
+                'threat_class': 'uav',
+                'activity_kind': 'official_uav_activity',
+                'count': None,
+                'text': 'Вражеский дрон ударил по дому в частном секторе города.',
+            }],
+        }
+        out = revalidate_archive_reports(data)
+        self.assertEqual(len(out['reports']), 1)
+        self.assertEqual(out['reports'][0]['activity_kind'], 'uav_attack_activity')
+        self.assertEqual(out['coverage']['reports_revalidated_removed'], 0)
+
     def test_v16_cached_mtproto_peer_still_works_during_resolve_floodwait(self):
         class FakeClient:
             _archive_resolve_flooded = True
