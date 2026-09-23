@@ -1,6 +1,6 @@
 import os
 import sys
-from telethon import TelegramClient
+from telethon.sync import TelegramClient
 from telethon.sessions import StringSession
 
 
