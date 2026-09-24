@@ -35,7 +35,7 @@
         <button id="routeToggle" class="route-toggle is-on" type="button" aria-pressed="true">
           <i class="legend-route"></i><span class="route-toggle-label">示意无人机路线 ON · 0</span>
         </button>
-        <small class="legend-note">路线起点只取乌克兰边界上的高精度边界点，并按邻近线路自动错开；路线会精确穿过被采用的本地观测点。观测之间的曲线仅用于平滑表达，不代表某一架无人机的真实连续航迹。</small>
+        <small class="legend-note">路线起点使用保守的乌俄边界候选段，并自动分散以减少交叉；路线限制在乌克兰/俄罗斯国家几何内，不穿越第三国。只有州级信息时会用州内低置信度代理点让该州参与路线；本地观测点仍会被精确穿过。所有曲线均为示意推断，不代表某一架无人机的真实连续航迹。</small>
       </div>
 
       <aside id="detailPanel" class="detail-panel" hidden>
