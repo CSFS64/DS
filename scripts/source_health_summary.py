@@ -13,6 +13,8 @@ if not path.exists():
 data = json.loads(path.read_text(encoding='utf-8'))
 coverage = data.get('coverage') or {}
 rows = [r for r in (data.get('source_status') or []) if r.get('source_type') == 'telegram']
+monitoring_rows = [r for r in rows if str(r.get('source_layer') or '').startswith('monitoring_')]
+official_rows = [r for r in rows if not str(r.get('source_layer') or '').startswith('monitoring_')]
 by_region = defaultdict(list)
 for row in rows:
     by_region[row.get('region') or 'Unknown'].append(row)
@@ -28,6 +30,9 @@ print(f"- Username peers resolved this run: **{coverage.get('telegram_peer_resol
 print(f"- High-resolution regions configured: **{coverage.get('high_resolution_regions_configured', 0)}**")
 print(f"- Regions with at least one transport-OK source: **{coverage.get('high_resolution_regions_transport_ok', 0)}**")
 print(f"- Failed high-resolution sources: **{coverage.get('high_resolution_sources_failed', 0)}**")
+print(f"- Monitoring feeds configured: **{len(monitoring_rows)}**")
+print(f"- Monitoring feeds transport-OK: **{sum(1 for r in monitoring_rows if r.get('transport_ok'))}**")
+print(f"- Monitoring window posts/signals: **{sum(int(r.get('window_posts', 0) or 0) for r in monitoring_rows)} posts / {sum(int(r.get('window_activity_posts', 0) or 0) for r in monitoring_rows)} activity signals**")
 print(f"- MChS RSS alert regions (auxiliary only): **{coverage.get('mchs_regions_with_alert_posts', 0)}**")
 if coverage.get('telegram_mtproto_resolve_flooded'):
     wait_s = coverage.get('telegram_mtproto_resolve_wait_seconds', 0) or 0
