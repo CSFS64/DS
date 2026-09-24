@@ -547,6 +547,8 @@ function routeObservationPoints(record, atMs, sourceType) {
   if (threatClass(record) !== "uav" || record.signal_class === "alert_clear_signal") return [];
   const points = [];
   const seen = new Set();
+  const recordKey = String(record.id || record.url || [record.region, record.at || record.start, record.place].join("|"));
+  const kind = record.activity_kind || record.alert_type || "";
   const add = (lon, lat, place, precision, weight = 1) => {
     lon = +lon; lat = +lat;
     if (!Number.isFinite(lon) || !Number.isFinite(lat)) return;
@@ -560,20 +562,20 @@ function routeObservationPoints(record, atMs, sourceType) {
       region: record.region || "",
       at: atMs,
       sourceType,
-      kind: record.activity_kind || record.alert_type || "",
+      kind,
+      recordKey,
       weight,
     });
   };
 
+  // Only use actual local coordinates for track geometry.  A region centroid is
+  // useful for coloring an oblast, but it is not evidence that a UAV passed
+  // through the geometric center of that oblast.
   for (const p of (record.mentioned_places || []).slice(0, 8)) {
     add(p.lon, p.lat, p.label || p.name, p.type || "local", 1.0);
   }
   if (record.scope !== "region") {
     add(record.lon, record.lat, record.place_label || record.place, record.scope || "local", 1.0);
-  }
-  if (!points.length) {
-    const c = state.regionCentroids.get(record.region);
-    if (c) add(c.lon, c.lat, record.region, "region-centroid", 0.55);
   }
   return points;
 }
@@ -609,8 +611,6 @@ function pickIngressAnchor(target) {
   for (const anchor of UAV_ROUTE_ANCHORS) {
     if (target.lat < 48.0 && !["east", "south"].includes(anchor.corridor)) continue;
     const distance = haversineKm(anchor, target);
-    // Long-range targets are visually more plausible when the entry corridor
-    // points generally toward the target instead of choosing a lateral detour.
     const eastPenalty = target.lon > 45 && anchor.lon < 34 ? 120 : 0;
     const northPenalty = target.lat > 53.5 && anchor.lat < 47 ? 160 : 0;
     const score = distance + eastPenalty + northPenalty;
@@ -637,7 +637,7 @@ function dedupeRouteObservations(observations) {
   for (const node of sorted) {
     const last = [...out].reverse().find(x =>
       x.region === node.region && x.place === node.place &&
-      Math.abs(x.at - node.at) <= 75 * 60 * 1000
+      Math.abs(x.at - node.at) <= 60 * 60 * 1000
     );
     if (last) {
       last.observations += 1;
@@ -645,58 +645,127 @@ function dedupeRouteObservations(observations) {
       last.at = Math.min(last.at, node.at);
       continue;
     }
-    out.push({ ...node, observations: 1, predecessor: null, anchor: pickIngressAnchor(node) });
+    out.push({ ...node, observations: 1 });
   }
   return out;
 }
 
-function inferRoutePredecessors(nodes) {
-  for (let i = 0; i < nodes.length; i++) {
-    const node = nodes[i];
-    let best = null;
-    let bestScore = Infinity;
-    const nodeAnchorDistance = haversineKm(node.anchor, node);
-    const nodeBearing = bearingDeg(node.anchor, node);
-
-    for (let j = Math.max(0, i - 80); j < i; j++) {
-      const prev = nodes[j];
-      const dtHours = (node.at - prev.at) / 3600000;
-      if (dtHours < 0.12 || dtHours > 8.0) continue;
-      const distance = haversineKm(prev, node);
-      if (distance < 18 || distance > 1100) continue;
-      const impliedSpeed = distance / dtHours;
-      if (impliedSpeed < 35 || impliedSpeed > 750) continue;
-
-      const prevAnchorDistance = haversineKm(node.anchor, prev);
-      // Allow modest lateral/backtracking, but reject paths that would require a
-      // large return toward the entry side before continuing to the target.
-      const backtrack = Math.max(0, prevAnchorDistance - nodeAnchorDistance);
-      if (backtrack > 220) continue;
-
-      const incomingBearing = bearingDeg(prev, node);
-      const headingPenalty = angleDiffDeg(nodeBearing, incomingBearing);
-      const anchorPenalty = prev.anchor.id === node.anchor.id ? 0 : 135;
-      const precisionPenalty = prev.precision === "region-centroid" ? 45 : 0;
-      const score =
-        distance * 0.18 +
-        Math.abs(impliedSpeed - 210) * 0.22 +
-        dtHours * 9 +
-        headingPenalty * 1.15 +
-        backtrack * 0.7 +
-        anchorPenalty +
-        precisionPenalty;
-
-      if (score < bestScore) {
-        bestScore = score;
-        best = prev;
-      }
-    }
-    node.predecessor = best;
-  }
-  return nodes;
+function isEndpointOnlyKind(kind) {
+  return ["uav_attack_activity", "impact_or_debris"].includes(kind);
 }
 
-function corridorWaypoints(anchor, first, seed) {
+function isStrongObservationKind(kind) {
+  return [
+    "uav_movement",
+    "air_defense_action",
+    "uav_attack_activity",
+    "impact_or_debris",
+    "official_uav_activity",
+  ].includes(kind);
+}
+
+function corridorProjection(anchor, terminal, point) {
+  // Equirectangular local projection is sufficient for corridor scoring over
+  // this map extent.  progressKm is distance along the anchor->terminal axis;
+  // crossTrackKm is perpendicular distance from that axis.
+  const meanLat = (anchor.lat + terminal.lat) * 0.5 * Math.PI / 180;
+  const kmLon = 111.32 * Math.cos(meanLat);
+  const kmLat = 110.57;
+  const tx = (terminal.lon - anchor.lon) * kmLon;
+  const ty = (terminal.lat - anchor.lat) * kmLat;
+  const px = (point.lon - anchor.lon) * kmLon;
+  const py = (point.lat - anchor.lat) * kmLat;
+  const length = Math.sqrt(tx * tx + ty * ty) || 1;
+  return {
+    routeLengthKm: length,
+    progressKm: (px * tx + py * ty) / length,
+    crossTrackKm: Math.abs(px * ty - py * tx) / length,
+  };
+}
+
+function plausibleSegment(a, b, terminal, anchor) {
+  if (a.recordKey === b.recordKey) return false; // same post can list parallel places
+  const dtHours = (b.at - a.at) / 3600000;
+  if (dtHours < 0.12 || dtHours > 5.5) return false;
+
+  const distance = haversineKm(a, b);
+  if (distance < 15 || distance > 800) return false;
+  const speed = distance / dtHours;
+  if (speed < 55 || speed > 560) return false;
+
+  const pa = corridorProjection(anchor, terminal, a);
+  const pb = corridorProjection(anchor, terminal, b);
+  if (pb.progressKm <= pa.progressKm + 10) return false; // never move backward along corridor
+
+  const crossLimit = Math.max(55, Math.min(150, pb.routeLengthKm * 0.14));
+  if (pa.crossTrackKm > crossLimit || pb.crossTrackKm > crossLimit) return false;
+
+  const corridorBearing = bearingDeg(anchor, terminal);
+  const segmentBearing = bearingDeg(a, b);
+  if (angleDiffDeg(corridorBearing, segmentBearing) > 52) return false;
+  return true;
+}
+
+function bestSupportChain(nodes, terminal, anchor) {
+  const termProj = corridorProjection(anchor, terminal, terminal);
+  const maxAgeHours = Math.min(8.5, Math.max(2.2, termProj.routeLengthKm / 120));
+  const candidates = nodes
+    .filter(n => n !== terminal)
+    .filter(n => n.at < terminal.at)
+    .filter(n => (terminal.at - n.at) / 3600000 <= maxAgeHours)
+    .filter(n => !isEndpointOnlyKind(n.kind))
+    .map(n => ({ node: n, proj: corridorProjection(anchor, terminal, n) }))
+    .filter(x => {
+      const crossLimit = Math.max(55, Math.min(150, termProj.routeLengthKm * 0.14));
+      return x.proj.progressKm > 20 &&
+        x.proj.progressKm < termProj.progressKm - 15 &&
+        x.proj.crossTrackKm <= crossLimit;
+    })
+    .sort((a, b) => a.node.at - b.node.at || a.proj.progressKm - b.proj.progressKm);
+
+  // Dynamic programming: maximize evidence while enforcing monotonic forward
+  // progress and physically plausible speed/heading on every segment.
+  const dp = candidates.map((x, i) => ({
+    score: (isStrongObservationKind(x.node.kind) ? 2.0 : 1.0) +
+      x.node.observations * 0.15 - x.proj.crossTrackKm * 0.004,
+    prev: -1,
+  }));
+
+  for (let i = 0; i < candidates.length; i++) {
+    for (let j = 0; j < i; j++) {
+      if (!plausibleSegment(candidates[j].node, candidates[i].node, terminal, anchor)) continue;
+      const score = dp[j].score +
+        (isStrongObservationKind(candidates[i].node.kind) ? 2.0 : 1.0) +
+        candidates[i].node.observations * 0.15 -
+        candidates[i].proj.crossTrackKm * 0.004;
+      if (score > dp[i].score) {
+        dp[i].score = score;
+        dp[i].prev = j;
+      }
+    }
+  }
+
+  let bestIndex = -1;
+  let bestScore = 0;
+  for (let i = 0; i < candidates.length; i++) {
+    if (!plausibleSegment(candidates[i].node, terminal, terminal, anchor)) continue;
+    const score = dp[i].score + 2.4;
+    if (score > bestScore) {
+      bestScore = score;
+      bestIndex = i;
+    }
+  }
+
+  const chain = [];
+  while (bestIndex >= 0) {
+    chain.push(candidates[bestIndex].node);
+    bestIndex = dp[bestIndex].prev;
+  }
+  chain.reverse();
+  return chain;
+}
+
+function corridorWaypoints(anchor, first, terminal, seed) {
   const distance = haversineKm(anchor, first);
   if (distance < 120) return [];
   const hash = routeHash(seed);
@@ -705,38 +774,42 @@ function corridorWaypoints(anchor, first, seed) {
   const dy = first.lat - anchor.lat;
   const len = Math.sqrt(dx * dx + dy * dy) || 1;
   const nx = -dy / len, ny = dx / len;
-  const bend = Math.min(0.65, Math.max(0.12, distance / 1500));
-  const fractions = distance > 700 ? [0.28, 0.58] : [0.42];
+  // Keep synthetic curvature intentionally small.  Evidence points, not
+  // decoration, determine the route shape.
+  const bend = Math.min(0.28, Math.max(0.06, distance / 3500));
+  const fractions = distance > 700 ? [0.30, 0.60] : [0.42];
   return fractions.map((f, idx) => {
-    const taper = idx === 0 ? 1 : 0.55;
+    const taper = idx === 0 ? 1 : 0.45;
     return {
       lon: anchor.lon + dx * f + nx * bend * sign * taper,
       lat: anchor.lat + dy * f + ny * bend * sign * taper,
     };
+  }).filter(p => {
+    const proj = corridorProjection(anchor, terminal, p);
+    return proj.progressKm > 0 && proj.progressKm < proj.routeLengthKm;
   });
 }
 
-function catmullRomPath(points, samplesPerSegment = 10) {
+function chaikinSmooth(points, iterations = 2) {
   if (points.length < 3) return points.map(p => [p.lon, p.lat]);
-  const out = [];
-  const pts = [points[0], ...points, points[points.length - 1]];
-  for (let i = 1; i < pts.length - 2; i++) {
-    const p0 = pts[i - 1], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2];
-    for (let step = 0; step < samplesPerSegment; step++) {
-      const t = step / samplesPerSegment;
-      const t2 = t * t, t3 = t2 * t;
-      const interp = key => 0.5 * (
-        (2 * p1[key]) +
-        (-p0[key] + p2[key]) * t +
-        (2*p0[key] - 5*p1[key] + 4*p2[key] - p3[key]) * t2 +
-        (-p0[key] + 3*p1[key] - 3*p2[key] + p3[key]) * t3
-      );
-      out.push([interp("lon"), interp("lat")]);
+  let coords = points.map(p => [p.lon, p.lat]);
+  for (let iter = 0; iter < iterations; iter++) {
+    const out = [coords[0]];
+    for (let i = 0; i < coords.length - 1; i++) {
+      const a = coords[i], b = coords[i + 1];
+      out.push([
+        a[0] * 0.75 + b[0] * 0.25,
+        a[1] * 0.75 + b[1] * 0.25,
+      ]);
+      out.push([
+        a[0] * 0.25 + b[0] * 0.75,
+        a[1] * 0.25 + b[1] * 0.75,
+      ]);
     }
+    out.push(coords[coords.length - 1]);
+    coords = out;
   }
-  const last = points[points.length - 1];
-  out.push([last.lon, last.lat]);
-  return out;
+  return coords;
 }
 
 function buildIllustrativeUavRoutes(startMs, endMs) {
@@ -752,58 +825,68 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
     raw.push(...routeObservationPoints(event, Math.max(start, startMs), "alert"));
   }
 
-  const nodes = inferRoutePredecessors(dedupeRouteObservations(raw));
-  const predecessorSet = new Set(nodes.filter(n => n.predecessor).map(n => n.predecessor));
-  let terminals = nodes.filter(n => !predecessorSet.has(n));
-  // Keep the more information-rich terminal routes first if a very long time
-  // selection would otherwise produce excessive visual clutter.
+  const nodes = dedupeRouteObservations(raw);
+  // Strong events are preferred as terminal points.  Terse/local movement
+  // reports still get a route if they are not immediately superseded nearby.
+  let terminals = nodes.filter((node, idx) => {
+    if (isStrongObservationKind(node.kind)) return true;
+    return !nodes.some((other, j) =>
+      j !== idx &&
+      other.at >= node.at &&
+      other.at - node.at <= 90 * 60 * 1000 &&
+      haversineKm(node, other) < 45 &&
+      isStrongObservationKind(other.kind)
+    );
+  });
+
   terminals = terminals
     .sort((a, b) => b.at - a.at || b.observations - a.observations)
-    .slice(0, 70)
+    .slice(0, 65)
     .sort((a, b) => a.at - b.at);
 
   const lineFeatures = [];
   const arrowFeatures = [];
   terminals.forEach((terminal, index) => {
-    const chain = [];
-    const seen = new Set();
-    let current = terminal;
-    while (current && chain.length < 9 && !seen.has(current)) {
-      seen.add(current);
-      chain.push(current);
-      current = current.predecessor;
-    }
-    chain.reverse();
-    if (!chain.length) return;
+    const anchor = pickIngressAnchor(terminal);
+    const supports = bestSupportChain(nodes, terminal, anchor);
+    const chain = [...supports, terminal];
 
-    const anchor = pickIngressAnchor(chain[0]);
     const seed = [anchor.id, terminal.region, terminal.place, index].join("|");
-    const support = corridorWaypoints(anchor, chain[0], seed);
-    const waypoints = [anchor, ...support, ...chain];
+    const first = chain[0];
+    const synthetic = corridorWaypoints(anchor, first, terminal, seed);
+    const waypoints = [anchor, ...synthetic, ...chain];
 
-    // Remove nearly-identical successive points before spline interpolation.
     const compact = [];
     for (const p of waypoints) {
-      if (!compact.length || haversineKm(compact[compact.length - 1], p) > 6) compact.push(p);
+      if (!compact.length || haversineKm(compact[compact.length - 1], p) > 7) compact.push(p);
     }
-    const coords = catmullRomPath(compact, compact.length > 5 ? 7 : 11);
+    const coords = chaikinSmooth(compact, compact.length >= 5 ? 2 : 1);
     if (coords.length < 2) return;
 
-    const preciseCount = chain.filter(n => n.precision !== "region-centroid").length;
     const evidence = chain.reduce((sum, n) => sum + n.observations, 0);
-    const confidence = Math.min(1, 0.34 + (chain.length - 1) * 0.14 + preciseCount * 0.08 + Math.min(0.16, evidence * 0.02));
+    const supportCount = supports.length;
+    const confidence = Math.min(
+      1,
+      0.24 +
+      supportCount * 0.17 +
+      Math.min(0.22, evidence * 0.035) +
+      (isStrongObservationKind(terminal.kind) ? 0.12 : 0)
+    );
+
     const props = {
       route_id: "uav-route-" + index,
       target: terminal.place,
       region: terminal.region,
       anchor: anchor.id,
       evidence_nodes: chain.length,
+      inferred_support_nodes: supportCount,
       observations: evidence,
       confidence,
       earliest_at: new Date(chain[0].at).toISOString(),
       latest_at: new Date(terminal.at).toISOString(),
       illustrative: true,
     };
+
     lineFeatures.push({
       type: "Feature",
       properties: props,
