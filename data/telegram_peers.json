@@ -1,6 +1,483 @@
 {
   "version": 1,
-  "updated_at": null,
+  "updated_at": "2026-09-24T21:52:07.362313+00:00",
   "note": "Entity metadata only; no Telegram auth/session credential is stored here.",
-  "peers": {}
+  "peers": {
+    "adygheya_gov": {
+      "peer_type": "channel",
+      "id": 1636652124,
+      "access_hash": -2202153335290435,
+      "username": "adygheya_gov",
+      "source": "resolved"
+    },
+    "aksenov82": {
+      "peer_type": "channel",
+      "id": 1508649222,
+      "access_hash": -6973101331669297000,
+      "username": "aksenov82",
+      "source": "resolved"
+    },
+    "anapaofficial": {
+      "peer_type": "channel",
+      "id": 1735005822,
+      "access_hash": 2563599640916928569,
+      "username": "anapaofficial",
+      "source": "resolved"
+    },
+    "anohin67": {
+      "peer_type": "channel",
+      "id": 1703853038,
+      "access_hash": 6387288761045382614,
+      "username": "anohin67",
+      "source": "resolved"
+    },
+    "astrakhan_governor": {
+      "peer_type": "channel",
+      "id": 1745486148,
+      "access_hash": -7411134229926311728,
+      "username": "astrakhan_governor",
+      "source": "resolved"
+    },
+    "busargin_r": {
+      "peer_type": "channel",
+      "id": 1325419731,
+      "access_hash": -5513044609318774772,
+      "username": "busargin_r",
+      "source": "resolved"
+    },
+    "chuvashia_region": {
+      "peer_type": "channel",
+      "id": 1505549181,
+      "access_hash": -5281021434634580783,
+      "username": "chuvashia_region",
+      "source": "resolved"
+    },
+    "drozdenko_au_lo": {
+      "peer_type": "channel",
+      "id": 1552132566,
+      "access_hash": -1695594925576044600,
+      "username": "drozdenko_au_lo",
+      "source": "resolved"
+    },
+    "e_v_kovalchuk": {
+      "peer_type": "channel",
+      "id": 3970211418,
+      "access_hash": 6111033802118242768,
+      "username": "e_v_kovalchuk",
+      "source": "resolved"
+    },
+    "evraevmikhail": {
+      "peer_type": "channel",
+      "id": 1784457475,
+      "access_hash": 295249777912903078,
+      "username": "evraevmikhail",
+      "source": "resolved"
+    },
+    "fedorishchev_official": {
+      "peer_type": "channel",
+      "id": 3040049939,
+      "access_hash": -5365078209041549117,
+      "username": "fedorishchev_official",
+      "source": "resolved"
+    },
+    "filimonov_official": {
+      "peer_type": "channel",
+      "id": 1786594726,
+      "access_hash": 3237873194951602179,
+      "username": "filimonov_official",
+      "source": "resolved"
+    },
+    "glebnikitin_nn": {
+      "peer_type": "channel",
+      "id": 1650853624,
+      "access_hash": -7297694314457296099,
+      "username": "glebnikitin_nn",
+      "source": "resolved"
+    },
+    "gov74": {
+      "peer_type": "channel",
+      "id": 1394179307,
+      "access_hash": 2195341042061787864,
+      "username": "gov74",
+      "source": "resolved"
+    },
+    "government_kgd": {
+      "peer_type": "channel",
+      "id": 1645667475,
+      "access_hash": -6715359409884190651,
+      "username": "government_kgd",
+      "source": "resolved"
+    },
+    "govrme12": {
+      "peer_type": "channel",
+      "id": 1704809000,
+      "access_hash": -4205798577035878055,
+      "username": "govrme12",
+      "source": "resolved"
+    },
+    "gu_mchs_tambov": {
+      "peer_type": "channel",
+      "id": 1365885182,
+      "access_hash": 7104580079256373449,
+      "username": "gu_mchs_tambov",
+      "source": "resolved"
+    },
+    "gubernator_46": {
+      "peer_type": "channel",
+      "id": 1762307105,
+      "access_hash": 2621437593545528918,
+      "username": "gubernator_46",
+      "source": "resolved"
+    },
+    "gumchs48": {
+      "peer_type": "channel",
+      "id": 1712909403,
+      "access_hash": 1023237643729117374,
+      "username": "gumchs48",
+      "source": "resolved"
+    },
+    "gusev_36": {
+      "peer_type": "channel",
+      "id": 1242513301,
+      "access_hash": -1649157810184296419,
+      "username": "gusev_36",
+      "source": "resolved"
+    },
+    "igor_artamonov48": {
+      "peer_type": "channel",
+      "id": 1617539309,
+      "access_hash": 562034668863480309,
+      "username": "igor_artamonov48",
+      "source": "resolved"
+    },
+    "ivanovoobl": {
+      "peer_type": "channel",
+      "id": 1130661568,
+      "access_hash": 3021455121014608182,
+      "username": "ivanovoobl",
+      "source": "resolved"
+    },
+    "kirovreg43": {
+      "peer_type": "channel",
+      "id": 1220684510,
+      "access_hash": -8120896794778737921,
+      "username": "kirovreg43",
+      "source": "resolved"
+    },
+    "klychkov_andrey": {
+      "peer_type": "channel",
+      "id": 1684991284,
+      "access_hash": 831844582839368306,
+      "username": "klychkov_andrey",
+      "source": "resolved"
+    },
+    "kondratyevvi": {
+      "peer_type": "channel",
+      "id": 1084024302,
+      "access_hash": 4782127737339792118,
+      "username": "kondratyevvi",
+      "source": "resolved"
+    },
+    "kurganskayaobl": {
+      "peer_type": "channel",
+      "id": 1383595657,
+      "access_hash": -5269463755304534487,
+      "username": "kurganskayaobl",
+      "source": "resolved"
+    },
+    "lipobl": {
+      "peer_type": "channel",
+      "id": 1189748872,
+      "access_hash": -4139790924486299965,
+      "username": "lipobl",
+      "source": "resolved"
+    },
+    "mahonin59": {
+      "peer_type": "channel",
+      "id": 1191466343,
+      "access_hash": -6919412999471659049,
+      "username": "mahonin59",
+      "source": "resolved"
+    },
+    "mchs12gov": {
+      "peer_type": "channel",
+      "id": 1685154486,
+      "access_hash": 6372680793798326453,
+      "username": "mchs12gov",
+      "source": "resolved"
+    },
+    "mchs34": {
+      "peer_type": "channel",
+      "id": 1341465893,
+      "access_hash": 3507494849653696786,
+      "username": "mchs34",
+      "source": "resolved"
+    },
+    "mchs52": {
+      "peer_type": "channel",
+      "id": 1729748798,
+      "access_hash": -461283189916790265,
+      "username": "mchs52",
+      "source": "resolved"
+    },
+    "mchs_bryansk": {
+      "peer_type": "channel",
+      "id": 1769674427,
+      "access_hash": -2098088780978373565,
+      "username": "mchs_bryansk",
+      "source": "resolved"
+    },
+    "mchs_kuban": {
+      "peer_type": "channel",
+      "id": 1749717632,
+      "access_hash": -4656764305530767174,
+      "username": "mchs_kuban",
+      "source": "resolved"
+    },
+    "mchs_mo": {
+      "peer_type": "channel",
+      "id": 1612168941,
+      "access_hash": -3705415583601021144,
+      "username": "mchs_mo",
+      "source": "resolved"
+    },
+    "mchs_orel": {
+      "peer_type": "channel",
+      "id": 1704539739,
+      "access_hash": -7675822950013795028,
+      "username": "mchs_orel",
+      "source": "resolved"
+    },
+    "mchs_rostov": {
+      "peer_type": "channel",
+      "id": 1270845014,
+      "access_hash": -2631371456042883646,
+      "username": "mchs_rostov",
+      "source": "resolved"
+    },
+    "mchs_ulyanovsk": {
+      "peer_type": "channel",
+      "id": 1756225944,
+      "access_hash": 4850319885746420700,
+      "username": "mchs_ulyanovsk",
+      "source": "resolved"
+    },
+    "mchsrb01": {
+      "peer_type": "channel",
+      "id": 1232339306,
+      "access_hash": 1164915871224707380,
+      "username": "mchsrb01",
+      "source": "resolved"
+    },
+    "miduralofficial": {
+      "peer_type": "channel",
+      "id": 1383320806,
+      "access_hash": -8317745071922586627,
+      "username": "miduralofficial",
+      "source": "resolved"
+    },
+    "mos_sobyanin": {
+      "peer_type": "channel",
+      "id": 1596963725,
+      "access_hash": 1181025406543491788,
+      "username": "mos_sobyanin",
+      "source": "resolved"
+    },
+    "nashtatarstan_official": {
+      "peer_type": "channel",
+      "id": 1788187878,
+      "access_hash": -6943155953205771486,
+      "username": "nashtatarstan_official",
+      "source": "resolved"
+    },
+    "novgorodinfo": {
+      "peer_type": "channel",
+      "id": 1448213592,
+      "access_hash": -4107447595063481700,
+      "username": "novgorodinfo",
+      "source": "resolved"
+    },
+    "officialmordovia": {
+      "peer_type": "channel",
+      "id": 1249820739,
+      "access_hash": 991446495234602591,
+      "username": "officialmordovia",
+      "source": "resolved"
+    },
+    "officialsochi": {
+      "peer_type": "channel",
+      "id": 1391397001,
+      "access_hash": -2091972909949240346,
+      "username": "officialsochi",
+      "source": "resolved"
+    },
+    "omelnichenko": {
+      "peer_type": "channel",
+      "id": 1744943961,
+      "access_hash": -3013744955710749633,
+      "username": "omelnichenko",
+      "source": "resolved"
+    },
+    "operativno31": {
+      "peer_type": "channel",
+      "id": 1623943359,
+      "access_hash": 1291706596581690526,
+      "username": "operativno31",
+      "source": "resolved"
+    },
+    "opershtab23": {
+      "peer_type": "channel",
+      "id": 1273366525,
+      "access_hash": 7542223535864097686,
+      "username": "opershtab23",
+      "source": "resolved"
+    },
+    "orelregion_government": {
+      "peer_type": "channel",
+      "id": 1744054298,
+      "access_hash": 2360857133528056249,
+      "username": "orelregion_government",
+      "source": "resolved"
+    },
+    "pavelmalkov_official": {
+      "peer_type": "channel",
+      "id": 1799703404,
+      "access_hash": 7512055070096139460,
+      "username": "pavelmalkov_official",
+      "source": "resolved"
+    },
+    "pervyshovea": {
+      "peer_type": "channel",
+      "id": 1475240362,
+      "access_hash": 271699043047055450,
+      "username": "pervyshovea",
+      "source": "resolved"
+    },
+    "pskov_oblast": {
+      "peer_type": "channel",
+      "id": 1266922489,
+      "access_hash": -4527259277774140921,
+      "username": "pskov_oblast",
+      "source": "resolved"
+    },
+    "pul69": {
+      "peer_type": "channel",
+      "id": 1268056393,
+      "access_hash": -7518359159560175717,
+      "username": "pul69",
+      "source": "resolved"
+    },
+    "razvozhaev": {
+      "peer_type": "channel",
+      "id": 1642880125,
+      "access_hash": 673811687591261103,
+      "username": "razvozhaev",
+      "source": "resolved"
+    },
+    "region33vladimir": {
+      "peer_type": "channel",
+      "id": 1650665673,
+      "access_hash": 7653899013053554888,
+      "username": "region33vladimir",
+      "source": "resolved"
+    },
+    "regionbez71": {
+      "peer_type": "channel",
+      "id": 2095918117,
+      "access_hash": -6678765558860581619,
+      "username": "regionbez71",
+      "source": "resolved"
+    },
+    "rgn_34": {
+      "peer_type": "channel",
+      "id": 1280720639,
+      "access_hash": 5704400135283262726,
+      "username": "rgn_34",
+      "source": "resolved"
+    },
+    "rostovregion": {
+      "peer_type": "channel",
+      "id": 1229903608,
+      "access_hash": -7831186769778726347,
+      "username": "rostovregion",
+      "source": "resolved"
+    },
+    "ryazanoblast_official": {
+      "peer_type": "channel",
+      "id": 1363613354,
+      "access_hash": -8975885685183138203,
+      "username": "ryazanoblast_official",
+      "source": "resolved"
+    },
+    "shapsha_vv": {
+      "peer_type": "channel",
+      "id": 1248323147,
+      "access_hash": -4523357017382043462,
+      "username": "shapsha_vv",
+      "source": "resolved"
+    },
+    "solntsev_official": {
+      "peer_type": "channel",
+      "id": 1628032725,
+      "access_hash": -8093689575815301676,
+      "username": "solntsev_official",
+      "source": "resolved"
+    },
+    "spbprav": {
+      "peer_type": "channel",
+      "id": 1183995460,
+      "access_hash": 825574752709829286,
+      "username": "spbprav",
+      "source": "resolved"
+    },
+    "tmbcan": {
+      "peer_type": "channel",
+      "id": 1091690642,
+      "access_hash": 1557467558990588193,
+      "username": "tmbcan",
+      "source": "resolved"
+    },
+    "udmurt_gov": {
+      "peer_type": "channel",
+      "id": 1386991436,
+      "access_hash": -205489368311491476,
+      "username": "udmurt_gov",
+      "source": "resolved"
+    },
+    "ugz_ufa": {
+      "peer_type": "channel",
+      "id": 1653721844,
+      "access_hash": 3511453258641681842,
+      "username": "ugz_ufa",
+      "source": "resolved"
+    },
+    "ulgovru": {
+      "peer_type": "channel",
+      "id": 1735645344,
+      "access_hash": 41063063327898858,
+      "username": "ulgovru",
+      "source": "resolved"
+    },
+    "volgadmin": {
+      "peer_type": "channel",
+      "id": 1463702247,
+      "access_hash": 8788209994875217471,
+      "username": "volgadmin",
+      "source": "resolved"
+    },
+    "vorobiev_live": {
+      "peer_type": "channel",
+      "id": 1194809626,
+      "access_hash": -2967480734006237964,
+      "username": "vorobiev_live",
+      "source": "resolved"
+    },
+    "yuri_slusar": {
+      "peer_type": "channel",
+      "id": 1796987148,
+      "access_hash": 3137281648119744569,
+      "username": "yuri_slusar",
+      "source": "resolved"
+    }
+  }
 }
