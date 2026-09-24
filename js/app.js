@@ -631,12 +631,23 @@ function pointInAllowedTerritory(point) {
   return false;
 }
 
-function routeStaysInAllowedTerritory(coords) {
-  // Ignore the exact start vertex (it lies on a border). After the first few
-  // samples every point must stay inside either Ukraine or Russia geometry.
+function pointInPermittedSouthernWater(point) {
+  // Northern Black Sea / Sea of Azov corridor. This is deliberately narrow:
+  // it permits realistic southern routes over water without opening a path
+  // through Belarus, Moldova, Romania, Bulgaria, Turkey or the Caucasus.
+  return point.lon >= 30.2 && point.lon <= 42.2 &&
+    point.lat >= 43.0 && point.lat <= 47.65;
+}
+
+function routeStaysInAllowedTerritory(coords, allowSouthernWater = false) {
+  // Ignore the exact start vertex (it may lie on an oblast/national boundary).
+  // Remaining samples must stay in Ukraine/Russia geometry, except that
+  // east/south-origin routes may use the northern Black Sea/Azov water corridor.
   for (let i = Math.min(3, coords.length - 1); i < coords.length; i += 2) {
     const p = { lon: +coords[i][0], lat: +coords[i][1] };
-    if (!pointInAllowedTerritory(p)) return false;
+    if (pointInAllowedTerritory(p)) continue;
+    if (allowSouthernWater && pointInPermittedSouthernWater(p)) continue;
+    return false;
   }
   return true;
 }
@@ -821,67 +832,111 @@ function minDistanceToPoints(point, points) {
   return best;
 }
 
-function buildUkraineBorderCandidates() {
-  if (state.ukraineBorderCandidates?.length) return state.ukraineBorderCandidates;
-
-  // Conservative origin model: only the Chernihiv/Sumy/Kharkiv portions of the
-  // internationally recognized Ukraine-Russia land boundary are eligible.
-  // This prevents coastline/Crimea/Belarus/Moldova/other-country starts and
-  // avoids using occupied Donetsk/Luhansk border sections as launch origins.
-  const allowedIso = new Set(["UA-74", "UA-59", "UA-63"]);
-  const russianBorder = sampleOutlinePoints(state.regionGeoJson, 10);
-  const candidates = [];
+function sampleFeatureBoundaryCandidates(feature, spacingKm, prefix, extra = {}) {
+  const points = [];
   let id = 0;
+  for (const ring of outerRingsFromGeometry(feature.geometry)) {
+    let last = null;
+    for (let i = 0; i < ring.length; i++) {
+      const coord = ring[i];
+      const p = { lon: +coord[0], lat: +coord[1] };
+      if (!Number.isFinite(p.lon) || !Number.isFinite(p.lat)) continue;
+      if (last && haversineKm(last, p) < spacingKm && i !== ring.length - 1) continue;
+      last = p;
+      points.push({
+        ...p,
+        borderId: prefix + "-" + (id++),
+        originRegion: feature.properties?.name_en || feature.properties?.name || feature.properties?.iso3166_2 || "",
+        originIso: feature.properties?.iso3166_2 || "",
+        ...extra,
+      });
+    }
+  }
+  return points;
+}
+
+function buildUkraineBorderCandidates() {
+  if (state.ukraineBorderCandidates?.north?.length || state.ukraineBorderCandidates?.eastSouth?.length) {
+    return state.ukraineBorderCandidates;
+  }
+
+  const russianBorder = sampleOutlinePoints(state.regionGeoJson, 10);
+  const northIso = new Set(["UA-74", "UA-59", "UA-63"]); // Chernihiv, Sumy, Kharkiv
+  const eastSouthIso = new Set(["UA-63", "UA-12", "UA-48", "UA-51"]); // Kharkiv, Dnipro, Mykolaiv, Odesa
+  const north = [];
+  const eastSouth = [];
 
   for (const feature of state.ukraineGeoJson?.features || []) {
     const iso = feature.properties?.iso3166_2;
-    if (!allowedIso.has(iso)) continue;
-    for (const ring of outerRingsFromGeometry(feature.geometry)) {
-      let last = null;
-      for (let i = 0; i < ring.length; i++) {
-        const coord = ring[i];
-        const p = { lon: +coord[0], lat: +coord[1] };
-        if (!Number.isFinite(p.lon) || !Number.isFinite(p.lat)) continue;
-        if (last && haversineKm(last, p) < 9 && i !== ring.length - 1) continue;
-        last = p;
 
-        // Keep only the portion physically adjacent to the Russian border.
-        if (minDistanceToPoints(p, russianBorder) > 24) continue;
-        candidates.push({
-          ...p,
-          borderId: "ukr-rus-border-" + (id++),
-          originRegion: feature.properties?.name_en || feature.properties?.name || iso,
-          originIso: iso,
-        });
+    // North: only the actual Ukraine-Russia international border portions of
+    // Chernihiv/Sumy/Kharkiv. Coastlines and third-country borders are excluded.
+    if (northIso.has(iso)) {
+      for (const point of sampleFeatureBoundaryCandidates(
+        feature, 9, "north-border", { originMode: "north-border" }
+      )) {
+        if (minDistanceToPoints(point, russianBorder) > 24) continue;
+        north.push(point);
       }
+    }
+
+    // East/south: use the boundary of the four user-selected oblasts. Ranking
+    // later chooses the side of the oblast that is closest to the target, so
+    // routes do not all jump back to the far northern international border.
+    if (eastSouthIso.has(iso)) {
+      eastSouth.push(...sampleFeatureBoundaryCandidates(
+        feature, 10, "east-south-border", { originMode: "east-south-oblast" }
+      ));
     }
   }
 
-  state.ukraineBorderCandidates = candidates;
-  return candidates;
+  state.ukraineBorderCandidates = { north, eastSouth };
+  return state.ukraineBorderCandidates;
+}
+
+function originModeForTerminal(terminal) {
+  // Northern/western targets use only the Ukraine-Russia national border.
+  // Lower-latitude or deep-eastern targets use the selected eastern/southern
+  // oblast boundaries. Belgorod falls into east/south; Kursk/Bryansk/Oryol/
+  // Moscow/Ryazan remain in the northern pool, while Volga/Ural targets use
+  // the eastern pool.
+  if (terminal.lat >= 51.15 && terminal.lon < 43.0) return "north";
+  return "eastSouth";
 }
 
 function rankBorderStarts(terminal, seed, usedStarts) {
-  const candidates = buildUkraineBorderCandidates();
-  if (!candidates.length) return [];
+  const pools = buildUkraineBorderCandidates();
+  const mode = originModeForTerminal(terminal);
+  const candidates = mode === "north" ? pools.north : pools.eastSouth;
+  if (!candidates?.length) return [];
 
   const ranked = candidates
     .map(point => ({ point, distance: haversineKm(point, terminal) }))
     .sort((a, b) => a.distance - b.distance);
   const bestDistance = ranked[0].distance;
-  const shortlist = ranked.filter(x => x.distance <= bestDistance + 230).slice(0, 70);
+
+  // For oblast-boundary origins, stay fairly close to the target-facing side.
+  // The northern border gets a wider shortlist because long-range routes can
+  // plausibly fan out over a longer border section.
+  const extraDistance = mode === "north" ? 230 : 120;
+  const maxCandidates = mode === "north" ? 70 : 55;
+  const shortlist = ranked
+    .filter(x => x.distance <= bestDistance + extraDistance)
+    .slice(0, maxCandidates);
 
   return shortlist
     .map(item => {
-      const nearestUsed = usedStarts.length
-        ? Math.min(...usedStarts.map(p => haversineKm(p, item.point)))
+      const sameModeStarts = usedStarts.filter(p => (p.originMode || "") === (item.point.originMode || ""));
+      const nearestUsed = sameModeStarts.length
+        ? Math.min(...sameModeStarts.map(p => haversineKm(p, item.point)))
         : Infinity;
       const crowdPenalty =
-        nearestUsed < 22 ? (22 - nearestUsed) * 10 :
-        nearestUsed < 55 ? (55 - nearestUsed) * 2.0 : 0;
-      const jitter = (routeHash(seed + "|" + item.point.borderId) % 1000) / 1000 * 10;
+        nearestUsed < 20 ? (20 - nearestUsed) * 10 :
+        nearestUsed < 50 ? (50 - nearestUsed) * 1.8 : 0;
+      const jitter = (routeHash(seed + "|" + item.point.borderId) % 1000) / 1000 * 8;
       return {
         ...item,
+        mode,
         crowdPenalty,
         baseScore: item.distance + crowdPenalty + jitter,
       };
@@ -1203,7 +1258,12 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
     let chosen = null;
 
     for (const option of startOptions) {
-      const borderStart = { ...option.point, borderDistanceKm: option.distance };
+      const borderStart = {
+        ...option.point,
+        borderDistanceKm: option.distance,
+        routeOriginPool: option.mode,
+      };
+      const allowSouthernWater = option.mode === "eastSouth";
       const supports = bestSupportChain(nodes, terminal, borderStart);
       const chain = [...supports, terminal];
       const evidenceWaypoints = [borderStart, ...chain];
@@ -1218,11 +1278,11 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
       // If decorative curvature would leave Ukraine/Russia geometry, retry with
       // evidence points only. If even that crosses a third country, reject this
       // border start entirely.
-      if (!routeStaysInAllowedTerritory(coords)) {
+      if (!routeStaysInAllowedTerritory(coords, allowSouthernWater)) {
         compact = evidenceWaypoints;
         coords = smoothInterpolatingRoute(compact, 7);
       }
-      if (coords.length < 2 || !routeStaysInAllowedTerritory(coords)) continue;
+      if (coords.length < 2 || !routeStaysInAllowedTerritory(coords, allowSouthernWater)) continue;
 
       const crossings = countRouteCrossings(coords, lineFeatures);
       const direct = haversineKm(borderStart, terminal);
@@ -1261,6 +1321,8 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
       region: terminal.region,
       start_border_id: chosen.borderStart.borderId,
       start_origin_region: chosen.borderStart.originRegion,
+      start_origin_iso: chosen.borderStart.originIso,
+      start_origin_pool: chosen.borderStart.routeOriginPool,
       evidence_nodes: chosen.chain.length,
       inferred_support_nodes: supportCount,
       region_proxy_nodes: proxyCount,
