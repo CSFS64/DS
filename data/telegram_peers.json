@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-09-24T21:52:07.362313+00:00",
+  "updated_at": "2026-09-24T23:38:33.858962+00:00",
   "note": "Entity metadata only; no Telegram auth/session credential is stored here.",
   "peers": {
     "adygheya_gov": {
@@ -365,6 +365,104 @@
       "id": 1268056393,
       "access_hash": -7518359159560175717,
       "username": "pul69",
+      "source": "resolved"
+    },
+    "rada_saratov": {
+      "peer_type": "channel",
+      "id": 2327302568,
+      "access_hash": 9221983241523107807,
+      "username": "rada_saratov",
+      "source": "resolved"
+    },
+    "radar_chuvashiya": {
+      "peer_type": "channel",
+      "id": 2798798009,
+      "access_hash": 646290445102899893,
+      "username": "radar_chuvashiya",
+      "source": "resolved"
+    },
+    "radar_kaluga": {
+      "peer_type": "channel",
+      "id": 2291409316,
+      "access_hash": -380519584795086061,
+      "username": "radar_kaluga",
+      "source": "resolved"
+    },
+    "radar_lipetskk": {
+      "peer_type": "channel",
+      "id": 2121903297,
+      "access_hash": -2856860646305238723,
+      "username": "radar_lipetskk",
+      "source": "resolved"
+    },
+    "radar_nizhniinovgorod": {
+      "peer_type": "channel",
+      "id": 2375511939,
+      "access_hash": 9003747205732913338,
+      "username": "radar_nizhniinovgorod",
+      "source": "resolved"
+    },
+    "radar_orei": {
+      "peer_type": "channel",
+      "id": 2164345768,
+      "access_hash": -2847080908311115290,
+      "username": "radar_orei",
+      "source": "resolved"
+    },
+    "radar_rostovv": {
+      "peer_type": "channel",
+      "id": 1675707937,
+      "access_hash": -6302707617965388491,
+      "username": "radar_rostovv",
+      "source": "resolved"
+    },
+    "radar_ryazan": {
+      "peer_type": "channel",
+      "id": 2343153331,
+      "access_hash": 1612764875596985116,
+      "username": "radar_ryazan",
+      "source": "resolved"
+    },
+    "radar_smolensk": {
+      "peer_type": "channel",
+      "id": 2321211570,
+      "access_hash": -4480608365724183535,
+      "username": "radar_smolensk",
+      "source": "resolved"
+    },
+    "radar_tambov": {
+      "peer_type": "channel",
+      "id": 2496301341,
+      "access_hash": 2844417084300816792,
+      "username": "radar_tambov",
+      "source": "resolved"
+    },
+    "radar_tatarstann": {
+      "peer_type": "channel",
+      "id": 2378128009,
+      "access_hash": 6091727791302337018,
+      "username": "radar_tatarstann",
+      "source": "resolved"
+    },
+    "radar_ulyanovsk": {
+      "peer_type": "channel",
+      "id": 2839461208,
+      "access_hash": -6926607791903115952,
+      "username": "radar_ulyanovsk",
+      "source": "resolved"
+    },
+    "radar_volgograd": {
+      "peer_type": "channel",
+      "id": 2306648579,
+      "access_hash": 2379944163050744499,
+      "username": "radar_volgograd",
+      "source": "resolved"
+    },
+    "radarrussiia": {
+      "peer_type": "channel",
+      "id": 1973203607,
+      "access_hash": -5790893365284773993,
+      "username": "radarrussiia",
       "source": "resolved"
     },
     "razvozhaev": {
