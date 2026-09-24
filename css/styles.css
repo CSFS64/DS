@@ -50,7 +50,7 @@ button, input, select { font: inherit; }
   font-size: 9px !important;
 }
 .maplibregl-ctrl-attrib a { color: #7aa3b7 !important; }
-.maplibregl-ctrl-bottom-right { bottom: 58px; right: 8px; }
+.maplibregl-ctrl-bottom-right { bottom: 188px; right: 8px; }
 
 .map-grid {
   position: absolute;
@@ -119,7 +119,7 @@ button, input, select { font: inherit; }
   backdrop-filter: blur(6px);
   color: #8ea7b6;
   font-size: 9px;
-  pointer-events: none;
+  pointer-events: auto;
 }
 .map-legend span { display: flex; align-items: center; gap: 7px; }
 .legend-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--off); display: inline-block; }
@@ -128,6 +128,52 @@ button, input, select { font: inherit; }
 .legend-region.uav-report { border: 1px solid #ffc15a; background: rgba(255,179,71,.13); }
 .legend-region.missile-alert { border: 1px solid #ff6678; background: rgba(255,51,77,.24); }
 .legend-region.missile-report { border: 1px solid #ff9f4a; background: rgba(255,138,51,.16); }
+.legend-border {
+  width: 18px;
+  height: 0;
+  display: inline-block;
+  border-top: 2px solid;
+  box-shadow: 0 0 5px currentColor;
+}
+.legend-border.ukraine { color: #c9f8ff; border-top-width: 3px; }
+.legend-border.russia { color: #eef5f8; opacity: .88; }
+.legend-route {
+  width: 18px;
+  height: 7px;
+  display: inline-block;
+  border-top: 2px solid #ff9b3d;
+  border-radius: 50%;
+  box-shadow: 0 -2px 7px rgba(255,143,47,.65);
+  transform: rotate(-8deg);
+}
+.route-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 5px 6px;
+  border: 1px solid rgba(255,155,61,.28);
+  border-radius: 2px;
+  background: rgba(38, 21, 8, .55);
+  color: #b7a38f;
+  font: 700 9px ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-align: left;
+  cursor: pointer;
+}
+.route-toggle:hover { border-color: rgba(255,155,61,.52); color: #ffd2a8; }
+.route-toggle.is-on {
+  color: #ffc27f;
+  border-color: rgba(255,155,61,.58);
+  box-shadow: inset 0 0 12px rgba(255,143,47,.07);
+}
+.route-toggle:not(.is-on) .legend-route { opacity: .28; box-shadow: none; }
+.legend-note {
+  display: block;
+  max-width: 245px;
+  margin-top: 1px;
+  color: #5d7889;
+  font: 600 7px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
 
 .detail-panel {
   position: absolute;
@@ -234,6 +280,9 @@ button, input, select { font: inherit; }
   .hud-header > div:first-child { padding: 8px 9px; }
   .hud-header h1 { font-size: 11px; }
   .map-legend { right: 8px; bottom: 8px; font-size: 8px; }
+  .route-toggle { font-size: 8px; }
+  .legend-note { max-width: 210px; font-size: 6.5px; }
+  .maplibregl-ctrl-bottom-right { bottom: 174px; }
   .detail-panel { left: 8px; bottom: 8px; width: calc(100% - 16px); }
   .control-panel { padding: 10px 9px max(10px, env(safe-area-inset-bottom)); }
   .timeline-layout { grid-template-columns: 1fr 1fr; gap: 7px 10px; }
@@ -250,6 +299,7 @@ button, input, select { font: inherit; }
 
 @media (max-width: 390px) {
   .map-legend { display: none; }
+  .maplibregl-ctrl-bottom-right { bottom: 58px; }
   .hud-sub { max-width: 230px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .clock-row { gap: 4px; }
   .clock span { font-size: 7px; }
