@@ -1611,6 +1611,15 @@ def record_source_id(record: dict[str, Any]) -> str | None:
             return m.group(1)
     return None
 
+def source_collection_sort_key(source: dict[str, Any]) -> tuple[int, int, str]:
+    """Collect coverage-primary monitoring before official/corroborating feeds."""
+    layer = str(source.get("source_layer") or "official_local")
+    default_rank = 0 if layer == "monitoring_local" else 1 if layer == "monitoring_national" else 2
+    coverage_priority = int(source.get("coverage_priority", default_rank))
+    config_priority = int(source.get("priority", 50) or 50)
+    return (coverage_priority, config_priority, str(source.get("channel") or ""))
+
+
 def annotate_provenance(records: list[dict[str, Any]], source: dict[str, Any],
                         transport: str, window_complete: bool) -> None:
     source_id = str(source.get("channel") or source.get("source_id") or "")
@@ -1622,6 +1631,16 @@ def annotate_provenance(records: list[dict[str, Any]], source: dict[str, Any],
         record["transport_window_complete"] = bool(window_complete)
         record["source_layer"] = source.get("source_layer", "official_local")
         record["verified_official"] = bool(source.get("verified_official", False))
+        record["coverage_role"] = source.get(
+            "coverage_role",
+            "primary_monitoring" if source.get("source_layer") == "monitoring_local"
+            else "monitoring_fallback" if source.get("source_layer") == "monitoring_national"
+            else "cross_validation",
+        )
+        record["coverage_priority"] = int(source.get("coverage_priority", 50) or 50)
+        record["verification_weight"] = int(
+            source.get("verification_weight", 100 if source.get("verified_official") else 70) or 0
+        )
         if source.get("monitoring_family"):
             record["monitoring_family"] = source["monitoring_family"]
 
@@ -1671,7 +1690,7 @@ def collect(args) -> dict[str, Any]:
         if mt_client is not None:
             configured_channels = [
                 str(s.get("channel"))
-                for s in source_cfg.get("sources", [])
+                for s in sorted(source_cfg.get("sources", []), key=source_collection_sort_key)
                 if s.get("enabled", False) and s.get("kind", "telegram") == "telegram" and s.get("channel")
             ]
             dialog_peers_added, dialog_peer_error = preload_peer_cache_from_dialogs(
@@ -1689,8 +1708,9 @@ def collect(args) -> dict[str, Any]:
         mtproto_error = str(exc)
         print(f"telegram MTProto setup ERROR: {exc}; falling back to public HTML", file=sys.stderr)
 
+    telegram_fetch_cache: dict[str, FetchResult] = {}
     try:
-        for source0 in source_cfg.get("sources", []):
+        for source0 in sorted(source_cfg.get("sources", []), key=source_collection_sort_key):
             if not source0.get("enabled", False):
                 continue
             source = dict(source0)
@@ -1699,19 +1719,40 @@ def collect(args) -> dict[str, Any]:
             source["_catalog_places"] = cities_by_region.get(source.get("region", ""), [])
             channel = source["channel"]
             try:
-                before_peer_count = len(peer_cache)
-                fetched = fetch_telegram_with_fallback(
-                    session, channel, window_start, window_end,
-                    max_pages=args.max_pages, context_hours=args.context_hours,
-                    mt_client=mt_client,
-                    peer_cache=peer_cache,
-                )
-                if len(peer_cache) != before_peer_count:
-                    save_telegram_peer_cache(peer_cache_path, peer_cache)
+                cache_hit = channel in telegram_fetch_cache
+                if cache_hit:
+                    fetched = telegram_fetch_cache[channel]
+                else:
+                    before_peer_count = len(peer_cache)
+                    fetched = fetch_telegram_with_fallback(
+                        session, channel, window_start, window_end,
+                        max_pages=args.max_pages, context_hours=args.context_hours,
+                        mt_client=mt_client,
+                        peer_cache=peer_cache,
+                    )
+                    telegram_fetch_cache[channel] = fetched
+                    if len(peer_cache) != before_peer_count:
+                        save_telegram_peer_cache(peer_cache_path, peer_cache)
                 posts = [p for p in fetched.posts if source_post_applies(p, source)]
                 window_posts = [p for p in posts if window_start <= p.published_at <= window_end]
                 events, unmatched = pair_alerts(posts, source, window_start, window_end)
                 reports = extract_reports(posts, source, window_start, window_end)
+                candidate_events = len(events)
+                candidate_reports = len(reports)
+                fallback_suppressed = False
+                if source.get("fallback_only_if_no_local_activity"):
+                    local_present = any(
+                        r.get("region") == source.get("region")
+                        and r.get("source_layer") == "monitoring_local"
+                        and window_start <= parse_iso(r.get("at")) <= window_end
+                        for r in all_reports
+                        if r.get("at")
+                    )
+                    if local_present:
+                        events = []
+                        reports = []
+                        unmatched = []
+                        fallback_suppressed = True
                 annotate_provenance(events, source, fetched.transport, fetched.window_complete)
                 annotate_provenance(reports, source, fetched.transport, fetched.window_complete)
                 all_events.extend(events); all_reports.extend(reports); all_unmatched.extend(unmatched)
@@ -1725,9 +1766,22 @@ def collect(args) -> dict[str, Any]:
                     window_posts=window_posts,
                     window_alert_stats=window_alert_stats,
                 )
+                row["coverage_role"] = source.get(
+                    "coverage_role",
+                    "primary_monitoring" if source.get("source_layer") == "monitoring_local"
+                    else "monitoring_fallback" if source.get("source_layer") == "monitoring_national"
+                    else "cross_validation",
+                )
+                row["coverage_priority"] = int(source.get("coverage_priority", 50) or 50)
+                row["verification_weight"] = int(source.get("verification_weight", 100 if source.get("verified_official") else 70) or 0)
+                row["fetch_cache_hit"] = bool(cache_hit)
+                row["fallback_suppressed"] = bool(fallback_suppressed)
+                row["candidate_events"] = candidate_events
+                row["candidate_reports"] = candidate_reports
                 statuses.append(row)
                 print(
                     f"telegram {channel}: health={row['health']} transport={row['transport']} "
+                    f"cache={'hit' if cache_hit else 'miss'} fallback={'suppressed' if fallback_suppressed else 'used'} "
                     f"posts={len(posts)} window_posts={len(window_posts)} "
                     f"alerts={window_alert_stats['alert_posts']} "
                     f"starts={window_alert_stats['start_posts']} ends={window_alert_stats['end_posts']} "
@@ -1738,6 +1792,9 @@ def collect(args) -> dict[str, Any]:
                 statuses.append({
                     "source_type": "telegram", "source": channel, "region": source["region"],
                     "source_layer": source.get("source_layer", "official_local"),
+                    "coverage_role": source.get("coverage_role", "cross_validation"),
+                    "coverage_priority": int(source.get("coverage_priority", 50) or 50),
+                    "verification_weight": int(source.get("verification_weight", 100 if source.get("verified_official") else 70) or 0),
                     "expected_active": source.get("expected_active", True),
                     "ok": False, "health": "failed", "transport": "unknown",
                     "transport_ok": False, "window_complete": False, "posts": 0,
