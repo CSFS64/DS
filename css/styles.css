@@ -149,6 +149,15 @@ button, input, select { font: inherit; }
 .legend-border.ukraine::after { background: #61e3cf; }
 .legend-border.russia { color: #8dbbd2; }
 .legend-border.russia::after { background: #8dbbd2; }
+.legend-unlinked {
+  width: 11px;
+  height: 11px;
+  display: inline-block;
+  border-radius: 50%;
+  border: 1.5px solid #ffd17c;
+  background: rgba(255, 179, 71, .05);
+  box-shadow: 0 0 6px rgba(255, 179, 71, .3);
+}
 .legend-route {
   position: relative;
   width: 20px;
