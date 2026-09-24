@@ -6,6 +6,16 @@ const REGION_GEOJSON_URLS = [
   "https://raw.githubusercontent.com/codeforgermany/click_that_hood/48ba05ad4c6969e3b3c25735492169227ae411f1/public/data/russia.geojson",
 ];
 
+const UAV_ROUTE_ANCHORS = [
+  { id: "northwest", lon: 31.8, lat: 52.1 },
+  { id: "north", lon: 34.2, lat: 51.1 },
+  { id: "northeast", lon: 36.7, lat: 50.2 },
+  { id: "east", lon: 39.1, lat: 48.3 },
+  { id: "azov", lon: 36.8, lat: 46.6 },
+  { id: "black-sea", lon: 31.6, lat: 45.4 },
+];
+const EMPTY_FEATURE_COLLECTION = Object.freeze({ type: "FeatureCollection", features: [] });
+
 const state = {
   archive: null,
   sources: null,
@@ -15,7 +25,9 @@ const state = {
   mapReady: false,
   baseStyleFallbackUsed: false,
   regionGeoJson: null,
+  countryGeoJson: null,
   regionFeatureIds: new Map(),
+  regionCentroids: new Map(),
   placeFeatureIds: new Map(),
   regionMatchedCount: 0,
   previousActiveRegionIds: new Set(),
@@ -28,6 +40,9 @@ const state = {
   timelineStartMs: 0,
   timelineEndMs: 0,
   timer: null,
+  routesVisible: true,
+  routeSelectionKey: "",
+  routeFeatureCount: 0,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -40,6 +55,7 @@ const els = {
   handleStart: $("handleStart"), handleEnd: $("handleEnd"), handleCumulative: $("handleCumulative"),
   playButton: $("playButton"), scrubber: $("scrubber"), currentTimeLabel: $("currentTimeLabel"), speedSelect: $("speedSelect"),
   clockMoscow: $("clockMoscow"), clockKyiv: $("clockKyiv"), clockBeijing: $("clockBeijing"),
+  routeToggle: $("routeToggle"),
 };
 
 function parseMoscowDate(dateStr, endOfDay = false) {
@@ -169,6 +185,12 @@ async function init() {
     state.regionGeoJson = await fetchFirstJson(REGION_GEOJSON_URLS);
   } catch (err) {
     console.warn("Admin overlay unavailable; base vector map will still render", err);
+  }
+
+  try {
+    state.countryGeoJson = await loadJson("data/country-borders.geojson", "force-cache");
+  } catch (err) {
+    console.warn("Russia/Ukraine country-border overlay unavailable", err);
   }
 
   initMap();
@@ -323,9 +345,29 @@ function firstSymbolLayerId() {
   return layers.find(l => l.type === "symbol")?.id;
 }
 
+function geometryBounds(geometry) {
+  const coords = geometry?.coordinates;
+  if (!coords) return null;
+  let minLon = Infinity, minLat = Infinity, maxLon = -Infinity, maxLat = -Infinity;
+  const visit = value => {
+    if (!Array.isArray(value)) return;
+    if (value.length >= 2 && Number.isFinite(+value[0]) && Number.isFinite(+value[1])) {
+      const lon = +value[0], lat = +value[1];
+      minLon = Math.min(minLon, lon); maxLon = Math.max(maxLon, lon);
+      minLat = Math.min(minLat, lat); maxLat = Math.max(maxLat, lat);
+      return;
+    }
+    for (const child of value) visit(child);
+  };
+  visit(coords);
+  if (!Number.isFinite(minLon)) return null;
+  return { minLon, minLat, maxLon, maxLat };
+}
+
 function prepareRegionGeoJson() {
   if (!state.regionGeoJson?.features) return null;
   state.regionFeatureIds.clear();
+  state.regionCentroids.clear();
   let nextId = 1;
   let matched = 0;
 
@@ -359,6 +401,13 @@ function prepareRegionGeoJson() {
     clone.properties.archive_region = canonical || "";
     if (canonical && !state.regionFeatureIds.has(canonical)) {
       state.regionFeatureIds.set(canonical, clone.id);
+      const bounds = geometryBounds(clone.geometry);
+      if (bounds) {
+        state.regionCentroids.set(canonical, {
+          lon: (bounds.minLon + bounds.maxLon) / 2,
+          lat: (bounds.minLat + bounds.maxLat) / 2,
+        });
+      }
       matched += 1;
     }
     return clone;
@@ -390,16 +439,218 @@ function preparePlacesGeoJson() {
   return { type: "FeatureCollection", features };
 }
 
+
+function routePointFromRecord(record) {
+  const precise = (record.mentioned_places || []).find(p =>
+    Number.isFinite(+p.lon) && Number.isFinite(+p.lat)
+  );
+  if (precise) {
+    return {
+      lon: +precise.lon,
+      lat: +precise.lat,
+      place: precise.label || precise.name || record.place || record.region,
+      precision: precise.type || "local",
+    };
+  }
+  if (record.scope !== "region" && Number.isFinite(+record.lon) && Number.isFinite(+record.lat)) {
+    return {
+      lon: +record.lon,
+      lat: +record.lat,
+      place: record.place_label || record.place || record.region,
+      precision: record.scope || "local",
+    };
+  }
+  const centroid = state.regionCentroids.get(record.region);
+  if (centroid) {
+    return {
+      lon: centroid.lon,
+      lat: centroid.lat,
+      place: record.region,
+      precision: "region-centroid",
+    };
+  }
+  return null;
+}
+
+function haversineKm(a, b) {
+  const rad = x => x * Math.PI / 180;
+  const dLat = rad(b.lat - a.lat);
+  const dLon = rad(b.lon - a.lon);
+  const lat1 = rad(a.lat), lat2 = rad(b.lat);
+  const h = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(Math.max(0, 1 - h)));
+}
+
+function pickIngressAnchor(target) {
+  let best = UAV_ROUTE_ANCHORS[0];
+  let bestDistance = Infinity;
+  for (const anchor of UAV_ROUTE_ANCHORS) {
+    if (target.lat < 48.0 && !["east", "azov", "black-sea"].includes(anchor.id)) continue;
+    const distance = haversineKm(anchor, target);
+    if (distance < bestDistance) {
+      best = anchor;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
+function routeHash(value) {
+  let h = 2166136261;
+  for (const ch of String(value)) {
+    h ^= ch.charCodeAt(0);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function makeIllustrativeCurve(start, end, seed, segments = 36) {
+  const dx = end.lon - start.lon;
+  const dy = end.lat - start.lat;
+  const span = Math.sqrt(dx * dx + dy * dy) || 1;
+  const sign = (routeHash(seed) & 1) ? 1 : -1;
+  const bend = Math.min(2.5, Math.max(0.18, span * 0.10));
+  const midLon = (start.lon + end.lon) / 2;
+  const midLat = (start.lat + end.lat) / 2;
+  const control = {
+    lon: midLon + (-dy / span) * bend * sign,
+    lat: midLat + (dx / span) * bend * sign,
+  };
+  const coords = [];
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    const u = 1 - t;
+    coords.push([
+      u * u * start.lon + 2 * u * t * control.lon + t * t * end.lon,
+      u * u * start.lat + 2 * u * t * control.lat + t * t * end.lat,
+    ]);
+  }
+  return coords;
+}
+
+function buildIllustrativeUavRoutes(startMs, endMs) {
+  const nodes = new Map();
+  const add = (record, atMs, sourceType) => {
+    if (threatClass(record) !== "uav") return;
+    if (record.signal_class === "alert_clear_signal") return;
+    const point = routePointFromRecord(record);
+    if (!point) return;
+    const key = [record.region || "", point.place, point.precision].join("::");
+    const existing = nodes.get(key);
+    if (!existing) {
+      nodes.set(key, {
+        ...point,
+        region: record.region || "",
+        earliest: atMs,
+        latest: atMs,
+        observations: 1,
+        sourceTypes: new Set([sourceType]),
+      });
+    } else {
+      existing.earliest = Math.min(existing.earliest, atMs);
+      existing.latest = Math.max(existing.latest, atMs);
+      existing.observations += 1;
+      existing.sourceTypes.add(sourceType);
+    }
+  };
+
+  for (const report of state.archive.reports || []) {
+    const at = Date.parse(report.at);
+    if (at >= startMs && at <= endMs) add(report, at, "report");
+  }
+  for (const event of state.archive.events || []) {
+    const start = Date.parse(event.start);
+    const end = Date.parse(event.end);
+    if (end < startMs || start > endMs) continue;
+    add(event, Math.max(start, startMs), "alert");
+  }
+
+  const sorted = [...nodes.values()]
+    .sort((a, b) => a.earliest - b.earliest || a.region.localeCompare(b.region))
+    .slice(0, 90);
+
+  return {
+    type: "FeatureCollection",
+    features: sorted.map((node, index) => {
+      const anchor = pickIngressAnchor(node);
+      const seed = [node.region, node.place, index].join("|");
+      return {
+        type: "Feature",
+        properties: {
+          route_id: "uav-route-" + index,
+          target: node.place,
+          region: node.region,
+          precision: node.precision,
+          observations: node.observations,
+          earliest_at: new Date(node.earliest).toISOString(),
+          latest_at: new Date(node.latest).toISOString(),
+          anchor: anchor.id,
+          illustrative: true,
+        },
+        geometry: {
+          type: "LineString",
+          coordinates: makeIllustrativeCurve(anchor, node, seed),
+        },
+      };
+    }),
+  };
+}
+
+function setRouteLayerVisibility() {
+  if (!state.mapReady) return;
+  const visibility = state.routesVisible ? "visible" : "none";
+  for (const id of ["archive-uav-route-glow", "archive-uav-route-line"]) {
+    if (state.map.getLayer(id)) state.map.setLayoutProperty(id, "visibility", visibility);
+  }
+  if (els.routeToggle) {
+    els.routeToggle.classList.toggle("is-on", state.routesVisible);
+    els.routeToggle.setAttribute("aria-pressed", String(state.routesVisible));
+    const label = els.routeToggle.querySelector(".route-toggle-label");
+    if (label) {
+      label.textContent = "示意无人机路线 " + (state.routesVisible ? "ON" : "OFF") + " · " + state.routeFeatureCount;
+    }
+  }
+}
+
+function updateRouteOverlay(force = false) {
+  if (!state.mapReady) return;
+  const source = state.map.getSource("archive-uav-routes");
+  if (!source) return;
+  const start = selectionStartMs();
+  const end = selectionEndMs();
+  const key = [
+    Math.round(start),
+    Math.round(end),
+    state.archive.reports?.length || 0,
+    state.archive.events?.length || 0,
+  ].join(":");
+  if (!force && key === state.routeSelectionKey) {
+    setRouteLayerVisibility();
+    return;
+  }
+  state.routeSelectionKey = key;
+  const data = buildIllustrativeUavRoutes(start, end);
+  state.routeFeatureCount = data.features.length;
+  source.setData(data);
+  setRouteLayerVisibility();
+}
+
 function installArchiveLayers() {
   if (!state.map?.isStyleLoaded()) return;
 
-  if (state.map.getLayer("archive-region-fill")) state.map.removeLayer("archive-region-fill");
-  if (state.map.getLayer("archive-region-line")) state.map.removeLayer("archive-region-line");
-  if (state.map.getLayer("archive-place-glow")) state.map.removeLayer("archive-place-glow");
-  if (state.map.getLayer("archive-place-dot")) state.map.removeLayer("archive-place-dot");
-  if (state.map.getLayer("archive-place-label")) state.map.removeLayer("archive-place-label");
-  if (state.map.getSource("archive-regions")) state.map.removeSource("archive-regions");
-  if (state.map.getSource("archive-places")) state.map.removeSource("archive-places");
+  for (const id of [
+    "archive-place-label", "archive-place-dot", "archive-place-glow",
+    "archive-uav-route-line", "archive-uav-route-glow",
+    "archive-russia-border", "archive-russia-border-glow",
+    "archive-ukraine-border", "archive-ukraine-border-glow",
+    "archive-region-line", "archive-region-fill",
+  ]) {
+    if (state.map.getLayer(id)) state.map.removeLayer(id);
+  }
+  for (const id of ["archive-places", "archive-uav-routes", "archive-country-borders", "archive-regions"]) {
+    if (state.map.getSource(id)) state.map.removeSource(id);
+  }
 
   const beforeId = firstSymbolLayerId();
 
@@ -456,6 +707,94 @@ function installArchiveLayers() {
       },
     }, beforeId);
   }
+
+  if (state.countryGeoJson?.features?.length) {
+    state.map.addSource("archive-country-borders", { type: "geojson", data: state.countryGeoJson });
+    state.map.addLayer({
+      id: "archive-ukraine-border-glow",
+      type: "line",
+      source: "archive-country-borders",
+      filter: ["==", ["get", "code"], "UKR"],
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-color": "#66e7ff",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 3, 7, 7, 10],
+        "line-opacity": 0.28,
+        "line-blur": 2.2,
+      },
+    }, beforeId);
+    state.map.addLayer({
+      id: "archive-ukraine-border",
+      type: "line",
+      source: "archive-country-borders",
+      filter: ["==", ["get", "code"], "UKR"],
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-color": "#c9f8ff",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 3, 2.4, 7, 3.4],
+        "line-opacity": 0.96,
+      },
+    }, beforeId);
+    state.map.addLayer({
+      id: "archive-russia-border-glow",
+      type: "line",
+      source: "archive-country-borders",
+      filter: ["==", ["get", "code"], "RUS"],
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-color": "#e8f1f5",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 3, 6, 7, 8],
+        "line-opacity": 0.18,
+        "line-blur": 2.0,
+      },
+    }, beforeId);
+    state.map.addLayer({
+      id: "archive-russia-border",
+      type: "line",
+      source: "archive-country-borders",
+      filter: ["==", ["get", "code"], "RUS"],
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-color": "#eef5f8",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 3, 1.8, 7, 2.7],
+        "line-opacity": 0.86,
+      },
+    }, beforeId);
+  }
+
+  state.map.addSource("archive-uav-routes", { type: "geojson", data: EMPTY_FEATURE_COLLECTION });
+  state.map.addLayer({
+    id: "archive-uav-route-glow",
+    type: "line",
+    source: "archive-uav-routes",
+    layout: {
+      "line-cap": "round",
+      "line-join": "round",
+      "visibility": state.routesVisible ? "visible" : "none",
+    },
+    paint: {
+      "line-color": "#ff8f2f",
+      "line-width": ["interpolate", ["linear"], ["zoom"], 3, 5, 7, 8.5, 11, 12],
+      "line-opacity": 0.24,
+      "line-blur": 3.2,
+    },
+  }, beforeId);
+  state.map.addLayer({
+    id: "archive-uav-route-line",
+    type: "line",
+    source: "archive-uav-routes",
+    layout: {
+      "line-cap": "round",
+      "line-join": "round",
+      "visibility": state.routesVisible ? "visible" : "none",
+    },
+    paint: {
+      "line-color": "#ff9b3d",
+      "line-width": ["interpolate", ["linear"], ["zoom"], 3, 1.4, 7, 2.2, 11, 3.0],
+      "line-opacity": 0.82,
+    },
+  }, beforeId);
+  state.routeSelectionKey = "";
 
   state.map.addSource("archive-places", { type: "geojson", data: preparePlacesGeoJson() });
   state.map.addLayer({
@@ -576,6 +915,13 @@ function wireControls() {
     render();
   });
   els.playButton.addEventListener("click", togglePlayback);
+  if (els.routeToggle) {
+    els.routeToggle.addEventListener("click", () => {
+      state.routesVisible = !state.routesVisible;
+      setRouteLayerVisibility();
+      if (state.routesVisible) updateRouteOverlay(true);
+    });
+  }
   els.detailClose.addEventListener("click", () => { els.detailPanel.hidden = true; });
 }
 
@@ -713,6 +1059,7 @@ function render() {
   const active = cumulative ? cumulativeEvents() : activeEvents();
   const reports = cumulative ? cumulativeReports() : activeReports();
   renderMap(active, reports);
+  updateRouteOverlay();
   renderClocks(active, reports);
   renderScrubber();
   updateCumulativeHandle();

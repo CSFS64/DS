@@ -24,11 +24,17 @@
         <div id="archiveLamp" class="archive-lamp" title="当前回放时刻存在活动或警报"></div>
       </header>
 
-      <div class="map-legend" aria-hidden="true">
+      <div class="map-legend" aria-label="地图图例与路线控制">
         <span><i class="legend-region uav-alert"></i>无人机正式警报</span>
         <span><i class="legend-region uav-report"></i>无人机官方活动</span>
         <span><i class="legend-region missile-alert"></i>导弹正式警报</span>
         <span><i class="legend-region missile-report"></i>导弹官方活动</span>
+        <span><i class="legend-border ukraine"></i>乌克兰国界</span>
+        <span><i class="legend-border russia"></i>俄罗斯国界</span>
+        <button id="routeToggle" class="route-toggle is-on" type="button" aria-pressed="true">
+          <i class="legend-route"></i><span class="route-toggle-label">示意无人机路线 ON · 0</span>
+        </button>
+        <small class="legend-note">路线根据所选时段内的公开无人机警报/活动报告自动估算，仅为示意，不代表真实连续航迹。国界数据：Natural Earth。</small>
       </div>
 
       <aside id="detailPanel" class="detail-panel" hidden>
