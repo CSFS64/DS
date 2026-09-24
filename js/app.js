@@ -7,12 +7,12 @@ const REGION_GEOJSON_URLS = [
 ];
 
 const UAV_ROUTE_ANCHORS = [
-  { id: "northwest", lon: 31.8, lat: 52.1 },
-  { id: "north", lon: 34.2, lat: 51.1 },
-  { id: "northeast", lon: 36.7, lat: 50.2 },
-  { id: "east", lon: 39.1, lat: 48.3 },
-  { id: "azov", lon: 36.8, lat: 46.6 },
-  { id: "black-sea", lon: 31.6, lat: 45.4 },
+  { id: "chernihiv", lon: 31.55, lat: 52.05, corridor: "north" },
+  { id: "sumy", lon: 34.65, lat: 51.00, corridor: "north" },
+  { id: "kharkiv", lon: 36.70, lat: 50.08, corridor: "northeast" },
+  { id: "donbas", lon: 39.15, lat: 48.35, corridor: "east" },
+  { id: "azov", lon: 36.65, lat: 46.45, corridor: "south" },
+  { id: "black-sea", lon: 32.20, lat: 45.35, corridor: "south" },
 ];
 const EMPTY_FEATURE_COLLECTION = Object.freeze({ type: "FeatureCollection", features: [] });
 
@@ -25,7 +25,7 @@ const state = {
   mapReady: false,
   baseStyleFallbackUsed: false,
   regionGeoJson: null,
-  countryGeoJson: null,
+  ukraineGeoJson: null,
   regionFeatureIds: new Map(),
   regionCentroids: new Map(),
   placeFeatureIds: new Map(),
@@ -188,9 +188,9 @@ async function init() {
   }
 
   try {
-    state.countryGeoJson = await loadJson("data/country-borders.geojson", "force-cache");
+    state.ukraineGeoJson = await loadJson("data/ukraine-regions.geojson", "force-cache");
   } catch (err) {
-    console.warn("Russia/Ukraine country-border overlay unavailable", err);
+    console.warn("Detailed Ukraine boundary support geometry unavailable", err);
   }
 
   initMap();
@@ -364,6 +364,109 @@ function geometryBounds(geometry) {
   return { minLon, minLat, maxLon, maxLat };
 }
 
+
+function boundaryCoordKey(coord, decimals = 5) {
+  return Number(coord[0]).toFixed(decimals) + "," + Number(coord[1]).toFixed(decimals);
+}
+
+function outerRingsFromGeometry(geometry) {
+  if (!geometry?.coordinates) return [];
+  if (geometry.type === "Polygon") return geometry.coordinates.length ? [geometry.coordinates[0]] : [];
+  if (geometry.type === "MultiPolygon") {
+    return geometry.coordinates.flatMap(poly => poly?.length ? [poly[0]] : []);
+  }
+  return [];
+}
+
+function buildOuterBoundaryGeoJson(collection, code) {
+  if (!collection?.features?.length) return null;
+
+  // Administrative regions share exact boundary edges in both source datasets.
+  // Toggle identical undirected segments: internal ADM1 edges occur twice and
+  // disappear, while the national exterior remains.  This preserves the native
+  // high-detail geometry instead of drawing a coarse low-resolution polygon.
+  const edgeMap = new Map();
+  for (const feature of collection.features) {
+    for (const ring of outerRingsFromGeometry(feature.geometry)) {
+      for (let i = 1; i < ring.length; i++) {
+        const a = ring[i - 1], b = ring[i];
+        if (!Array.isArray(a) || !Array.isArray(b)) continue;
+        if (!Number.isFinite(+a[0]) || !Number.isFinite(+a[1]) ||
+            !Number.isFinite(+b[0]) || !Number.isFinite(+b[1])) continue;
+        // Avoid rendering a dateline-crossing segment as a line across Eurasia.
+        if (Math.abs(+a[0] - +b[0]) > 180) continue;
+        const ak = boundaryCoordKey(a), bk = boundaryCoordKey(b);
+        const key = ak < bk ? ak + "|" + bk : bk + "|" + ak;
+        if (edgeMap.has(key)) edgeMap.delete(key);
+        else edgeMap.set(key, { a: [+a[0], +a[1]], b: [+b[0], +b[1]], ak, bk });
+      }
+    }
+  }
+
+  const adjacency = new Map();
+  const edges = [...edgeMap.values()].map((edge, id) => ({ ...edge, id }));
+  const attach = (key, id) => {
+    if (!adjacency.has(key)) adjacency.set(key, []);
+    adjacency.get(key).push(id);
+  };
+  for (const edge of edges) {
+    attach(edge.ak, edge.id);
+    attach(edge.bk, edge.id);
+  }
+
+  const used = new Set();
+  const lines = [];
+  const walk = startId => {
+    const first = edges[startId];
+    if (!first || used.has(startId)) return null;
+    let currentId = startId;
+    let currentKey = first.ak;
+    const coords = [];
+    while (currentId != null && !used.has(currentId)) {
+      const edge = edges[currentId];
+      used.add(currentId);
+      const forward = edge.ak === currentKey;
+      const from = forward ? edge.a : edge.b;
+      const to = forward ? edge.b : edge.a;
+      if (!coords.length) coords.push(from);
+      coords.push(to);
+      currentKey = forward ? edge.bk : edge.ak;
+      const next = (adjacency.get(currentKey) || []).find(id => !used.has(id));
+      currentId = next ?? null;
+    }
+    return coords.length >= 2 ? coords : null;
+  };
+
+  // Start open chains at non-degree-2 vertices, then consume remaining loops.
+  for (const [key, ids] of adjacency) {
+    if (ids.length === 2) continue;
+    for (const id of ids) {
+      const line = walk(id);
+      if (line) lines.push(line);
+    }
+  }
+  for (const edge of edges) {
+    if (used.has(edge.id)) continue;
+    const line = walk(edge.id);
+    if (line) lines.push(line);
+  }
+
+  return {
+    type: "Feature",
+    properties: { code, detail: "admin-region-derived" },
+    geometry: { type: "MultiLineString", coordinates: lines },
+  };
+}
+
+function detailedCountryBorderGeoJson() {
+  const features = [];
+  const russia = buildOuterBoundaryGeoJson(state.regionGeoJson, "RUS");
+  const ukraine = buildOuterBoundaryGeoJson(state.ukraineGeoJson, "UKR");
+  if (russia) features.push(russia);
+  if (ukraine) features.push(ukraine);
+  return { type: "FeatureCollection", features };
+}
+
 function prepareRegionGeoJson() {
   if (!state.regionGeoJson?.features) return null;
   state.regionFeatureIds.clear();
@@ -440,36 +543,39 @@ function preparePlacesGeoJson() {
 }
 
 
-function routePointFromRecord(record) {
-  const precise = (record.mentioned_places || []).find(p =>
-    Number.isFinite(+p.lon) && Number.isFinite(+p.lat)
-  );
-  if (precise) {
-    return {
-      lon: +precise.lon,
-      lat: +precise.lat,
-      place: precise.label || precise.name || record.place || record.region,
-      precision: precise.type || "local",
-    };
+function routeObservationPoints(record, atMs, sourceType) {
+  if (threatClass(record) !== "uav" || record.signal_class === "alert_clear_signal") return [];
+  const points = [];
+  const seen = new Set();
+  const add = (lon, lat, place, precision, weight = 1) => {
+    lon = +lon; lat = +lat;
+    if (!Number.isFinite(lon) || !Number.isFinite(lat)) return;
+    const key = lon.toFixed(4) + ":" + lat.toFixed(4);
+    if (seen.has(key)) return;
+    seen.add(key);
+    points.push({
+      lon, lat,
+      place: place || record.place || record.region,
+      precision,
+      region: record.region || "",
+      at: atMs,
+      sourceType,
+      kind: record.activity_kind || record.alert_type || "",
+      weight,
+    });
+  };
+
+  for (const p of (record.mentioned_places || []).slice(0, 8)) {
+    add(p.lon, p.lat, p.label || p.name, p.type || "local", 1.0);
   }
-  if (record.scope !== "region" && Number.isFinite(+record.lon) && Number.isFinite(+record.lat)) {
-    return {
-      lon: +record.lon,
-      lat: +record.lat,
-      place: record.place_label || record.place || record.region,
-      precision: record.scope || "local",
-    };
+  if (record.scope !== "region") {
+    add(record.lon, record.lat, record.place_label || record.place, record.scope || "local", 1.0);
   }
-  const centroid = state.regionCentroids.get(record.region);
-  if (centroid) {
-    return {
-      lon: centroid.lon,
-      lat: centroid.lat,
-      place: record.region,
-      precision: "region-centroid",
-    };
+  if (!points.length) {
+    const c = state.regionCentroids.get(record.region);
+    if (c) add(c.lon, c.lat, record.region, "region-centroid", 0.55);
   }
-  return null;
+  return points;
 }
 
 function haversineKm(a, b) {
@@ -482,15 +588,35 @@ function haversineKm(a, b) {
   return 6371 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(Math.max(0, 1 - h)));
 }
 
+function bearingDeg(a, b) {
+  const rad = x => x * Math.PI / 180;
+  const deg = x => x * 180 / Math.PI;
+  const lat1 = rad(a.lat), lat2 = rad(b.lat), dLon = rad(b.lon - a.lon);
+  const y = Math.sin(dLon) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) -
+    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+  return (deg(Math.atan2(y, x)) + 360) % 360;
+}
+
+function angleDiffDeg(a, b) {
+  const d = Math.abs(a - b) % 360;
+  return Math.min(d, 360 - d);
+}
+
 function pickIngressAnchor(target) {
   let best = UAV_ROUTE_ANCHORS[0];
-  let bestDistance = Infinity;
+  let bestScore = Infinity;
   for (const anchor of UAV_ROUTE_ANCHORS) {
-    if (target.lat < 48.0 && !["east", "azov", "black-sea"].includes(anchor.id)) continue;
+    if (target.lat < 48.0 && !["east", "south"].includes(anchor.corridor)) continue;
     const distance = haversineKm(anchor, target);
-    if (distance < bestDistance) {
+    // Long-range targets are visually more plausible when the entry corridor
+    // points generally toward the target instead of choosing a lateral detour.
+    const eastPenalty = target.lon > 45 && anchor.lon < 34 ? 120 : 0;
+    const northPenalty = target.lat > 53.5 && anchor.lat < 47 ? 160 : 0;
+    const score = distance + eastPenalty + northPenalty;
+    if (score < bestScore) {
       best = anchor;
-      bestDistance = distance;
+      bestScore = score;
     }
   }
   return best;
@@ -505,102 +631,212 @@ function routeHash(value) {
   return h >>> 0;
 }
 
-function makeIllustrativeCurve(start, end, seed, segments = 36) {
-  const dx = end.lon - start.lon;
-  const dy = end.lat - start.lat;
-  const span = Math.sqrt(dx * dx + dy * dy) || 1;
-  const sign = (routeHash(seed) & 1) ? 1 : -1;
-  const bend = Math.min(2.5, Math.max(0.18, span * 0.10));
-  const midLon = (start.lon + end.lon) / 2;
-  const midLat = (start.lat + end.lat) / 2;
-  const control = {
-    lon: midLon + (-dy / span) * bend * sign,
-    lat: midLat + (dx / span) * bend * sign,
-  };
-  const coords = [];
-  for (let i = 0; i <= segments; i++) {
-    const t = i / segments;
-    const u = 1 - t;
-    coords.push([
-      u * u * start.lon + 2 * u * t * control.lon + t * t * end.lon,
-      u * u * start.lat + 2 * u * t * control.lat + t * t * end.lat,
-    ]);
+function dedupeRouteObservations(observations) {
+  const sorted = [...observations].sort((a, b) => a.at - b.at);
+  const out = [];
+  for (const node of sorted) {
+    const last = [...out].reverse().find(x =>
+      x.region === node.region && x.place === node.place &&
+      Math.abs(x.at - node.at) <= 75 * 60 * 1000
+    );
+    if (last) {
+      last.observations += 1;
+      last.weight = Math.max(last.weight, node.weight);
+      last.at = Math.min(last.at, node.at);
+      continue;
+    }
+    out.push({ ...node, observations: 1, predecessor: null, anchor: pickIngressAnchor(node) });
   }
-  return coords;
+  return out;
+}
+
+function inferRoutePredecessors(nodes) {
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i];
+    let best = null;
+    let bestScore = Infinity;
+    const nodeAnchorDistance = haversineKm(node.anchor, node);
+    const nodeBearing = bearingDeg(node.anchor, node);
+
+    for (let j = Math.max(0, i - 80); j < i; j++) {
+      const prev = nodes[j];
+      const dtHours = (node.at - prev.at) / 3600000;
+      if (dtHours < 0.12 || dtHours > 8.0) continue;
+      const distance = haversineKm(prev, node);
+      if (distance < 18 || distance > 1100) continue;
+      const impliedSpeed = distance / dtHours;
+      if (impliedSpeed < 35 || impliedSpeed > 750) continue;
+
+      const prevAnchorDistance = haversineKm(node.anchor, prev);
+      // Allow modest lateral/backtracking, but reject paths that would require a
+      // large return toward the entry side before continuing to the target.
+      const backtrack = Math.max(0, prevAnchorDistance - nodeAnchorDistance);
+      if (backtrack > 220) continue;
+
+      const incomingBearing = bearingDeg(prev, node);
+      const headingPenalty = angleDiffDeg(nodeBearing, incomingBearing);
+      const anchorPenalty = prev.anchor.id === node.anchor.id ? 0 : 135;
+      const precisionPenalty = prev.precision === "region-centroid" ? 45 : 0;
+      const score =
+        distance * 0.18 +
+        Math.abs(impliedSpeed - 210) * 0.22 +
+        dtHours * 9 +
+        headingPenalty * 1.15 +
+        backtrack * 0.7 +
+        anchorPenalty +
+        precisionPenalty;
+
+      if (score < bestScore) {
+        bestScore = score;
+        best = prev;
+      }
+    }
+    node.predecessor = best;
+  }
+  return nodes;
+}
+
+function corridorWaypoints(anchor, first, seed) {
+  const distance = haversineKm(anchor, first);
+  if (distance < 120) return [];
+  const hash = routeHash(seed);
+  const sign = (hash & 1) ? 1 : -1;
+  const dx = first.lon - anchor.lon;
+  const dy = first.lat - anchor.lat;
+  const len = Math.sqrt(dx * dx + dy * dy) || 1;
+  const nx = -dy / len, ny = dx / len;
+  const bend = Math.min(0.65, Math.max(0.12, distance / 1500));
+  const fractions = distance > 700 ? [0.28, 0.58] : [0.42];
+  return fractions.map((f, idx) => {
+    const taper = idx === 0 ? 1 : 0.55;
+    return {
+      lon: anchor.lon + dx * f + nx * bend * sign * taper,
+      lat: anchor.lat + dy * f + ny * bend * sign * taper,
+    };
+  });
+}
+
+function catmullRomPath(points, samplesPerSegment = 10) {
+  if (points.length < 3) return points.map(p => [p.lon, p.lat]);
+  const out = [];
+  const pts = [points[0], ...points, points[points.length - 1]];
+  for (let i = 1; i < pts.length - 2; i++) {
+    const p0 = pts[i - 1], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2];
+    for (let step = 0; step < samplesPerSegment; step++) {
+      const t = step / samplesPerSegment;
+      const t2 = t * t, t3 = t2 * t;
+      const interp = key => 0.5 * (
+        (2 * p1[key]) +
+        (-p0[key] + p2[key]) * t +
+        (2*p0[key] - 5*p1[key] + 4*p2[key] - p3[key]) * t2 +
+        (-p0[key] + 3*p1[key] - 3*p2[key] + p3[key]) * t3
+      );
+      out.push([interp("lon"), interp("lat")]);
+    }
+  }
+  const last = points[points.length - 1];
+  out.push([last.lon, last.lat]);
+  return out;
 }
 
 function buildIllustrativeUavRoutes(startMs, endMs) {
-  const nodes = new Map();
-  const add = (record, atMs, sourceType) => {
-    if (threatClass(record) !== "uav") return;
-    if (record.signal_class === "alert_clear_signal") return;
-    const point = routePointFromRecord(record);
-    if (!point) return;
-    const key = [record.region || "", point.place, point.precision].join("::");
-    const existing = nodes.get(key);
-    if (!existing) {
-      nodes.set(key, {
-        ...point,
-        region: record.region || "",
-        earliest: atMs,
-        latest: atMs,
-        observations: 1,
-        sourceTypes: new Set([sourceType]),
-      });
-    } else {
-      existing.earliest = Math.min(existing.earliest, atMs);
-      existing.latest = Math.max(existing.latest, atMs);
-      existing.observations += 1;
-      existing.sourceTypes.add(sourceType);
-    }
-  };
-
+  const raw = [];
   for (const report of state.archive.reports || []) {
     const at = Date.parse(report.at);
-    if (at >= startMs && at <= endMs) add(report, at, "report");
+    if (at >= startMs && at <= endMs) raw.push(...routeObservationPoints(report, at, "report"));
   }
   for (const event of state.archive.events || []) {
     const start = Date.parse(event.start);
     const end = Date.parse(event.end);
     if (end < startMs || start > endMs) continue;
-    add(event, Math.max(start, startMs), "alert");
+    raw.push(...routeObservationPoints(event, Math.max(start, startMs), "alert"));
   }
 
-  const sorted = [...nodes.values()]
-    .sort((a, b) => a.earliest - b.earliest || a.region.localeCompare(b.region))
-    .slice(0, 90);
+  const nodes = inferRoutePredecessors(dedupeRouteObservations(raw));
+  const predecessorSet = new Set(nodes.filter(n => n.predecessor).map(n => n.predecessor));
+  let terminals = nodes.filter(n => !predecessorSet.has(n));
+  // Keep the more information-rich terminal routes first if a very long time
+  // selection would otherwise produce excessive visual clutter.
+  terminals = terminals
+    .sort((a, b) => b.at - a.at || b.observations - a.observations)
+    .slice(0, 70)
+    .sort((a, b) => a.at - b.at);
+
+  const lineFeatures = [];
+  const arrowFeatures = [];
+  terminals.forEach((terminal, index) => {
+    const chain = [];
+    const seen = new Set();
+    let current = terminal;
+    while (current && chain.length < 9 && !seen.has(current)) {
+      seen.add(current);
+      chain.push(current);
+      current = current.predecessor;
+    }
+    chain.reverse();
+    if (!chain.length) return;
+
+    const anchor = pickIngressAnchor(chain[0]);
+    const seed = [anchor.id, terminal.region, terminal.place, index].join("|");
+    const support = corridorWaypoints(anchor, chain[0], seed);
+    const waypoints = [anchor, ...support, ...chain];
+
+    // Remove nearly-identical successive points before spline interpolation.
+    const compact = [];
+    for (const p of waypoints) {
+      if (!compact.length || haversineKm(compact[compact.length - 1], p) > 6) compact.push(p);
+    }
+    const coords = catmullRomPath(compact, compact.length > 5 ? 7 : 11);
+    if (coords.length < 2) return;
+
+    const preciseCount = chain.filter(n => n.precision !== "region-centroid").length;
+    const evidence = chain.reduce((sum, n) => sum + n.observations, 0);
+    const confidence = Math.min(1, 0.34 + (chain.length - 1) * 0.14 + preciseCount * 0.08 + Math.min(0.16, evidence * 0.02));
+    const props = {
+      route_id: "uav-route-" + index,
+      target: terminal.place,
+      region: terminal.region,
+      anchor: anchor.id,
+      evidence_nodes: chain.length,
+      observations: evidence,
+      confidence,
+      earliest_at: new Date(chain[0].at).toISOString(),
+      latest_at: new Date(terminal.at).toISOString(),
+      illustrative: true,
+    };
+    lineFeatures.push({
+      type: "Feature",
+      properties: props,
+      geometry: { type: "LineString", coordinates: coords },
+    });
+
+    const a = coords[coords.length - 2], b = coords[coords.length - 1];
+    arrowFeatures.push({
+      type: "Feature",
+      properties: {
+        ...props,
+        bearing: bearingDeg({ lon: a[0], lat: a[1] }, { lon: b[0], lat: b[1] }),
+      },
+      geometry: { type: "Point", coordinates: b },
+    });
+  });
 
   return {
-    type: "FeatureCollection",
-    features: sorted.map((node, index) => {
-      const anchor = pickIngressAnchor(node);
-      const seed = [node.region, node.place, index].join("|");
-      return {
-        type: "Feature",
-        properties: {
-          route_id: "uav-route-" + index,
-          target: node.place,
-          region: node.region,
-          precision: node.precision,
-          observations: node.observations,
-          earliest_at: new Date(node.earliest).toISOString(),
-          latest_at: new Date(node.latest).toISOString(),
-          anchor: anchor.id,
-          illustrative: true,
-        },
-        geometry: {
-          type: "LineString",
-          coordinates: makeIllustrativeCurve(anchor, node, seed),
-        },
-      };
-    }),
+    lines: { type: "FeatureCollection", features: lineFeatures },
+    arrows: { type: "FeatureCollection", features: arrowFeatures },
   };
 }
 
 function setRouteLayerVisibility() {
   if (!state.mapReady) return;
   const visibility = state.routesVisible ? "visible" : "none";
-  for (const id of ["archive-uav-route-glow", "archive-uav-route-line"]) {
+  for (const id of [
+    "archive-uav-route-glow",
+    "archive-uav-route-casing",
+    "archive-uav-route-line",
+    "archive-uav-route-highlight",
+    "archive-uav-route-arrows",
+  ]) {
     if (state.map.getLayer(id)) state.map.setLayoutProperty(id, "visibility", visibility);
   }
   if (els.routeToggle) {
@@ -615,8 +851,9 @@ function setRouteLayerVisibility() {
 
 function updateRouteOverlay(force = false) {
   if (!state.mapReady) return;
-  const source = state.map.getSource("archive-uav-routes");
-  if (!source) return;
+  const lineSource = state.map.getSource("archive-uav-routes");
+  const arrowSource = state.map.getSource("archive-uav-route-arrows");
+  if (!lineSource || !arrowSource) return;
   const start = selectionStartMs();
   const end = selectionEndMs();
   const key = [
@@ -631,8 +868,9 @@ function updateRouteOverlay(force = false) {
   }
   state.routeSelectionKey = key;
   const data = buildIllustrativeUavRoutes(start, end);
-  state.routeFeatureCount = data.features.length;
-  source.setData(data);
+  state.routeFeatureCount = data.lines.features.length;
+  lineSource.setData(data.lines);
+  arrowSource.setData(data.arrows);
   setRouteLayerVisibility();
 }
 
