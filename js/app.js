@@ -879,14 +879,18 @@ function installArchiveLayers() {
 
   for (const id of [
     "archive-place-label", "archive-place-dot", "archive-place-glow",
-    "archive-uav-route-line", "archive-uav-route-glow",
-    "archive-russia-border", "archive-russia-border-glow",
-    "archive-ukraine-border", "archive-ukraine-border-glow",
+    "archive-uav-route-arrows", "archive-uav-route-highlight", "archive-uav-route-line",
+    "archive-uav-route-casing", "archive-uav-route-glow",
+    "archive-russia-border-main", "archive-russia-border-casing", "archive-russia-border-glow",
+    "archive-ukraine-border-main", "archive-ukraine-border-casing", "archive-ukraine-border-glow",
     "archive-region-line", "archive-region-fill",
   ]) {
     if (state.map.getLayer(id)) state.map.removeLayer(id);
   }
-  for (const id of ["archive-places", "archive-uav-routes", "archive-country-borders", "archive-regions"]) {
+  for (const id of [
+    "archive-places", "archive-uav-route-arrows", "archive-uav-routes",
+    "archive-country-borders", "archive-regions"
+  ]) {
     if (state.map.getSource(id)) state.map.removeSource(id);
   }
 
@@ -946,61 +950,59 @@ function installArchiveLayers() {
     }, beforeId);
   }
 
-  if (state.countryGeoJson?.features?.length) {
-    state.map.addSource("archive-country-borders", { type: "geojson", data: state.countryGeoJson });
-    state.map.addLayer({
-      id: "archive-ukraine-border-glow",
-      type: "line",
-      source: "archive-country-borders",
-      filter: ["==", ["get", "code"], "UKR"],
-      layout: { "line-cap": "round", "line-join": "round" },
-      paint: {
-        "line-color": "#66e7ff",
-        "line-width": ["interpolate", ["linear"], ["zoom"], 3, 7, 7, 10],
-        "line-opacity": 0.28,
-        "line-blur": 2.2,
-      },
-    }, beforeId);
-    state.map.addLayer({
-      id: "archive-ukraine-border",
-      type: "line",
-      source: "archive-country-borders",
-      filter: ["==", ["get", "code"], "UKR"],
-      layout: { "line-cap": "round", "line-join": "round" },
-      paint: {
-        "line-color": "#c9f8ff",
-        "line-width": ["interpolate", ["linear"], ["zoom"], 3, 2.4, 7, 3.4],
-        "line-opacity": 0.96,
-      },
-    }, beforeId);
-    state.map.addLayer({
-      id: "archive-russia-border-glow",
-      type: "line",
-      source: "archive-country-borders",
-      filter: ["==", ["get", "code"], "RUS"],
-      layout: { "line-cap": "round", "line-join": "round" },
-      paint: {
-        "line-color": "#e8f1f5",
-        "line-width": ["interpolate", ["linear"], ["zoom"], 3, 6, 7, 8],
-        "line-opacity": 0.18,
-        "line-blur": 2.0,
-      },
-    }, beforeId);
-    state.map.addLayer({
-      id: "archive-russia-border",
-      type: "line",
-      source: "archive-country-borders",
-      filter: ["==", ["get", "code"], "RUS"],
-      layout: { "line-cap": "round", "line-join": "round" },
-      paint: {
-        "line-color": "#eef5f8",
-        "line-width": ["interpolate", ["linear"], ["zoom"], 3, 1.8, 7, 2.7],
-        "line-opacity": 0.86,
-      },
-    }, beforeId);
+  const countryBorders = detailedCountryBorderGeoJson();
+  if (countryBorders.features.length) {
+    state.map.addSource("archive-country-borders", { type: "geojson", data: countryBorders });
+
+    // Equal visual weight, distinct cool hues.  A dark casing keeps the line
+    // crisp against both the base map and bright alert fills.
+    const addCountryBorderLayers = (code, slug, color, glow) => {
+      state.map.addLayer({
+        id: "archive-" + slug + "-border-glow",
+        type: "line",
+        source: "archive-country-borders",
+        filter: ["==", ["get", "code"], code],
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: {
+          "line-color": glow,
+          "line-width": ["interpolate", ["linear"], ["zoom"], 3, 7.5, 7, 10.5, 11, 14],
+          "line-opacity": 0.22,
+          "line-blur": 2.8,
+        },
+      }, beforeId);
+      state.map.addLayer({
+        id: "archive-" + slug + "-border-casing",
+        type: "line",
+        source: "archive-country-borders",
+        filter: ["==", ["get", "code"], code],
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: {
+          "line-color": "#031018",
+          "line-width": ["interpolate", ["linear"], ["zoom"], 3, 4.2, 7, 5.8, 11, 7.2],
+          "line-opacity": 0.92,
+        },
+      }, beforeId);
+      state.map.addLayer({
+        id: "archive-" + slug + "-border-main",
+        type: "line",
+        source: "archive-country-borders",
+        filter: ["==", ["get", "code"], code],
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: {
+          "line-color": color,
+          "line-width": ["interpolate", ["linear"], ["zoom"], 3, 1.55, 7, 2.15, 11, 2.75],
+          "line-opacity": 0.94,
+        },
+      }, beforeId);
+    };
+
+    addCountryBorderLayers("UKR", "ukraine", "#61e3cf", "#38bfae");
+    addCountryBorderLayers("RUS", "russia", "#8dbbd2", "#5c8ea6");
   }
 
   state.map.addSource("archive-uav-routes", { type: "geojson", data: EMPTY_FEATURE_COLLECTION });
+  state.map.addSource("archive-uav-route-arrows", { type: "geojson", data: EMPTY_FEATURE_COLLECTION });
+
   state.map.addLayer({
     id: "archive-uav-route-glow",
     type: "line",
@@ -1011,12 +1013,29 @@ function installArchiveLayers() {
       "visibility": state.routesVisible ? "visible" : "none",
     },
     paint: {
-      "line-color": "#ff8f2f",
-      "line-width": ["interpolate", ["linear"], ["zoom"], 3, 5, 7, 8.5, 11, 12],
-      "line-opacity": 0.24,
-      "line-blur": 3.2,
+      "line-color": "#ff7218",
+      "line-width": ["interpolate", ["linear"], ["zoom"], 3, 6.8, 7, 9.5, 11, 12.5],
+      "line-opacity": ["interpolate", ["linear"], ["get", "confidence"], 0.3, 0.10, 1, 0.26],
+      "line-blur": 3.6,
     },
   }, beforeId);
+
+  state.map.addLayer({
+    id: "archive-uav-route-casing",
+    type: "line",
+    source: "archive-uav-routes",
+    layout: {
+      "line-cap": "round",
+      "line-join": "round",
+      "visibility": state.routesVisible ? "visible" : "none",
+    },
+    paint: {
+      "line-color": "#6f2c08",
+      "line-width": ["interpolate", ["linear"], ["zoom"], 3, 3.5, 7, 4.5, 11, 5.6],
+      "line-opacity": ["interpolate", ["linear"], ["get", "confidence"], 0.3, 0.50, 1, 0.88],
+    },
+  }, beforeId);
+
   state.map.addLayer({
     id: "archive-uav-route-line",
     type: "line",
@@ -1027,11 +1046,52 @@ function installArchiveLayers() {
       "visibility": state.routesVisible ? "visible" : "none",
     },
     paint: {
-      "line-color": "#ff9b3d",
-      "line-width": ["interpolate", ["linear"], ["zoom"], 3, 1.4, 7, 2.2, 11, 3.0],
-      "line-opacity": 0.82,
+      "line-color": "#ff8b1f",
+      "line-width": ["interpolate", ["linear"], ["zoom"], 3, 1.35, 7, 1.85, 11, 2.45],
+      "line-opacity": ["interpolate", ["linear"], ["get", "confidence"], 0.3, 0.62, 1, 0.96],
     },
   }, beforeId);
+
+  state.map.addLayer({
+    id: "archive-uav-route-highlight",
+    type: "line",
+    source: "archive-uav-routes",
+    minzoom: 3.2,
+    layout: {
+      "line-cap": "round",
+      "line-join": "round",
+      "visibility": state.routesVisible ? "visible" : "none",
+    },
+    paint: {
+      "line-color": "#ffc263",
+      "line-width": ["interpolate", ["linear"], ["zoom"], 3, 0.35, 7, 0.55, 11, 0.8],
+      "line-opacity": ["interpolate", ["linear"], ["get", "confidence"], 0.3, 0.22, 1, 0.62],
+    },
+  }, beforeId);
+
+  state.map.addLayer({
+    id: "archive-uav-route-arrows",
+    type: "symbol",
+    source: "archive-uav-route-arrows",
+    minzoom: 3,
+    layout: {
+      "visibility": state.routesVisible ? "visible" : "none",
+      "text-field": "▲",
+      "text-font": ["Noto Sans Regular"],
+      "text-size": ["interpolate", ["linear"], ["zoom"], 3, 10, 7, 13, 11, 16],
+      "text-rotate": ["get", "bearing"],
+      "text-rotation-alignment": "map",
+      "text-allow-overlap": true,
+      "text-ignore-placement": true,
+    },
+    paint: {
+      "text-color": "#ff9a2f",
+      "text-halo-color": "#5e2608",
+      "text-halo-width": 1.1,
+      "text-opacity": ["interpolate", ["linear"], ["get", "confidence"], 0.3, 0.55, 1, 1],
+    },
+  });
+
   state.routeSelectionKey = "";
 
   state.map.addSource("archive-places", { type: "geojson", data: preparePlacesGeoJson() });
