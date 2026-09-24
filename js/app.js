@@ -20,7 +20,9 @@ const state = {
   ukraineGeoJson: null,
   regionFeatureIds: new Map(),
   regionCentroids: new Map(),
+  regionGeometryByName: new Map(),
   placeFeatureIds: new Map(),
+  allowedTerritoryParts: null,
   regionMatchedCount: 0,
   previousActiveRegionIds: new Set(),
   previousActivePlaceIds: new Set(),
@@ -465,6 +467,7 @@ function prepareRegionGeoJson() {
   if (!state.regionGeoJson?.features) return null;
   state.regionFeatureIds.clear();
   state.regionCentroids.clear();
+  state.regionGeometryByName.clear();
   let nextId = 1;
   let matched = 0;
 
@@ -505,6 +508,7 @@ function prepareRegionGeoJson() {
           lat: (bounds.minLat + bounds.maxLat) / 2,
         });
       }
+      state.regionGeometryByName.set(canonical, clone.geometry);
       matched += 1;
     }
     return clone;
@@ -536,6 +540,106 @@ function preparePlacesGeoJson() {
   return { type: "FeatureCollection", features };
 }
 
+
+function pointInRing(point, ring) {
+  const x = point.lon, y = point.lat;
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = +ring[i][0], yi = +ring[i][1];
+    const xj = +ring[j][0], yj = +ring[j][1];
+    const crosses = ((yi > y) !== (yj > y)) &&
+      (x < (xj - xi) * (y - yi) / ((yj - yi) || 1e-12) + xi);
+    if (crosses) inside = !inside;
+  }
+  return inside;
+}
+
+function pointInGeometry(point, geometry) {
+  if (!geometry?.coordinates) return false;
+  const inPolygon = polygon => {
+    if (!polygon?.length || !pointInRing(point, polygon[0])) return false;
+    for (let i = 1; i < polygon.length; i++) {
+      if (pointInRing(point, polygon[i])) return false;
+    }
+    return true;
+  };
+  if (geometry.type === "Polygon") return inPolygon(geometry.coordinates);
+  if (geometry.type === "MultiPolygon") return geometry.coordinates.some(inPolygon);
+  return false;
+}
+
+function regionRepresentativePoint(region) {
+  const geometry = state.regionGeometryByName.get(region);
+  const center = state.regionCentroids.get(region);
+  if (!geometry || !center) return center || null;
+  if (pointInGeometry(center, geometry)) return { ...center, regionProxy: true };
+
+  const bounds = geometryBounds(geometry);
+  if (!bounds) return { ...center, regionProxy: true };
+  let best = null;
+  let bestDistance = Infinity;
+  for (let yi = 1; yi <= 5; yi++) {
+    for (let xi = 1; xi <= 5; xi++) {
+      const p = {
+        lon: bounds.minLon + (bounds.maxLon - bounds.minLon) * xi / 6,
+        lat: bounds.minLat + (bounds.maxLat - bounds.minLat) * yi / 6,
+      };
+      if (!pointInGeometry(p, geometry)) continue;
+      const d = haversineKm(center, p);
+      if (d < bestDistance) { best = p; bestDistance = d; }
+    }
+  }
+  return best ? { ...best, regionProxy: true } : { ...center, regionProxy: true };
+}
+
+function geometryParts(collection) {
+  const parts = [];
+  for (const feature of collection?.features || []) {
+    const g = feature.geometry;
+    if (!g?.coordinates) continue;
+    const polygons = g.type === "Polygon" ? [g.coordinates] :
+      g.type === "MultiPolygon" ? g.coordinates : [];
+    for (const polygon of polygons) {
+      const bounds = geometryBounds({ type: "Polygon", coordinates: polygon });
+      if (bounds) parts.push({ polygon, bounds });
+    }
+  }
+  return parts;
+}
+
+function allowedTerritoryParts() {
+  if (state.allowedTerritoryParts) return state.allowedTerritoryParts;
+  state.allowedTerritoryParts = [
+    ...geometryParts(state.regionGeoJson),
+    ...geometryParts(state.ukraineGeoJson),
+  ];
+  return state.allowedTerritoryParts;
+}
+
+function pointInAllowedTerritory(point) {
+  for (const part of allowedTerritoryParts()) {
+    const b = part.bounds;
+    if (point.lon < b.minLon || point.lon > b.maxLon || point.lat < b.minLat || point.lat > b.maxLat) continue;
+    if (pointInRing(point, part.polygon[0])) {
+      let inHole = false;
+      for (let i = 1; i < part.polygon.length; i++) {
+        if (pointInRing(point, part.polygon[i])) { inHole = true; break; }
+      }
+      if (!inHole) return true;
+    }
+  }
+  return false;
+}
+
+function routeStaysInAllowedTerritory(coords) {
+  // Ignore the exact start vertex (it lies on a border). After the first few
+  // samples every point must stay inside either Ukraine or Russia geometry.
+  for (let i = Math.min(3, coords.length - 1); i < coords.length; i += 2) {
+    const p = { lon: +coords[i][0], lat: +coords[i][1] };
+    if (!pointInAllowedTerritory(p)) return false;
+  }
+  return true;
+}
 
 function routePlaceCatalog() {
   const exact = sourcePlaceIndex();
@@ -627,6 +731,31 @@ function routeObservationPoints(record, atMs, sourceType, catalog) {
       1.0,
     );
   }
+
+  // A region-only alert/report is still evidence that the UAV activity touched
+  // that region. It participates as a low-confidence area proxy, not as a claim
+  // that the UAV passed through the exact geometric centre.
+  if (!points.length && record.region) {
+    const proxy = regionRepresentativePoint(record.region);
+    if (proxy) {
+      points.push({
+        lon: proxy.lon, lat: proxy.lat,
+        place: record.region,
+        placeName: record.region,
+        placeKey: null,
+        nodeKey: "region-proxy|" + record.region,
+        precision: "region-proxy",
+        region: record.region,
+        at: atMs,
+        sourceType,
+        kind,
+        formal,
+        recordKey,
+        weight: 0.42,
+        regionProxy: true,
+      });
+    }
+  }
   return points;
 }
 
@@ -664,63 +793,102 @@ function routeHash(value) {
   return h >>> 0;
 }
 
-function buildUkraineBorderCandidates() {
-  if (state.ukraineBorderCandidates?.length) return state.ukraineBorderCandidates;
-  const outline = buildOuterBoundaryGeoJson(state.ukraineGeoJson, "UKR");
-  const lines = outline?.geometry?.coordinates || [];
-  const candidates = [];
-  let id = 0;
-
-  // Sample the actual high-detail national outline. Every generated route
-  // therefore begins exactly on a border/coastline vertex, never from an
-  // arbitrary point inside Ukraine.
-  for (const line of lines) {
-    if (!Array.isArray(line) || line.length < 2) continue;
+function sampleOutlinePoints(collection, spacingKm = 12) {
+  const outline = buildOuterBoundaryGeoJson(collection, "OUTLINE");
+  const points = [];
+  for (const line of outline?.geometry?.coordinates || []) {
     let last = null;
     for (let i = 0; i < line.length; i++) {
       const coord = line[i];
-      if (!Array.isArray(coord) || !Number.isFinite(+coord[0]) || !Number.isFinite(+coord[1])) continue;
-      const point = { lon: +coord[0], lat: +coord[1], borderId: "ukr-border-" + (id++) };
-      if (!last || haversineKm(last, point) >= 14 || i === line.length - 1) {
-        candidates.push(point);
-        last = point;
+      const p = { lon: +coord[0], lat: +coord[1] };
+      if (!Number.isFinite(p.lon) || !Number.isFinite(p.lat)) continue;
+      if (!last || haversineKm(last, p) >= spacingKm || i === line.length - 1) {
+        points.push(p);
+        last = p;
       }
     }
   }
+  return points;
+}
+
+function minDistanceToPoints(point, points) {
+  let best = Infinity;
+  for (const p of points) {
+    const d = haversineKm(point, p);
+    if (d < best) best = d;
+    if (best < 2) break;
+  }
+  return best;
+}
+
+function buildUkraineBorderCandidates() {
+  if (state.ukraineBorderCandidates?.length) return state.ukraineBorderCandidates;
+
+  // Conservative origin model: only the Chernihiv/Sumy/Kharkiv portions of the
+  // internationally recognized Ukraine-Russia land boundary are eligible.
+  // This prevents coastline/Crimea/Belarus/Moldova/other-country starts and
+  // avoids using occupied Donetsk/Luhansk border sections as launch origins.
+  const allowedIso = new Set(["UA-74", "UA-59", "UA-63"]);
+  const russianBorder = sampleOutlinePoints(state.regionGeoJson, 10);
+  const candidates = [];
+  let id = 0;
+
+  for (const feature of state.ukraineGeoJson?.features || []) {
+    const iso = feature.properties?.iso3166_2;
+    if (!allowedIso.has(iso)) continue;
+    for (const ring of outerRingsFromGeometry(feature.geometry)) {
+      let last = null;
+      for (let i = 0; i < ring.length; i++) {
+        const coord = ring[i];
+        const p = { lon: +coord[0], lat: +coord[1] };
+        if (!Number.isFinite(p.lon) || !Number.isFinite(p.lat)) continue;
+        if (last && haversineKm(last, p) < 9 && i !== ring.length - 1) continue;
+        last = p;
+
+        // Keep only the portion physically adjacent to the Russian border.
+        if (minDistanceToPoints(p, russianBorder) > 24) continue;
+        candidates.push({
+          ...p,
+          borderId: "ukr-rus-border-" + (id++),
+          originRegion: feature.properties?.name_en || feature.properties?.name || iso,
+          originIso: iso,
+        });
+      }
+    }
+  }
+
   state.ukraineBorderCandidates = candidates;
   return candidates;
 }
 
-function selectBorderStart(terminal, seed, usedStarts) {
+function rankBorderStarts(terminal, seed, usedStarts) {
   const candidates = buildUkraineBorderCandidates();
-  if (!candidates.length) return null;
+  if (!candidates.length) return [];
 
   const ranked = candidates
     .map(point => ({ point, distance: haversineKm(point, terminal) }))
     .sort((a, b) => a.distance - b.distance);
   const bestDistance = ranked[0].distance;
-  const shortlist = ranked.filter(x => x.distance <= bestDistance + 150).slice(0, 90);
+  const shortlist = ranked.filter(x => x.distance <= bestDistance + 230).slice(0, 70);
 
-  let best = shortlist[0];
-  let bestScore = Infinity;
-  for (const item of shortlist) {
-    const nearestUsed = usedStarts.length
-      ? Math.min(...usedStarts.map(p => haversineKm(p, item.point)))
-      : Infinity;
-    const crowdPenalty =
-      nearestUsed < 28 ? (28 - nearestUsed) * 8 :
-      nearestUsed < 65 ? (65 - nearestUsed) * 1.7 : 0;
-    const jitter = (routeHash(seed + "|" + item.point.borderId) % 1000) / 1000 * 18;
-    const score = item.distance + crowdPenalty + jitter;
-    if (score < bestScore) {
-      bestScore = score;
-      best = item;
-    }
-  }
-  const chosen = { ...best.point, borderDistanceKm: best.distance };
-  usedStarts.push(chosen);
-  return chosen;
+  return shortlist
+    .map(item => {
+      const nearestUsed = usedStarts.length
+        ? Math.min(...usedStarts.map(p => haversineKm(p, item.point)))
+        : Infinity;
+      const crowdPenalty =
+        nearestUsed < 22 ? (22 - nearestUsed) * 10 :
+        nearestUsed < 55 ? (55 - nearestUsed) * 2.0 : 0;
+      const jitter = (routeHash(seed + "|" + item.point.borderId) % 1000) / 1000 * 10;
+      return {
+        ...item,
+        crowdPenalty,
+        baseScore: item.distance + crowdPenalty + jitter,
+      };
+    })
+    .sort((a, b) => a.baseScore - b.baseScore);
 }
+
 
 function dedupeRouteObservations(observations) {
   const sorted = [...observations].sort((a, b) => a.at - b.at);
@@ -814,7 +982,8 @@ function bestSupportChain(nodes, terminal, anchor) {
 
   const dp = candidates.map(x => ({
     score: (isStrongObservationKind(x.node.kind) ? 2.0 : 1.0) +
-      x.node.observations * 0.15 - x.proj.crossTrackKm * 0.004,
+      x.node.observations * 0.15 - x.proj.crossTrackKm * 0.004 -
+      (x.node.precision === "region-proxy" ? 0.65 : 0),
     prev: -1,
   }));
 
@@ -824,7 +993,8 @@ function bestSupportChain(nodes, terminal, anchor) {
       const score = dp[j].score +
         (isStrongObservationKind(candidates[i].node.kind) ? 2.0 : 1.0) +
         candidates[i].node.observations * 0.15 -
-        candidates[i].proj.crossTrackKm * 0.004;
+        candidates[i].proj.crossTrackKm * 0.004 -
+        (candidates[i].node.precision === "region-proxy" ? 0.65 : 0);
       if (score > dp[i].score) {
         dp[i].score = score;
         dp[i].prev = j;
@@ -944,6 +1114,49 @@ function smoothInterpolatingRoute(points, samplesPerSegment = 7) {
   return out;
 }
 
+function orient2d(a, b, c) {
+  return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+}
+
+function segmentsProperlyIntersect(a, b, c, d) {
+  const o1 = orient2d(a, b, c), o2 = orient2d(a, b, d);
+  const o3 = orient2d(c, d, a), o4 = orient2d(c, d, b);
+  const eps = 1e-8;
+  return ((o1 > eps && o2 < -eps) || (o1 < -eps && o2 > eps)) &&
+         ((o3 > eps && o4 < -eps) || (o3 < -eps && o4 > eps));
+}
+
+function countRouteCrossings(coords, existingRoutes) {
+  let crossings = 0;
+  for (const existing of existingRoutes) {
+    const other = existing.geometry?.coordinates || existing;
+    for (let i = 1; i < coords.length; i++) {
+      // Ignore the first/last tiny pieces: nearby routes may legitimately fan
+      // out from the border or converge near a shared reported location.
+      if (i < 3 || i > coords.length - 3) continue;
+      for (let j = 1; j < other.length; j++) {
+        if (j < 3 || j > other.length - 3) continue;
+        if (segmentsProperlyIntersect(coords[i - 1], coords[i], other[j - 1], other[j])) {
+          crossings += 1;
+          if (crossings >= 4) return crossings;
+        }
+      }
+    }
+  }
+  return crossings;
+}
+
+function routeLengthKm(coords) {
+  let total = 0;
+  for (let i = 1; i < coords.length; i++) {
+    total += haversineKm(
+      { lon: coords[i - 1][0], lat: coords[i - 1][1] },
+      { lon: coords[i][0], lat: coords[i][1] },
+    );
+  }
+  return total;
+}
+
 function buildIllustrativeUavRoutes(startMs, endMs) {
   const catalog = routePlaceCatalog();
   const raw = [];
@@ -960,7 +1173,7 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
 
   const nodes = dedupeRouteObservations(raw);
   let terminals = nodes.filter((node, idx) => {
-    if (isStrongObservationKind(node.kind)) return true;
+    if (isStrongObservationKind(node.kind) || node.precision === "region-proxy") return true;
     return !nodes.some((other, j) =>
       j !== idx &&
       other.at >= node.at &&
@@ -971,9 +1184,13 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
   });
 
   terminals = terminals
-    .sort((a, b) => b.at - a.at || b.observations - a.observations)
-    .slice(0, 90)
-    .sort((a, b) => a.at - b.at);
+    .sort((a, b) => {
+      // Spatial ordering makes start assignment more stable and reduces the
+      // spaghetti effect compared with assigning origins purely by report time.
+      if (Math.abs(a.lat - b.lat) > 0.15) return b.lat - a.lat;
+      return a.lon - b.lon || a.at - b.at;
+    })
+    .slice(0, 100);
 
   const lineFeatures = [];
   const arrowFeatures = [];
@@ -982,53 +1199,87 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
 
   terminals.forEach((terminal, index) => {
     const seed = [terminal.region, terminal.placeName, terminal.at, index].join("|");
-    const borderStart = selectBorderStart(terminal, seed, usedBorderStarts);
-    if (!borderStart) return;
+    const startOptions = rankBorderStarts(terminal, seed, usedBorderStarts).slice(0, 18);
+    let chosen = null;
 
-    const supports = bestSupportChain(nodes, terminal, borderStart);
-    const chain = [...supports, terminal];
-    chain.forEach(node => linkedNodeKeys.add(node.nodeKey));
+    for (const option of startOptions) {
+      const borderStart = { ...option.point, borderDistanceKm: option.distance };
+      const supports = bestSupportChain(nodes, terminal, borderStart);
+      const chain = [...supports, terminal];
+      const evidenceWaypoints = [borderStart, ...chain];
 
-    const evidenceWaypoints = [borderStart, ...chain];
-    const expanded = expandRouteWithNaturalSupports(evidenceWaypoints, seed);
-    const compact = [];
-    for (const p of expanded) {
-      if (!compact.length || haversineKm(compact[compact.length - 1], p) > 4) compact.push(p);
+      let expanded = expandRouteWithNaturalSupports(evidenceWaypoints, seed);
+      let compact = [];
+      for (const p of expanded) {
+        if (!compact.length || haversineKm(compact[compact.length - 1], p) > 4) compact.push(p);
+      }
+      let coords = smoothInterpolatingRoute(compact, compact.length > 8 ? 6 : 8);
+
+      // If decorative curvature would leave Ukraine/Russia geometry, retry with
+      // evidence points only. If even that crosses a third country, reject this
+      // border start entirely.
+      if (!routeStaysInAllowedTerritory(coords)) {
+        compact = evidenceWaypoints;
+        coords = smoothInterpolatingRoute(compact, 7);
+      }
+      if (coords.length < 2 || !routeStaysInAllowedTerritory(coords)) continue;
+
+      const crossings = countRouteCrossings(coords, lineFeatures);
+      const direct = haversineKm(borderStart, terminal);
+      const detourRatio = direct > 1 ? routeLengthKm(coords) / direct : 1;
+      const score =
+        option.baseScore +
+        crossings * 900 +
+        Math.max(0, detourRatio - 1.18) * 700 +
+        (terminal.precision === "region-proxy" ? 45 : 0);
+
+      if (!chosen || score < chosen.score) {
+        chosen = { borderStart, supports, chain, coords, crossings, score };
+      }
+      if (crossings === 0 && detourRatio < 1.28 && option.baseScore <= startOptions[0].baseScore + 35) break;
     }
-    const coords = smoothInterpolatingRoute(compact, compact.length > 8 ? 6 : 8);
-    if (coords.length < 2) return;
 
-    const evidence = chain.reduce((sum, n) => sum + n.observations, 0);
-    const supportCount = supports.length;
+    if (!chosen) return;
+    usedBorderStarts.push(chosen.borderStart);
+    chosen.chain.forEach(node => linkedNodeKeys.add(node.nodeKey));
+
+    const evidence = chosen.chain.reduce((sum, n) => sum + n.observations, 0);
+    const supportCount = chosen.supports.length;
+    const proxyCount = chosen.chain.filter(n => n.precision === "region-proxy").length;
     const confidence = Math.min(
       1,
-      0.24 +
+      0.22 +
       supportCount * 0.17 +
       Math.min(0.22, evidence * 0.035) +
-      (isStrongObservationKind(terminal.kind) ? 0.12 : 0)
+      (isStrongObservationKind(terminal.kind) ? 0.12 : 0) -
+      proxyCount * 0.08
     );
 
     const props = {
       route_id: "uav-route-" + index,
       target: terminal.place,
       region: terminal.region,
-      start_border_id: borderStart.borderId,
-      evidence_nodes: chain.length,
+      start_border_id: chosen.borderStart.borderId,
+      start_origin_region: chosen.borderStart.originRegion,
+      evidence_nodes: chosen.chain.length,
       inferred_support_nodes: supportCount,
+      region_proxy_nodes: proxyCount,
+      route_crossings: chosen.crossings,
       observations: evidence,
       confidence,
-      earliest_at: new Date(chain[0].at).toISOString(),
+      earliest_at: new Date(chosen.chain[0].at).toISOString(),
       latest_at: new Date(terminal.at).toISOString(),
       illustrative: true,
     };
 
-    lineFeatures.push({
+    const feature = {
       type: "Feature",
       properties: props,
-      geometry: { type: "LineString", coordinates: coords },
-    });
+      geometry: { type: "LineString", coordinates: chosen.coords },
+    };
+    lineFeatures.push(feature);
 
-    const a = coords[coords.length - 2], b = coords[coords.length - 1];
+    const a = chosen.coords[chosen.coords.length - 2], b = chosen.coords[chosen.coords.length - 1];
     arrowFeatures.push({
       type: "Feature",
       properties: {
