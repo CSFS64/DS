@@ -25,6 +25,7 @@ from collector.collect import (
     merge_existing_archive,
     revalidate_archive_reports,
     fetch_posts_mtproto_for_window,
+    source_post_applies,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -222,6 +223,49 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(args.lookback_hours, 168)
         self.assertIsNone(args.window_start_override)
         self.assertIsNone(args.window_end_override)
+
+    def test_v18_monitoring_wording_and_registry(self):
+        self.assertEqual(uav_activity_kind('Сернурский район. Фиксация БПЛА.'), 'uav_detected')
+        self.assertEqual(uav_activity_kind('Саратовская область. Внимание по БПЛА.'), 'uav_warning')
+        cfg = json.loads((ROOT / 'data' / 'sources.json').read_text(encoding='utf-8'))
+        monitoring = [s for s in cfg['sources'] if s.get('source_layer','').startswith('monitoring_')]
+        regions = {s['region'] for s in monitoring}
+        required = {
+            'Smolensk Oblast','Kaluga Oblast','Oryol Oblast','Lipetsk Oblast','Tambov Oblast',
+            'Ryazan Oblast','Nizhny Novgorod Oblast','Mari El Republic','Chuvash Republic',
+            'Republic of Tatarstan','Ulyanovsk Oblast','Saratov Oblast','Volgograd Oblast','Rostov Oblast',
+        }
+        self.assertTrue(required <= regions)
+        self.assertGreaterEqual(len(monitoring), 14)
+
+    def test_v18_national_monitoring_is_region_scoped(self):
+        source = {
+            'region':'Mari El Republic', 'region_label':'Республика Марий Эл',
+            'region_aliases':['республика марий эл','марий эл'],
+            'require_region_match':True, 'places':[], '_catalog_places':[],
+        }
+        yes = Post('radarrussiia', 1, datetime(2026,9,24,1,0,tzinfo=timezone.utc),
+                   'Республика Марий Эл. Опасность по БПЛА.', 'https://t.me/radarrussiia/1')
+        no = Post('radarrussiia', 2, datetime(2026,9,24,1,1,tzinfo=timezone.utc),
+                  'Калужская область. Опасность по БПЛА.', 'https://t.me/radarrussiia/2')
+        self.assertTrue(source_post_applies(yes, source))
+        self.assertFalse(source_post_applies(no, source))
+
+    def test_v18_replay_previous_window_uses_exact_old_window(self):
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / 'events.json'
+            start = datetime(2026,9,23,23,27,31,tzinfo=timezone.utc)
+            end = datetime(2026,9,24,21,43,53,tzinfo=timezone.utc)
+            out.write_text(json.dumps({'window_start':start.isoformat(),'window_end':end.isoformat()}), encoding='utf-8')
+            args = Namespace(
+                output=str(out), safety_lag_hours=0, lookback_hours=168,
+                incremental_overlap_hours=0, full_backfill=False, replay_previous_window=True,
+            )
+            configure_incremental_window(args)
+            self.assertEqual(args.collection_mode, 'replay_previous')
+            self.assertEqual(args.window_start_override, start)
+            self.assertEqual(args.window_end_override, end)
+            self.assertAlmostEqual(args.lookback_hours, (end-start).total_seconds()/3600.0, places=6)
 
     def test_v10_broad_alert_wording(self):
         self.assertEqual(text_kind('На территории города Пензы объявлен режим «Воздушная опасность».'), 'start')

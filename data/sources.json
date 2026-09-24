@@ -1,5 +1,5 @@
 {
-  "version": 13,
+  "version": 18,
   "sources": [
     {
       "region": "Belgorod Oblast",
@@ -3188,12 +3188,362 @@
       "priority": 2,
       "expected_active": true,
       "max_url": "https://max.ru/id2309090290_gos"
+    },
+    {
+      "region": "Smolensk Oblast",
+      "region_label": "Смоленская область",
+      "channel": "radar_smolensk",
+      "source_name": "Radar monitoring — Смоленская область",
+      "source_url": "https://t.me/radar_smolensk",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "смоленская область",
+        "смоленской области"
+      ],
+      "verified_official": false,
+      "source_layer": "monitoring_local",
+      "monitoring_family": "radar_russia",
+      "priority": 0,
+      "expected_active": true,
+      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive."
+    },
+    {
+      "region": "Kaluga Oblast",
+      "region_label": "Калужская область",
+      "channel": "radar_kaluga",
+      "source_name": "Radar monitoring — Калужская область",
+      "source_url": "https://t.me/radar_kaluga",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "калужская область",
+        "калужской области"
+      ],
+      "verified_official": false,
+      "source_layer": "monitoring_local",
+      "monitoring_family": "radar_russia",
+      "priority": 0,
+      "expected_active": true,
+      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive."
+    },
+    {
+      "region": "Oryol Oblast",
+      "region_label": "Орловская область",
+      "channel": "radar_oreI",
+      "source_name": "Radar monitoring — Орловская область",
+      "source_url": "https://t.me/radar_oreI",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "орловская область",
+        "орловской области"
+      ],
+      "verified_official": false,
+      "source_layer": "monitoring_local",
+      "monitoring_family": "radar_russia",
+      "priority": 0,
+      "expected_active": true,
+      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive."
+    },
+    {
+      "region": "Lipetsk Oblast",
+      "region_label": "Липецкая область",
+      "channel": "radar_lipetskk",
+      "source_name": "Radar monitoring — Липецкая область",
+      "source_url": "https://t.me/radar_lipetskk",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "липецкая область",
+        "липецкой области"
+      ],
+      "verified_official": false,
+      "source_layer": "monitoring_local",
+      "monitoring_family": "radar_russia",
+      "priority": 0,
+      "expected_active": true,
+      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive."
+    },
+    {
+      "region": "Tambov Oblast",
+      "region_label": "Тамбовская область",
+      "channel": "radar_tambov",
+      "source_name": "Radar monitoring — Тамбовская область",
+      "source_url": "https://t.me/radar_tambov",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "тамбовская область",
+        "тамбовской области"
+      ],
+      "verified_official": false,
+      "source_layer": "monitoring_local",
+      "monitoring_family": "radar_russia",
+      "priority": 0,
+      "expected_active": true,
+      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive."
+    },
+    {
+      "region": "Ryazan Oblast",
+      "region_label": "Рязанская область",
+      "channel": "radar_ryazan",
+      "source_name": "Radar monitoring — Рязанская область",
+      "source_url": "https://t.me/radar_ryazan",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "рязанская область",
+        "рязанской области"
+      ],
+      "verified_official": false,
+      "source_layer": "monitoring_local",
+      "monitoring_family": "radar_russia",
+      "priority": 0,
+      "expected_active": true,
+      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive."
+    },
+    {
+      "region": "Nizhny Novgorod Oblast",
+      "region_label": "Нижегородская область",
+      "channel": "radar_nizhniinovgorod",
+      "source_name": "Radar monitoring — Нижегородская область",
+      "source_url": "https://t.me/radar_nizhniinovgorod",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "нижегородская область",
+        "нижегородской области"
+      ],
+      "verified_official": false,
+      "source_layer": "monitoring_local",
+      "monitoring_family": "radar_russia",
+      "priority": 0,
+      "expected_active": true,
+      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive."
+    },
+    {
+      "region": "Chuvash Republic",
+      "region_label": "Чувашская Республика - Чувашии",
+      "channel": "radar_chuvashiya",
+      "source_name": "Radar monitoring — Чувашская Республика - Чувашии",
+      "source_url": "https://t.me/radar_chuvashiya",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "чувашская республика",
+        "чувашской республике",
+        "республика чувашия",
+        "чувашии"
+      ],
+      "verified_official": false,
+      "source_layer": "monitoring_local",
+      "monitoring_family": "radar_russia",
+      "priority": 0,
+      "expected_active": true,
+      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive."
+    },
+    {
+      "region": "Republic of Tatarstan",
+      "region_label": "Республика Татарстан",
+      "channel": "radar_tatarstann",
+      "source_name": "Radar monitoring — Республика Татарстан",
+      "source_url": "https://t.me/radar_tatarstann",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "республика татарстан",
+        "татарстан",
+        "татарстане"
+      ],
+      "verified_official": false,
+      "source_layer": "monitoring_local",
+      "monitoring_family": "radar_russia",
+      "priority": 0,
+      "expected_active": true,
+      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive."
+    },
+    {
+      "region": "Ulyanovsk Oblast",
+      "region_label": "Ульяновская область",
+      "channel": "radar_ulyanovsk",
+      "source_name": "Radar monitoring — Ульяновская область",
+      "source_url": "https://t.me/radar_ulyanovsk",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "ульяновская область",
+        "ульяновской области"
+      ],
+      "verified_official": false,
+      "source_layer": "monitoring_local",
+      "monitoring_family": "radar_russia",
+      "priority": 0,
+      "expected_active": true,
+      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive."
+    },
+    {
+      "region": "Saratov Oblast",
+      "region_label": "Саратовская область",
+      "channel": "rada_saratov",
+      "source_name": "Radar monitoring — Саратовская область",
+      "source_url": "https://t.me/rada_saratov",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "саратовская область",
+        "саратовской области"
+      ],
+      "verified_official": false,
+      "source_layer": "monitoring_local",
+      "monitoring_family": "radar_russia",
+      "priority": 0,
+      "expected_active": true,
+      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive."
+    },
+    {
+      "region": "Volgograd Oblast",
+      "region_label": "Волгоградская область",
+      "channel": "radar_volgograd",
+      "source_name": "Radar monitoring — Волгоградская область",
+      "source_url": "https://t.me/radar_volgograd",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "волгоградская область",
+        "волгоградской области"
+      ],
+      "verified_official": false,
+      "source_layer": "monitoring_local",
+      "monitoring_family": "radar_russia",
+      "priority": 0,
+      "expected_active": true,
+      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive."
+    },
+    {
+      "region": "Rostov Oblast",
+      "region_label": "Ростовская область",
+      "channel": "radar_rostovv",
+      "source_name": "Radar monitoring — Ростовская область",
+      "source_url": "https://t.me/radar_rostovv",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "ростовская область",
+        "ростовской области"
+      ],
+      "verified_official": false,
+      "source_layer": "monitoring_local",
+      "monitoring_family": "radar_russia",
+      "priority": 0,
+      "expected_active": true,
+      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive."
+    },
+    {
+      "region": "Mari El Republic",
+      "region_label": "Республика Марий Эл",
+      "channel": "radarrussiia",
+      "source_name": "Радар по всей России | БПЛА",
+      "source_url": "https://t.me/radarrussiia",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "республика марий эл",
+        "марий эл",
+        "марий-эл"
+      ],
+      "verified_official": false,
+      "source_layer": "monitoring_national",
+      "monitoring_family": "radar_russia",
+      "priority": 0,
+      "expected_active": true,
+      "require_region_match": true,
+      "notes": "Nationwide monitoring feed used only for Mari El; posts are region-filtered before parsing."
     }
   ],
-  "notes": [
-    "High-resolution official local sources. Nationwide regional fallback sources are in data/regions.json.",
-    "City/municipality matches take precedence. Valid UAV alerts that cannot be resolved locally fall back to the parent region.",
-    "MAX RSChS channels are tracked separately as provenance where verified; the collector does not use the authenticated MAX Bot API for channels it does not administer.",
-    "v13.1: current Bryansk governor source + Oryol government mirror; MTProto flood-wait hardening."
-  ]
+  "notes": "High-resolution official local sources. Nationwide regional fallback sources are in data/regions.json.,City/municipality matches take precedence. Valid UAV alerts that cannot be resolved locally fall back to the parent region.,MAX RSChS channels are tracked separately as provenance where verified; the collector does not use the authenticated MAX Bot API for channels it does not administer.,v13.1: current Bryansk governor source + Oryol government mirror; MTProto flood-wait hardening. v18 adds a 14-region monitoring pilot with explicit monitoring provenance; local Radar feeds are preferred, with the nationwide feed region-filtered for Mari El."
 }

@@ -135,12 +135,12 @@ UAV_REFERENCE_PATTERNS = tuple(re.compile(p) for p in (
 
 UAV_OPERATIONAL_PATTERNS = tuple(re.compile(p) for p in (
     # warnings / danger / threat
-    r"\b(?:опасност\w*|угроз\w*|тревог\w*|опасн\w*\s+неб\w*)\b",
+    r"\b(?:опасност\w*|угроз\w*|тревог\w*|внимани\w*|опасн\w*\s+неб\w*)\b",
     r"\b(?:объявлен\w*|введен\w*|действует|сохраняется)\b.{0,100}\b(?:режим\w*|опасност\w*|угроз\w*)\b",
     # attack / strike / approach / flight / detection
     r"\b(?:атак\w*|удар\w*|пораж\w*|врезал\w*)\b",
     r"\b(?:летит|летят|летел\w*|движ\w*|направля\w*|приближа\w*|подлета\w*|подлет\w*|пролет\w*|следу\w*)\b",
-    r"\b(?:обнаруж\w*|зафиксир\w*|замеч\w*|выявл\w*|наблюда\w*|фиксиру\w*)\b",
+    r"\b(?:обнаруж\w*|зафиксир\w*|замеч\w*|выявл\w*|наблюда\w*|фиксиру\w*|фиксац\w*)\b",
     # air-defence / EW response
     r"\b(?:(?:сбит\w*|сбил\w*)|уничтож\w*|перехват\w*|подав\w*|нейтрализ\w*|обезвреж\w*|ликвидир\w*)\b",
     r"\b(?:пво|рэб)\b.{0,80}\b(?:работа\w*|отража\w*|(?:сбит\w*|сбил\w*)|уничтож\w*|подав\w*)\b",
@@ -305,8 +305,10 @@ def uav_activity_kind(text: str) -> str | None:
             return "impact_or_debris"
         if re.search(r"\b(?:(?:сбит\w*|сбил\w*)|уничтож\w*|перехват\w*|подав\w*|нейтрализ\w*|обезвреж\w*|ликвидир\w*)\b", n):
             return "air_defense_action"
-        if re.search(r"\b(?:обнаруж\w*|зафиксир\w*|замеч\w*|выявл\w*|наблюда\w*|фиксиру\w*)\b", n):
+        if re.search(r"\b(?:обнаруж\w*|зафиксир\w*|замеч\w*|выявл\w*|наблюда\w*|фиксиру\w*|фиксац\w*)\b", n):
             return "uav_detected"
+        if re.search(r"\bвнимани\w*\b", n):
+            return "uav_warning"
         if re.search(r"\b(?:летит|летят|летел\w*|движ\w*|направля\w*|приближа\w*|подлета\w*|подлет\w*|пролет\w*|следу\w*)\b", n):
             return "uav_movement"
         if re.search(r"\b(?:атак\w*|удар\w*|пораж\w*|врезал\w*)\b", n):
@@ -891,7 +893,10 @@ def fetch_telegram_with_fallback(session: requests.Session, channel: str,
 def source_status_row(source_type: str, source_name: str, region: str,
                       fetched: FetchResult, events, reports, alert_stats,
                       *, source_layer: str = "official_local",
-                      expected_active: bool = True) -> dict[str, Any]:
+                      expected_active: bool = True,
+                      scoped_posts: list[Post] | None = None,
+                      window_posts: list[Post] | None = None,
+                      window_alert_stats: dict[str, int] | None = None) -> dict[str, Any]:
     if not expected_active and not fetched.posts:
         health = "inactive"
     elif fetched.transport == "telegram_mtproto" and fetched.transport_ok and fetched.window_complete and not fetched.posts:
@@ -906,6 +911,11 @@ def source_status_row(source_type: str, source_name: str, region: str,
     # An HTML source expected to be active but returning no parsed history is a
     # failure, not evidence that the region had no UAV activity.
     ok = health in {"healthy", "degraded", "quiet"}
+    scoped_posts = fetched.posts if scoped_posts is None else scoped_posts
+    window_posts = scoped_posts if window_posts is None else window_posts
+    window_alert_stats = alert_stats if window_alert_stats is None else window_alert_stats
+    scoped_oldest = min((p.published_at for p in scoped_posts), default=None)
+    scoped_newest = max((p.published_at for p in scoped_posts), default=None)
     return {
         "source_type": source_type,
         "source": source_name,
@@ -917,16 +927,19 @@ def source_status_row(source_type: str, source_name: str, region: str,
         "transport": fetched.transport,
         "transport_ok": fetched.transport_ok,
         "window_complete": fetched.window_complete,
-        "posts": len(fetched.posts),
+        "posts": len(scoped_posts),
+        "context_posts": len(scoped_posts),
+        "window_posts": len(window_posts),
         "raw_items": fetched.raw_items,
         "mtproto_peer_cache_hit": fetched.mtproto_peer_cache_hit,
         "mtproto_peer_resolved": fetched.mtproto_peer_resolved,
-        "oldest_post": fetched.oldest.isoformat() if fetched.oldest else None,
-        "newest_post": fetched.newest.isoformat() if fetched.newest else None,
+        "oldest_post": scoped_oldest.isoformat() if scoped_oldest else None,
+        "newest_post": scoped_newest.isoformat() if scoped_newest else None,
         "error": fetched.error,
         "events": len(events),
         "reports": len(reports),
         **alert_stats,
+        **{f"window_{k}": v for k, v in window_alert_stats.items()},
         **({"error": fetched.error} if fetched.error else {}),
     }
 
@@ -1248,6 +1261,18 @@ def is_region_message(text: str, source: dict[str, Any]) -> bool:
     if not places and any(alias in n for alias in region_aliases):
         return True
     return False
+
+
+def source_post_applies(post: Post, source: dict[str, Any]) -> bool:
+    """Limit shared/national monitoring feeds to the configured region.
+
+    Local channels are trusted to be region-scoped by channel identity. Shared
+    feeds must explicitly mention the region or a catalogued place in it, so one
+    nationwide post cannot be attributed to every configured region.
+    """
+    if not source.get("require_region_match"):
+        return True
+    return is_region_message(post.text, source) or bool(extract_places(post.text, source))
 
 
 def alert_scope(place: dict[str, Any] | None) -> str:
@@ -1595,6 +1620,10 @@ def annotate_provenance(records: list[dict[str, Any]], source: dict[str, Any],
         record["transport"] = transport
         record["transport_quality"] = quality
         record["transport_window_complete"] = bool(window_complete)
+        record["source_layer"] = source.get("source_layer", "official_local")
+        record["verified_official"] = bool(source.get("verified_official", False))
+        if source.get("monitoring_family"):
+            record["monitoring_family"] = source["monitoring_family"]
 
 def record_quality(record: dict[str, Any]) -> int:
     stored = record.get("transport_quality")
@@ -1679,23 +1708,29 @@ def collect(args) -> dict[str, Any]:
                 )
                 if len(peer_cache) != before_peer_count:
                     save_telegram_peer_cache(peer_cache_path, peer_cache)
-                posts = fetched.posts
+                posts = [p for p in fetched.posts if source_post_applies(p, source)]
+                window_posts = [p for p in posts if window_start <= p.published_at <= window_end]
                 events, unmatched = pair_alerts(posts, source, window_start, window_end)
                 reports = extract_reports(posts, source, window_start, window_end)
                 annotate_provenance(events, source, fetched.transport, fetched.window_complete)
                 annotate_provenance(reports, source, fetched.transport, fetched.window_complete)
                 all_events.extend(events); all_reports.extend(reports); all_unmatched.extend(unmatched)
                 alert_stats = alert_post_stats(posts)
+                window_alert_stats = alert_post_stats(window_posts)
                 row = source_status_row(
                     "telegram", channel, source["region"], fetched, events, reports, alert_stats,
                     source_layer=source.get("source_layer", "official_local"),
                     expected_active=source.get("expected_active", True),
+                    scoped_posts=posts,
+                    window_posts=window_posts,
+                    window_alert_stats=window_alert_stats,
                 )
                 statuses.append(row)
                 print(
                     f"telegram {channel}: health={row['health']} transport={row['transport']} "
-                    f"posts={len(posts)} alerts={alert_stats['alert_posts']} "
-                    f"starts={alert_stats['start_posts']} ends={alert_stats['end_posts']} "
+                    f"posts={len(posts)} window_posts={len(window_posts)} "
+                    f"alerts={window_alert_stats['alert_posts']} "
+                    f"starts={window_alert_stats['start_posts']} ends={window_alert_stats['end_posts']} "
                     f"events={len(events)} reports={len(reports)}",
                     file=sys.stderr,
                 )
@@ -2082,7 +2117,8 @@ def configure_incremental_window(args) -> None:
     after it, but reports before the cursor are not re-added. A backfill remains
     available only when explicitly selected.
     """
-    args.collection_mode = "backfill" if args.full_backfill else "incremental"
+    replay_previous = bool(getattr(args, "replay_previous_window", False))
+    args.collection_mode = "backfill" if args.full_backfill else ("replay_previous" if replay_previous else "incremental")
     args.window_start_override = None
     args.window_end_override = None
     if args.full_backfill:
@@ -2098,6 +2134,19 @@ def configure_incremental_window(args) -> None:
         previous_end = parse_iso(old.get("window_end", ""))
     except Exception:
         args.collection_mode = "initial"
+        return
+
+    if replay_previous:
+        try:
+            previous_start = parse_iso(old.get("window_start", ""))
+            previous_window_end = parse_iso(old.get("window_end", ""))
+        except Exception:
+            args.collection_mode = "initial"
+            return
+        args.window_start_override = previous_start
+        args.window_end_override = previous_window_end
+        args.lookback_hours = max(0.0, (previous_window_end - previous_start).total_seconds() / 3600.0)
+        args.incremental_overlap_hours = 0
         return
 
     target_end = datetime.now(timezone.utc) - timedelta(hours=args.safety_lag_hours)
@@ -2123,6 +2172,7 @@ def main():
     p.add_argument("--context-hours", type=int, default=int(os.getenv("TELEGRAM_CONTEXT_HOURS", "48")))
     p.add_argument("--incremental-overlap-hours", type=int, default=int(os.getenv("INCREMENTAL_OVERLAP_HOURS", "0")))
     p.add_argument("--full-backfill", action="store_true", default=os.getenv("FULL_BACKFILL", "0") == "1")
+    p.add_argument("--replay-previous-window", action="store_true", default=os.getenv("REPLAY_PREVIOUS_WINDOW", "0") == "1")
     p.add_argument("--mchs-workers", type=int, default=int(os.getenv("MCHS_WORKERS", "8")))
     args = p.parse_args()
     args.safety_lag_hours = max(0, args.safety_lag_hours)
