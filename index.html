@@ -31,10 +31,11 @@
         <span><i class="legend-region missile-report"></i>导弹官方活动</span>
         <span><i class="legend-border ukraine"></i>乌克兰国界</span>
         <span><i class="legend-border russia"></i>俄罗斯国界</span>
+        <span><i class="legend-unlinked"></i>外圈：独立观测 / 未可靠并入路线</span>
         <button id="routeToggle" class="route-toggle is-on" type="button" aria-pressed="true">
           <i class="legend-route"></i><span class="route-toggle-label">示意无人机路线 ON · 0</span>
         </button>
-        <small class="legend-note">路线按所选时段内的本地无人机报告估算可能走廊；只在时间、前进方向、速度和横向偏差同时合理时连接观测点。它不代表某一架无人机的真实连续航迹。国界由高精度行政区几何生成。</small>
+        <small class="legend-note">路线起点只取乌克兰边界上的高精度边界点，并按邻近线路自动错开；路线会精确穿过被采用的本地观测点。观测之间的曲线仅用于平滑表达，不代表某一架无人机的真实连续航迹。</small>
       </div>
 
       <aside id="detailPanel" class="detail-panel" hidden>
