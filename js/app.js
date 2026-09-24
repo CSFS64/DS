@@ -895,11 +895,18 @@ function buildUkraineBorderCandidates() {
 }
 
 function originModeForTerminal(terminal) {
-  // Northern/western targets use only the Ukraine-Russia national border.
-  // Lower-latitude or deep-eastern targets use the selected eastern/southern
-  // oblast boundaries. Belgorod falls into east/south; Kursk/Bryansk/Oryol/
-  // Moscow/Ryazan remain in the northern pool, while Volga/Ural targets use
-  // the eastern pool.
+  // Immediate northern-border regions must always start on the actual
+  // Ukraine-Russia international border.  Do not let the generic latitude
+  // split push Belgorod into the Kharkiv/Dnipro/Mykolaiv/Odesa oblast-boundary
+  // pool, which could otherwise select an internal Kharkiv-Poltava boundary.
+  const strictNorthRegions = new Set([
+    "Bryansk Oblast",
+    "Kursk Oblast",
+    "Belgorod Oblast",
+  ]);
+  if (strictNorthRegions.has(terminal.region)) return "north";
+
+  // Farther northern/western targets keep the same border-only rule.
   if (terminal.lat >= 51.15 && terminal.lon < 43.0) return "north";
   return "eastSouth";
 }
@@ -915,11 +922,13 @@ function rankBorderStarts(terminal, seed, usedStarts) {
     .sort((a, b) => a.distance - b.distance);
   const bestDistance = ranked[0].distance;
 
-  // For oblast-boundary origins, stay fairly close to the target-facing side.
-  // The northern border gets a wider shortlist because long-range routes can
-  // plausibly fan out over a longer border section.
-  const extraDistance = mode === "north" ? 230 : 120;
-  const maxCandidates = mode === "north" ? 70 : 55;
+  // For oblast-boundary origins, stay tightly on the target-facing side.
+  // This prevents spacing penalties from pushing an east/south route onto a
+  // distant internal oblast boundary (for example Kharkiv-Poltava).
+  // The northern border keeps a wider fan because it is a true international
+  // border pool rather than a whole-oblast perimeter.
+  const extraDistance = mode === "north" ? 230 : 70;
+  const maxCandidates = mode === "north" ? 70 : 40;
   const shortlist = ranked
     .filter(x => x.distance <= bestDistance + extraDistance)
     .slice(0, maxCandidates);
@@ -930,10 +939,12 @@ function rankBorderStarts(terminal, seed, usedStarts) {
       const nearestUsed = sameModeStarts.length
         ? Math.min(...sameModeStarts.map(p => haversineKm(p, item.point)))
         : Infinity;
-      const crowdPenalty =
-        nearestUsed < 20 ? (20 - nearestUsed) * 10 :
-        nearestUsed < 50 ? (50 - nearestUsed) * 1.8 : 0;
-      const jitter = (routeHash(seed + "|" + item.point.borderId) % 1000) / 1000 * 8;
+      const crowdPenalty = mode === "north"
+        ? (nearestUsed < 20 ? (20 - nearestUsed) * 10 :
+           nearestUsed < 50 ? (50 - nearestUsed) * 1.8 : 0)
+        : (nearestUsed < 16 ? (16 - nearestUsed) * 4.0 :
+           nearestUsed < 36 ? (36 - nearestUsed) * 0.9 : 0);
+      const jitter = (routeHash(seed + "|" + item.point.borderId) % 1000) / 1000 * (mode === "north" ? 8 : 4);
       return {
         ...item,
         mode,
