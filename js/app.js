@@ -790,12 +790,7 @@ function installArchiveLayers() {
     },
     paint: {
       "line-color": "#ff9b3d",
-      "line-width": [
-        "interpolate", ["linear"], ["zoom"],
-        3, ["interpolate", ["linear"], ["get", "observations"], 1, 1.2, 6, 2.0],
-        7, ["interpolate", ["linear"], ["get", "observations"], 1, 1.8, 6, 3.0],
-        11, ["interpolate", ["linear"], ["get", "observations"], 1, 2.5, 6, 3.8]
-      ],
+      "line-width": ["interpolate", ["linear"], ["zoom"], 3, 1.4, 7, 2.2, 11, 3.0],
       "line-opacity": 0.82,
     },
   }, beforeId);
