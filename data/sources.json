@@ -1,5 +1,5 @@
 {
-  "version": 18,
+  "version": 19,
   "sources": [
     {
       "region": "Belgorod Oblast",
@@ -327,7 +327,10 @@
       "verified_official": true,
       "source_layer": "official_local",
       "priority": 2,
-      "expected_active": true
+      "expected_active": true,
+      "coverage_role": "cross_validation",
+      "coverage_priority": 2,
+      "verification_weight": 100
     },
     {
       "region": "Tula Oblast",
@@ -525,7 +528,10 @@
       "verified_official": true,
       "source_layer": "official_local",
       "priority": 2,
-      "expected_active": true
+      "expected_active": true,
+      "coverage_role": "cross_validation",
+      "coverage_priority": 2,
+      "verification_weight": 100
     },
     {
       "region": "Penza Oblast",
@@ -1077,7 +1083,10 @@
       "verified_official": true,
       "source_layer": "official_local",
       "priority": 2,
-      "expected_active": true
+      "expected_active": true,
+      "coverage_role": "cross_validation",
+      "coverage_priority": 2,
+      "verification_weight": 100
     },
     {
       "region": "Vladimir Oblast",
@@ -1158,7 +1167,10 @@
       "verified_official": true,
       "source_layer": "official_local",
       "priority": 2,
-      "expected_active": true
+      "expected_active": true,
+      "coverage_role": "cross_validation",
+      "coverage_priority": 2,
+      "verification_weight": 100
     },
     {
       "region": "Oryol Oblast",
@@ -1198,9 +1210,12 @@
       ],
       "verified_official": true,
       "source_layer": "official_local",
-      "priority": 1,
+      "priority": 2,
       "expected_active": true,
-      "notes": "Official regional-government mirror; adds redundancy because some operational notices moved primarily to MAX."
+      "notes": "Official regional-government mirror; adds redundancy because some operational notices moved primarily to MAX.",
+      "coverage_role": "cross_validation",
+      "coverage_priority": 2,
+      "verification_weight": 100
     },
     {
       "region": "Kaluga Oblast",
@@ -1252,7 +1267,10 @@
       "verified_official": true,
       "source_layer": "official_local",
       "priority": 2,
-      "expected_active": true
+      "expected_active": true,
+      "coverage_role": "cross_validation",
+      "coverage_priority": 2,
+      "verification_weight": 100
     },
     {
       "region": "Nizhny Novgorod Oblast",
@@ -1322,7 +1340,10 @@
       "verified_official": true,
       "source_layer": "official_local",
       "priority": 2,
-      "expected_active": true
+      "expected_active": true,
+      "coverage_role": "cross_validation",
+      "coverage_priority": 2,
+      "verification_weight": 100
     },
     {
       "region": "Ivanovo Oblast",
@@ -1440,7 +1461,10 @@
       "verified_official": true,
       "source_layer": "official_local",
       "priority": 2,
-      "expected_active": true
+      "expected_active": true,
+      "coverage_role": "cross_validation",
+      "coverage_priority": 2,
+      "verification_weight": 100
     },
     {
       "region": "Saratov Oblast",
@@ -1496,7 +1520,10 @@
       "verified_official": true,
       "source_layer": "official_local",
       "priority": 2,
-      "expected_active": true
+      "expected_active": true,
+      "coverage_role": "cross_validation",
+      "coverage_priority": 2,
+      "verification_weight": 100
     },
     {
       "region": "Tambov Oblast",
@@ -1542,7 +1569,10 @@
       "verified_official": true,
       "source_layer": "official_local",
       "priority": 2,
-      "expected_active": true
+      "expected_active": true,
+      "coverage_role": "cross_validation",
+      "coverage_priority": 2,
+      "verification_weight": 100
     },
     {
       "region": "Republic of Mordovia",
@@ -1625,7 +1655,10 @@
       "verified_official": true,
       "source_layer": "official_local",
       "priority": 2,
-      "expected_active": true
+      "expected_active": true,
+      "coverage_role": "cross_validation",
+      "coverage_priority": 2,
+      "verification_weight": 100
     },
     {
       "region": "Rostov Oblast",
@@ -1682,7 +1715,10 @@
       "verified_official": true,
       "source_layer": "official_local",
       "priority": 2,
-      "expected_active": true
+      "expected_active": true,
+      "coverage_role": "cross_validation",
+      "coverage_priority": 2,
+      "verification_weight": 100
     },
     {
       "region": "Krasnodar Krai",
@@ -1807,7 +1843,10 @@
       "verified_official": true,
       "source_layer": "official_local",
       "priority": 2,
-      "expected_active": true
+      "expected_active": true,
+      "coverage_role": "cross_validation",
+      "coverage_priority": 2,
+      "verification_weight": 100
     },
     {
       "region": "Volgograd Oblast",
@@ -1864,7 +1903,10 @@
       "verified_official": true,
       "source_layer": "official_local",
       "priority": 2,
-      "expected_active": true
+      "expected_active": true,
+      "coverage_role": "cross_validation",
+      "coverage_priority": 2,
+      "verification_weight": 100
     },
     {
       "region": "Orenburg Oblast",
@@ -2769,9 +2811,12 @@
       ],
       "verified_official": true,
       "source_layer": "official_emergency",
-      "priority": 1,
+      "priority": 2,
       "expected_active": true,
-      "max_url": "https://max.ru/id5753035851_gos"
+      "max_url": "https://max.ru/id5753035851_gos",
+      "coverage_role": "cross_validation",
+      "coverage_priority": 2,
+      "verification_weight": 100
     },
     {
       "region": "Bryansk Oblast",
@@ -2817,9 +2862,12 @@
       ],
       "verified_official": true,
       "source_layer": "official_alert",
-      "priority": 1,
+      "priority": 2,
       "expected_active": true,
-      "max_url": "https://max.ru/gumchs48"
+      "max_url": "https://max.ru/gumchs48",
+      "coverage_role": "cross_validation",
+      "coverage_priority": 2,
+      "verification_weight": 100
     },
     {
       "region": "Lipetsk Oblast",
@@ -2842,7 +2890,10 @@
       "verified_official": true,
       "source_layer": "official_local",
       "priority": 2,
-      "expected_active": true
+      "expected_active": true,
+      "coverage_role": "cross_validation",
+      "coverage_priority": 2,
+      "verification_weight": 100
     },
     {
       "region": "Ryazan Oblast",
@@ -2864,8 +2915,11 @@
       ],
       "verified_official": true,
       "source_layer": "official_local",
-      "priority": 1,
-      "expected_active": true
+      "priority": 2,
+      "expected_active": true,
+      "coverage_role": "cross_validation",
+      "coverage_priority": 2,
+      "verification_weight": 100
     },
     {
       "region": "Tambov Oblast",
@@ -2887,8 +2941,11 @@
       ],
       "verified_official": true,
       "source_layer": "official_local",
-      "priority": 1,
-      "expected_active": true
+      "priority": 2,
+      "expected_active": true,
+      "coverage_role": "cross_validation",
+      "coverage_priority": 2,
+      "verification_weight": 100
     },
     {
       "region": "Tambov Oblast",
@@ -2910,8 +2967,11 @@
       ],
       "verified_official": true,
       "source_layer": "official_emergency",
-      "priority": 1,
-      "expected_active": true
+      "priority": 2,
+      "expected_active": true,
+      "coverage_role": "cross_validation",
+      "coverage_priority": 2,
+      "verification_weight": 100
     },
     {
       "region": "Moscow Oblast",
@@ -2958,7 +3018,10 @@
       "source_layer": "official_emergency",
       "priority": 3,
       "expected_active": false,
-      "max_url": "https://max.ru/mchs52"
+      "max_url": "https://max.ru/mchs52",
+      "coverage_role": "cross_validation",
+      "coverage_priority": 2,
+      "verification_weight": 100
     },
     {
       "region": "Mari El Republic",
@@ -2981,8 +3044,11 @@
       ],
       "verified_official": true,
       "source_layer": "official_local",
-      "priority": 1,
-      "expected_active": true
+      "priority": 2,
+      "expected_active": true,
+      "coverage_role": "cross_validation",
+      "coverage_priority": 2,
+      "verification_weight": 100
     },
     {
       "region": "Mari El Republic",
@@ -3005,9 +3071,12 @@
       ],
       "verified_official": true,
       "source_layer": "official_emergency",
-      "priority": 1,
+      "priority": 2,
       "expected_active": true,
-      "max_url": "https://max.ru/id1215098830_gos"
+      "max_url": "https://max.ru/id1215098830_gos",
+      "coverage_role": "cross_validation",
+      "coverage_priority": 2,
+      "verification_weight": 100
     },
     {
       "region": "Ulyanovsk Oblast",
@@ -3029,9 +3098,12 @@
       ],
       "verified_official": true,
       "source_layer": "official_emergency",
-      "priority": 1,
+      "priority": 2,
       "expected_active": true,
-      "max_url": "https://max.ru/id7325050261_gos"
+      "max_url": "https://max.ru/id7325050261_gos",
+      "coverage_role": "cross_validation",
+      "coverage_priority": 2,
+      "verification_weight": 100
     },
     {
       "region": "Volgograd Oblast",
@@ -3053,9 +3125,12 @@
       ],
       "verified_official": true,
       "source_layer": "official_emergency",
-      "priority": 1,
+      "priority": 2,
       "expected_active": true,
-      "max_url": "https://max.ru/id3444118546_gos"
+      "max_url": "https://max.ru/id3444118546_gos",
+      "coverage_role": "cross_validation",
+      "coverage_priority": 2,
+      "verification_weight": 100
     },
     {
       "region": "Volgograd Oblast",
@@ -3091,8 +3166,11 @@
       ],
       "verified_official": true,
       "source_layer": "official_municipal",
-      "priority": 1,
-      "expected_active": true
+      "priority": 2,
+      "expected_active": true,
+      "coverage_role": "cross_validation",
+      "coverage_priority": 2,
+      "verification_weight": 100
     },
     {
       "region": "Rostov Oblast",
@@ -3114,9 +3192,12 @@
       ],
       "verified_official": true,
       "source_layer": "official_local",
-      "priority": 1,
+      "priority": 2,
       "expected_active": true,
-      "max_url": "https://max.ru/Yuri_Slusar"
+      "max_url": "https://max.ru/Yuri_Slusar",
+      "coverage_role": "cross_validation",
+      "coverage_priority": 2,
+      "verification_weight": 100
     },
     {
       "region": "Rostov Oblast",
@@ -3140,7 +3221,10 @@
       "source_layer": "official_emergency",
       "priority": 2,
       "expected_active": true,
-      "max_url": "https://max.ru/id6164228703_gos"
+      "max_url": "https://max.ru/id6164228703_gos",
+      "coverage_role": "cross_validation",
+      "coverage_priority": 2,
+      "verification_weight": 100
     },
     {
       "region": "Krasnodar Krai",
@@ -3210,9 +3294,12 @@
       "verified_official": false,
       "source_layer": "monitoring_local",
       "monitoring_family": "radar_russia",
-      "priority": 3,
+      "priority": 0,
       "expected_active": true,
-      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive."
+      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive.",
+      "coverage_role": "primary_monitoring",
+      "coverage_priority": 0,
+      "verification_weight": 70
     },
     {
       "region": "Kaluga Oblast",
@@ -3235,9 +3322,12 @@
       "verified_official": false,
       "source_layer": "monitoring_local",
       "monitoring_family": "radar_russia",
-      "priority": 3,
+      "priority": 0,
       "expected_active": true,
-      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive."
+      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive.",
+      "coverage_role": "primary_monitoring",
+      "coverage_priority": 0,
+      "verification_weight": 70
     },
     {
       "region": "Oryol Oblast",
@@ -3260,9 +3350,12 @@
       "verified_official": false,
       "source_layer": "monitoring_local",
       "monitoring_family": "radar_russia",
-      "priority": 3,
+      "priority": 0,
       "expected_active": true,
-      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive."
+      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive.",
+      "coverage_role": "primary_monitoring",
+      "coverage_priority": 0,
+      "verification_weight": 70
     },
     {
       "region": "Lipetsk Oblast",
@@ -3285,9 +3378,12 @@
       "verified_official": false,
       "source_layer": "monitoring_local",
       "monitoring_family": "radar_russia",
-      "priority": 3,
+      "priority": 0,
       "expected_active": true,
-      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive."
+      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive.",
+      "coverage_role": "primary_monitoring",
+      "coverage_priority": 0,
+      "verification_weight": 70
     },
     {
       "region": "Tambov Oblast",
@@ -3310,9 +3406,12 @@
       "verified_official": false,
       "source_layer": "monitoring_local",
       "monitoring_family": "radar_russia",
-      "priority": 3,
+      "priority": 0,
       "expected_active": true,
-      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive."
+      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive.",
+      "coverage_role": "primary_monitoring",
+      "coverage_priority": 0,
+      "verification_weight": 70
     },
     {
       "region": "Ryazan Oblast",
@@ -3335,9 +3434,12 @@
       "verified_official": false,
       "source_layer": "monitoring_local",
       "monitoring_family": "radar_russia",
-      "priority": 3,
+      "priority": 0,
       "expected_active": true,
-      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive."
+      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive.",
+      "coverage_role": "primary_monitoring",
+      "coverage_priority": 0,
+      "verification_weight": 70
     },
     {
       "region": "Nizhny Novgorod Oblast",
@@ -3360,9 +3462,12 @@
       "verified_official": false,
       "source_layer": "monitoring_local",
       "monitoring_family": "radar_russia",
-      "priority": 3,
+      "priority": 0,
       "expected_active": true,
-      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive."
+      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive.",
+      "coverage_role": "primary_monitoring",
+      "coverage_priority": 0,
+      "verification_weight": 70
     },
     {
       "region": "Chuvash Republic",
@@ -3387,9 +3492,12 @@
       "verified_official": false,
       "source_layer": "monitoring_local",
       "monitoring_family": "radar_russia",
-      "priority": 3,
+      "priority": 0,
       "expected_active": true,
-      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive."
+      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive.",
+      "coverage_role": "primary_monitoring",
+      "coverage_priority": 0,
+      "verification_weight": 70
     },
     {
       "region": "Republic of Tatarstan",
@@ -3413,9 +3521,12 @@
       "verified_official": false,
       "source_layer": "monitoring_local",
       "monitoring_family": "radar_russia",
-      "priority": 3,
+      "priority": 0,
       "expected_active": true,
-      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive."
+      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive.",
+      "coverage_role": "primary_monitoring",
+      "coverage_priority": 0,
+      "verification_weight": 70
     },
     {
       "region": "Ulyanovsk Oblast",
@@ -3438,9 +3549,12 @@
       "verified_official": false,
       "source_layer": "monitoring_local",
       "monitoring_family": "radar_russia",
-      "priority": 3,
+      "priority": 0,
       "expected_active": true,
-      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive."
+      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive.",
+      "coverage_role": "primary_monitoring",
+      "coverage_priority": 0,
+      "verification_weight": 70
     },
     {
       "region": "Saratov Oblast",
@@ -3463,9 +3577,12 @@
       "verified_official": false,
       "source_layer": "monitoring_local",
       "monitoring_family": "radar_russia",
-      "priority": 3,
+      "priority": 0,
       "expected_active": true,
-      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive."
+      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive.",
+      "coverage_role": "primary_monitoring",
+      "coverage_priority": 0,
+      "verification_weight": 70
     },
     {
       "region": "Volgograd Oblast",
@@ -3488,9 +3605,12 @@
       "verified_official": false,
       "source_layer": "monitoring_local",
       "monitoring_family": "radar_russia",
-      "priority": 3,
+      "priority": 0,
       "expected_active": true,
-      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive."
+      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive.",
+      "coverage_role": "primary_monitoring",
+      "coverage_priority": 0,
+      "verification_weight": 70
     },
     {
       "region": "Rostov Oblast",
@@ -3513,9 +3633,12 @@
       "verified_official": false,
       "source_layer": "monitoring_local",
       "monitoring_family": "radar_russia",
-      "priority": 3,
+      "priority": 0,
       "expected_active": true,
-      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive."
+      "notes": "Non-official monitoring feed; retained as monitoring provenance in the delayed historical archive.",
+      "coverage_role": "primary_monitoring",
+      "coverage_priority": 0,
+      "verification_weight": 70
     },
     {
       "region": "Mari El Republic",
@@ -3539,11 +3662,45 @@
       "verified_official": false,
       "source_layer": "monitoring_national",
       "monitoring_family": "radar_russia",
-      "priority": 4,
+      "priority": 1,
       "expected_active": true,
       "require_region_match": true,
-      "notes": "Nationwide monitoring feed used only for Mari El; posts are region-filtered before parsing."
+      "notes": "Nationwide monitoring feed used only for Mari El; posts are region-filtered before parsing.",
+      "coverage_role": "monitoring_fallback",
+      "coverage_priority": 1,
+      "verification_weight": 65
+    },
+    {
+      "region": "Volgograd Oblast",
+      "region_label": "Волгоградская область",
+      "channel": "radarrussiia",
+      "source_name": "Радар по всей России | БПЛА",
+      "source_url": "https://t.me/radarrussiia",
+      "roles": [
+        "alerts",
+        "reports"
+      ],
+      "enabled": true,
+      "places": [],
+      "kind": "telegram",
+      "fallback_to_region_on_unresolved": true,
+      "region_aliases": [
+        "волгоградская область",
+        "волгоградской области",
+        "волгоград"
+      ],
+      "verified_official": false,
+      "source_layer": "monitoring_national",
+      "monitoring_family": "radar_russia",
+      "coverage_role": "monitoring_fallback",
+      "coverage_priority": 1,
+      "verification_weight": 65,
+      "priority": 1,
+      "expected_active": true,
+      "require_region_match": true,
+      "fallback_only_if_no_local_activity": true,
+      "notes": "Nationwide same-family fallback; used only when the local Volgograd Radar feed yields no monitoring activity in the selected archive window."
     }
   ],
-  "notes": "High-resolution official local sources. Nationwide regional fallback sources are in data/regions.json.,City/municipality matches take precedence. Valid UAV alerts that cannot be resolved locally fall back to the parent region.,MAX RSChS channels are tracked separately as provenance where verified; the collector does not use the authenticated MAX Bot API for channels it does not administer.,v13.1: current Bryansk governor source + Oryol government mirror; MTProto flood-wait hardening. v18 adds a 14-region monitoring pilot with explicit monitoring provenance; local Radar feeds are preferred, with the nationwide feed region-filtered for Mari El."
+  "notes": "High-resolution official local sources. Nationwide regional fallback sources are in data/regions.json.,City/municipality matches take precedence. Valid UAV alerts that cannot be resolved locally fall back to the parent region.,MAX RSChS channels are tracked separately as provenance where verified; the collector does not use the authenticated MAX Bot API for channels it does not administer.,v13.1: current Bryansk governor source + Oryol government mirror; MTProto flood-wait hardening. v18 adds a 14-region monitoring pilot with explicit monitoring provenance; local Radar feeds are preferred, with the nationwide feed region-filtered for Mari El. v19 promotes the 14-region Radar pilot to coverage-primary monitoring; official feeds remain fully ingested as higher-verification cross-validation. Volgograd gets a region-filtered nationwide same-family fallback."
 }
