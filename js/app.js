@@ -34,6 +34,8 @@ const state = {
   previousActivePlaceIds: new Set(),
   previousReportRegionIds: new Set(),
   previousReportPlaceIds: new Set(),
+  previousRoutePlaceIds: new Set(),
+  ukraineBorderCandidates: null,
   currentMs: 0,
   cumulativeMs: 0,
   viewMode: "realtime",
@@ -543,39 +545,95 @@ function preparePlacesGeoJson() {
 }
 
 
-function routeObservationPoints(record, atMs, sourceType) {
+function routePlaceCatalog() {
+  const exact = sourcePlaceIndex();
+  const aliases = new Map();
+  for (const [key, place] of exact) {
+    for (const value of [place.name, place.label]) {
+      const n = normalizeAdminNameStrict(value);
+      if (!n) continue;
+      const aliasKey = place.region + "::" + n;
+      if (!aliases.has(aliasKey)) aliases.set(aliasKey, { ...place, key });
+    }
+  }
+  return { exact, aliases };
+}
+
+function resolveRouteCatalogPlace(catalog, region, ...names) {
+  for (const name of names) {
+    if (!name) continue;
+    const exactKey = region + "::" + name;
+    if (catalog.exact.has(exactKey)) return catalog.exact.get(exactKey);
+    const alias = catalog.aliases.get(region + "::" + normalizeAdminNameStrict(name));
+    if (alias) return alias;
+  }
+  return null;
+}
+
+function routeObservationPoints(record, atMs, sourceType, catalog) {
   if (threatClass(record) !== "uav" || record.signal_class === "alert_clear_signal") return [];
   const points = [];
   const seen = new Set();
   const recordKey = String(record.id || record.url || [record.region, record.at || record.start, record.place].join("|"));
   const kind = record.activity_kind || record.alert_type || "";
-  const add = (lon, lat, place, precision, weight = 1) => {
-    lon = +lon; lat = +lat;
-    if (!Number.isFinite(lon) || !Number.isFinite(lat)) return;
-    const key = lon.toFixed(4) + ":" + lat.toFixed(4);
-    if (seen.has(key)) return;
-    seen.add(key);
+  const formal = record.signal_class === "formal_alert_signal" || sourceType === "alert";
+
+  const add = (candidate, fallbackName, precision, weight = 1) => {
+    const resolved = candidate && Number.isFinite(+candidate.lon) && Number.isFinite(+candidate.lat)
+      ? candidate
+      : resolveRouteCatalogPlace(
+          catalog,
+          record.region || "",
+          candidate?.name,
+          candidate?.label,
+          fallbackName,
+        );
+    if (!resolved || !Number.isFinite(+resolved.lon) || !Number.isFinite(+resolved.lat)) return;
+
+    const lon = +resolved.lon, lat = +resolved.lat;
+    const placeName = resolved.name || candidate?.name || fallbackName || record.place || record.region;
+    const placeLabel = resolved.label || candidate?.label || placeName;
+    const placeKey = resolved.key || ((record.region || "") + "::" + placeName);
+    const coordKey = lon.toFixed(4) + ":" + lat.toFixed(4);
+    if (seen.has(coordKey)) return;
+    seen.add(coordKey);
+    const nodeKey = [
+      record.region || "",
+      normalizeAdminNameStrict(placeName),
+      lon.toFixed(4),
+      lat.toFixed(4),
+    ].join("|");
+
     points.push({
       lon, lat,
-      place: place || record.place || record.region,
-      precision,
+      place: placeLabel,
+      placeName,
+      placeKey,
+      nodeKey,
+      precision: resolved.type || precision || "local",
       region: record.region || "",
       at: atMs,
       sourceType,
       kind,
+      formal,
       recordKey,
       weight,
     });
   };
 
-  // Only use actual local coordinates for track geometry.  A region centroid is
-  // useful for coloring an oblast, but it is not evidence that a UAV passed
-  // through the geometric center of that oblast.
+  // The route engine now resolves locations through the same city/municipality
+  // catalog used to render the visible map dots. This removes the old state
+  // where the map knew a point's coordinates but the route engine did not.
   for (const p of (record.mentioned_places || []).slice(0, 8)) {
-    add(p.lon, p.lat, p.label || p.name, p.type || "local", 1.0);
+    add(p, p.label || p.name, p.type || "local", 1.0);
   }
   if (record.scope !== "region") {
-    add(record.lon, record.lat, record.place_label || record.place, record.scope || "local", 1.0);
+    add(
+      { lon: record.lon, lat: record.lat, name: record.place, label: record.place_label },
+      record.place,
+      record.scope || "local",
+      1.0,
+    );
   }
   return points;
 }
@@ -605,23 +663,6 @@ function angleDiffDeg(a, b) {
   return Math.min(d, 360 - d);
 }
 
-function pickIngressAnchor(target) {
-  let best = UAV_ROUTE_ANCHORS[0];
-  let bestScore = Infinity;
-  for (const anchor of UAV_ROUTE_ANCHORS) {
-    if (target.lat < 48.0 && !["east", "south"].includes(anchor.corridor)) continue;
-    const distance = haversineKm(anchor, target);
-    const eastPenalty = target.lon > 45 && anchor.lon < 34 ? 120 : 0;
-    const northPenalty = target.lat > 53.5 && anchor.lat < 47 ? 160 : 0;
-    const score = distance + eastPenalty + northPenalty;
-    if (score < bestScore) {
-      best = anchor;
-      bestScore = score;
-    }
-  }
-  return best;
-}
-
 function routeHash(value) {
   let h = 2166136261;
   for (const ch of String(value)) {
@@ -631,18 +672,77 @@ function routeHash(value) {
   return h >>> 0;
 }
 
+function buildUkraineBorderCandidates() {
+  if (state.ukraineBorderCandidates?.length) return state.ukraineBorderCandidates;
+  const outline = buildOuterBoundaryGeoJson(state.ukraineGeoJson, "UKR");
+  const lines = outline?.geometry?.coordinates || [];
+  const candidates = [];
+  let id = 0;
+
+  // Sample the actual high-detail national outline. Every generated route
+  // therefore begins exactly on a border/coastline vertex, never from an
+  // arbitrary point inside Ukraine.
+  for (const line of lines) {
+    if (!Array.isArray(line) || line.length < 2) continue;
+    let last = null;
+    for (let i = 0; i < line.length; i++) {
+      const coord = line[i];
+      if (!Array.isArray(coord) || !Number.isFinite(+coord[0]) || !Number.isFinite(+coord[1])) continue;
+      const point = { lon: +coord[0], lat: +coord[1], borderId: "ukr-border-" + (id++) };
+      if (!last || haversineKm(last, point) >= 14 || i === line.length - 1) {
+        candidates.push(point);
+        last = point;
+      }
+    }
+  }
+  state.ukraineBorderCandidates = candidates;
+  return candidates;
+}
+
+function selectBorderStart(terminal, seed, usedStarts) {
+  const candidates = buildUkraineBorderCandidates();
+  if (!candidates.length) return null;
+
+  const ranked = candidates
+    .map(point => ({ point, distance: haversineKm(point, terminal) }))
+    .sort((a, b) => a.distance - b.distance);
+  const bestDistance = ranked[0].distance;
+  const shortlist = ranked.filter(x => x.distance <= bestDistance + 150).slice(0, 90);
+
+  let best = shortlist[0];
+  let bestScore = Infinity;
+  for (const item of shortlist) {
+    const nearestUsed = usedStarts.length
+      ? Math.min(...usedStarts.map(p => haversineKm(p, item.point)))
+      : Infinity;
+    const crowdPenalty =
+      nearestUsed < 28 ? (28 - nearestUsed) * 8 :
+      nearestUsed < 65 ? (65 - nearestUsed) * 1.7 : 0;
+    const jitter = (routeHash(seed + "|" + item.point.borderId) % 1000) / 1000 * 18;
+    const score = item.distance + crowdPenalty + jitter;
+    if (score < bestScore) {
+      bestScore = score;
+      best = item;
+    }
+  }
+  const chosen = { ...best.point, borderDistanceKm: best.distance };
+  usedStarts.push(chosen);
+  return chosen;
+}
+
 function dedupeRouteObservations(observations) {
   const sorted = [...observations].sort((a, b) => a.at - b.at);
   const out = [];
   for (const node of sorted) {
     const last = [...out].reverse().find(x =>
-      x.region === node.region && x.place === node.place &&
+      x.region === node.region && x.placeName === node.placeName &&
       Math.abs(x.at - node.at) <= 60 * 60 * 1000
     );
     if (last) {
       last.observations += 1;
       last.weight = Math.max(last.weight, node.weight);
       last.at = Math.min(last.at, node.at);
+      last.formal = last.formal || node.formal;
       continue;
     }
     out.push({ ...node, observations: 1 });
@@ -665,9 +765,6 @@ function isStrongObservationKind(kind) {
 }
 
 function corridorProjection(anchor, terminal, point) {
-  // Equirectangular local projection is sufficient for corridor scoring over
-  // this map extent.  progressKm is distance along the anchor->terminal axis;
-  // crossTrackKm is perpendicular distance from that axis.
   const meanLat = (anchor.lat + terminal.lat) * 0.5 * Math.PI / 180;
   const kmLon = 111.32 * Math.cos(meanLat);
   const kmLat = 110.57;
@@ -684,7 +781,7 @@ function corridorProjection(anchor, terminal, point) {
 }
 
 function plausibleSegment(a, b, terminal, anchor) {
-  if (a.recordKey === b.recordKey) return false; // same post can list parallel places
+  if (a.recordKey === b.recordKey) return false;
   const dtHours = (b.at - a.at) / 3600000;
   if (dtHours < 0.12 || dtHours > 5.5) return false;
 
@@ -695,7 +792,7 @@ function plausibleSegment(a, b, terminal, anchor) {
 
   const pa = corridorProjection(anchor, terminal, a);
   const pb = corridorProjection(anchor, terminal, b);
-  if (pb.progressKm <= pa.progressKm + 10) return false; // never move backward along corridor
+  if (pb.progressKm <= pa.progressKm + 10) return false;
 
   const crossLimit = Math.max(55, Math.min(150, pb.routeLengthKm * 0.14));
   if (pa.crossTrackKm > crossLimit || pb.crossTrackKm > crossLimit) return false;
@@ -717,15 +814,13 @@ function bestSupportChain(nodes, terminal, anchor) {
     .map(n => ({ node: n, proj: corridorProjection(anchor, terminal, n) }))
     .filter(x => {
       const crossLimit = Math.max(55, Math.min(150, termProj.routeLengthKm * 0.14));
-      return x.proj.progressKm > 20 &&
-        x.proj.progressKm < termProj.progressKm - 15 &&
+      return x.proj.progressKm > 15 &&
+        x.proj.progressKm < termProj.progressKm - 12 &&
         x.proj.crossTrackKm <= crossLimit;
     })
     .sort((a, b) => a.node.at - b.node.at || a.proj.progressKm - b.proj.progressKm);
 
-  // Dynamic programming: maximize evidence while enforcing monotonic forward
-  // progress and physically plausible speed/heading on every segment.
-  const dp = candidates.map((x, i) => ({
+  const dp = candidates.map(x => ({
     score: (isStrongObservationKind(x.node.kind) ? 2.0 : 1.0) +
       x.node.observations * 0.15 - x.proj.crossTrackKm * 0.004,
     prev: -1,
@@ -765,69 +860,113 @@ function bestSupportChain(nodes, terminal, anchor) {
   return chain;
 }
 
-function corridorWaypoints(anchor, first, terminal, seed) {
-  const distance = haversineKm(anchor, first);
-  if (distance < 120) return [];
-  const hash = routeHash(seed);
-  const sign = (hash & 1) ? 1 : -1;
-  const dx = first.lon - anchor.lon;
-  const dy = first.lat - anchor.lat;
-  const len = Math.sqrt(dx * dx + dy * dy) || 1;
-  const nx = -dy / len, ny = dx / len;
-  // Keep synthetic curvature intentionally small.  Evidence points, not
-  // decoration, determine the route shape.
-  const bend = Math.min(0.28, Math.max(0.06, distance / 3500));
-  const fractions = distance > 700 ? [0.30, 0.60] : [0.42];
-  return fractions.map((f, idx) => {
-    const taper = idx === 0 ? 1 : 0.45;
-    return {
-      lon: anchor.lon + dx * f + nx * bend * sign * taper,
-      lat: anchor.lat + dy * f + ny * bend * sign * taper,
+function localVectorKm(a, b, refLat) {
+  const kmLon = 111.32 * Math.cos(refLat * Math.PI / 180);
+  return {
+    x: (b.lon - a.lon) * kmLon,
+    y: (b.lat - a.lat) * 110.57,
+  };
+}
+
+function offsetPointKm(point, xKm, yKm, refLat) {
+  const kmLon = Math.max(20, 111.32 * Math.cos(refLat * Math.PI / 180));
+  return {
+    lon: point.lon + xKm / kmLon,
+    lat: point.lat + yKm / 110.57,
+    synthetic: true,
+  };
+}
+
+function naturalSegmentSupports(a, b, seed, segmentIndex) {
+  const distance = haversineKm(a, b);
+  if (distance < 75) return [];
+  const refLat = (a.lat + b.lat) / 2;
+  const v = localVectorKm(a, b, refLat);
+  const len = Math.sqrt(v.x * v.x + v.y * v.y) || 1;
+  const nx = -v.y / len, ny = v.x / len;
+  const routeSign = (routeHash(seed) & 1) ? 1 : -1;
+  const modulation = 0.84 + ((routeHash(seed + "|" + segmentIndex) % 33) / 100);
+  const bendKm = Math.min(24, Math.max(4.5, distance * 0.028)) * routeSign * modulation;
+
+  return [0.34, 0.68].map((fraction, idx) => {
+    const base = {
+      lon: a.lon + (b.lon - a.lon) * fraction,
+      lat: a.lat + (b.lat - a.lat) * fraction,
     };
-  }).filter(p => {
-    const proj = corridorProjection(anchor, terminal, p);
-    return proj.progressKm > 0 && proj.progressKm < proj.routeLengthKm;
+    const envelope = Math.sin(Math.PI * fraction);
+    const localBend = bendKm * envelope * (idx === 0 ? 0.92 : 1.0);
+    return offsetPointKm(base, nx * localBend, ny * localBend, refLat);
   });
 }
 
-function chaikinSmooth(points, iterations = 2) {
-  if (points.length < 3) return points.map(p => [p.lon, p.lat]);
-  let coords = points.map(p => [p.lon, p.lat]);
-  for (let iter = 0; iter < iterations; iter++) {
-    const out = [coords[0]];
-    for (let i = 0; i < coords.length - 1; i++) {
-      const a = coords[i], b = coords[i + 1];
-      out.push([
-        a[0] * 0.75 + b[0] * 0.25,
-        a[1] * 0.75 + b[1] * 0.25,
-      ]);
-      out.push([
-        a[0] * 0.25 + b[0] * 0.75,
-        a[1] * 0.25 + b[1] * 0.75,
-      ]);
-    }
-    out.push(coords[coords.length - 1]);
-    coords = out;
+function expandRouteWithNaturalSupports(points, seed) {
+  const out = [];
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i], b = points[i + 1];
+    if (!out.length) out.push(a);
+    out.push(...naturalSegmentSupports(a, b, seed, i));
+    out.push(b);
   }
-  return coords;
+  return out;
+}
+
+function tangentDirection(points, i, refLat) {
+  if (points.length < 2) return { x: 1, y: 0 };
+  const prev = points[Math.max(0, i - 1)];
+  const next = points[Math.min(points.length - 1, i + 1)];
+  const v = localVectorKm(prev, next, refLat);
+  const len = Math.sqrt(v.x * v.x + v.y * v.y) || 1;
+  return { x: v.x / len, y: v.y / len };
+}
+
+function smoothInterpolatingRoute(points, samplesPerSegment = 7) {
+  if (points.length < 2) return points.map(p => [p.lon, p.lat]);
+  const refLat = points.reduce((sum, p) => sum + p.lat, 0) / points.length;
+  const out = [];
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i], b = points[i + 1];
+    const segment = localVectorKm(a, b, refLat);
+    const segLen = Math.sqrt(segment.x * segment.x + segment.y * segment.y) || 1;
+    const ta = tangentDirection(points, i, refLat);
+    const tb = tangentDirection(points, i + 1, refLat);
+    const prevLen = i > 0 ? haversineKm(points[i - 1], a) : segLen;
+    const nextLen = i + 2 < points.length ? haversineKm(b, points[i + 2]) : segLen;
+    const handleA = Math.min(segLen * 0.30, prevLen * 0.34, 75);
+    const handleB = Math.min(segLen * 0.30, nextLen * 0.34, 75);
+    const c1 = offsetPointKm(a, ta.x * handleA, ta.y * handleA, refLat);
+    const c2 = offsetPointKm(b, -tb.x * handleB, -tb.y * handleB, refLat);
+
+    for (let step = 0; step < samplesPerSegment; step++) {
+      const t = step / samplesPerSegment;
+      const u = 1 - t;
+      const lon = u*u*u*a.lon + 3*u*u*t*c1.lon + 3*u*t*t*c2.lon + t*t*t*b.lon;
+      const lat = u*u*u*a.lat + 3*u*u*t*c1.lat + 3*u*t*t*c2.lat + t*t*t*b.lat;
+      if (!out.length || Math.abs(out[out.length - 1][0] - lon) > 1e-8 || Math.abs(out[out.length - 1][1] - lat) > 1e-8) {
+        out.push([lon, lat]);
+      }
+    }
+    // The real observation/support waypoint itself is always included exactly.
+    out.push([b.lon, b.lat]);
+  }
+  return out;
 }
 
 function buildIllustrativeUavRoutes(startMs, endMs) {
+  const catalog = routePlaceCatalog();
   const raw = [];
   for (const report of state.archive.reports || []) {
     const at = Date.parse(report.at);
-    if (at >= startMs && at <= endMs) raw.push(...routeObservationPoints(report, at, "report"));
+    if (at >= startMs && at <= endMs) raw.push(...routeObservationPoints(report, at, "report", catalog));
   }
   for (const event of state.archive.events || []) {
     const start = Date.parse(event.start);
     const end = Date.parse(event.end);
     if (end < startMs || start > endMs) continue;
-    raw.push(...routeObservationPoints(event, Math.max(start, startMs), "alert"));
+    raw.push(...routeObservationPoints(event, Math.max(start, startMs), "alert", catalog));
   }
 
   const nodes = dedupeRouteObservations(raw);
-  // Strong events are preferred as terminal points.  Terse/local movement
-  // reports still get a route if they are not immediately superseded nearby.
   let terminals = nodes.filter((node, idx) => {
     if (isStrongObservationKind(node.kind)) return true;
     return !nodes.some((other, j) =>
@@ -841,26 +980,30 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
 
   terminals = terminals
     .sort((a, b) => b.at - a.at || b.observations - a.observations)
-    .slice(0, 65)
+    .slice(0, 90)
     .sort((a, b) => a.at - b.at);
 
   const lineFeatures = [];
   const arrowFeatures = [];
+  const linkedNodeKeys = new Set();
+  const usedBorderStarts = [];
+
   terminals.forEach((terminal, index) => {
-    const anchor = pickIngressAnchor(terminal);
-    const supports = bestSupportChain(nodes, terminal, anchor);
+    const seed = [terminal.region, terminal.placeName, terminal.at, index].join("|");
+    const borderStart = selectBorderStart(terminal, seed, usedBorderStarts);
+    if (!borderStart) return;
+
+    const supports = bestSupportChain(nodes, terminal, borderStart);
     const chain = [...supports, terminal];
+    chain.forEach(node => linkedNodeKeys.add(node.nodeKey));
 
-    const seed = [anchor.id, terminal.region, terminal.place, index].join("|");
-    const first = chain[0];
-    const synthetic = corridorWaypoints(anchor, first, terminal, seed);
-    const waypoints = [anchor, ...synthetic, ...chain];
-
+    const evidenceWaypoints = [borderStart, ...chain];
+    const expanded = expandRouteWithNaturalSupports(evidenceWaypoints, seed);
     const compact = [];
-    for (const p of waypoints) {
-      if (!compact.length || haversineKm(compact[compact.length - 1], p) > 7) compact.push(p);
+    for (const p of expanded) {
+      if (!compact.length || haversineKm(compact[compact.length - 1], p) > 4) compact.push(p);
     }
-    const coords = chaikinSmooth(compact, compact.length >= 5 ? 2 : 1);
+    const coords = smoothInterpolatingRoute(compact, compact.length > 8 ? 6 : 8);
     if (coords.length < 2) return;
 
     const evidence = chain.reduce((sum, n) => sum + n.observations, 0);
@@ -877,7 +1020,7 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
       route_id: "uav-route-" + index,
       target: terminal.place,
       region: terminal.region,
-      anchor: anchor.id,
+      start_border_id: borderStart.borderId,
       evidence_nodes: chain.length,
       inferred_support_nodes: supportCount,
       observations: evidence,
@@ -904,9 +1047,17 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
     });
   });
 
+  const evidenceStates = nodes.map(node => ({
+    placeKey: node.placeKey,
+    nodeKey: node.nodeKey,
+    linked: linkedNodeKeys.has(node.nodeKey),
+    formal: node.formal,
+  }));
+
   return {
     lines: { type: "FeatureCollection", features: lineFeatures },
     arrows: { type: "FeatureCollection", features: arrowFeatures },
+    evidenceStates,
   };
 }
 
@@ -919,6 +1070,7 @@ function setRouteLayerVisibility() {
     "archive-uav-route-line",
     "archive-uav-route-highlight",
     "archive-uav-route-arrows",
+    "archive-place-route-unlinked",
   ]) {
     if (state.map.getLayer(id)) state.map.setLayoutProperty(id, "visibility", visibility);
   }
@@ -929,6 +1081,31 @@ function setRouteLayerVisibility() {
     if (label) {
       label.textContent = "示意无人机路线 " + (state.routesVisible ? "ON" : "OFF") + " · " + state.routeFeatureCount;
     }
+  }
+}
+
+function applyRouteEvidenceStates(evidenceStates) {
+  if (!state.mapReady || !state.map.getSource("archive-places")) return;
+  for (const id of state.previousRoutePlaceIds) {
+    try {
+      state.map.setFeatureState(
+        { source: "archive-places", id },
+        { routeLinked: false, routeUnlinked: false },
+      );
+    } catch (_) {}
+  }
+  state.previousRoutePlaceIds.clear();
+
+  for (const evidence of evidenceStates || []) {
+    const id = state.placeFeatureIds.get(evidence.placeKey);
+    if (id == null) continue;
+    try {
+      state.map.setFeatureState(
+        { source: "archive-places", id },
+        evidence.linked ? { routeLinked: true, routeUnlinked: false } : { routeLinked: false, routeUnlinked: true },
+      );
+      state.previousRoutePlaceIds.add(id);
+    } catch (_) {}
   }
 }
 
@@ -954,6 +1131,7 @@ function updateRouteOverlay(force = false) {
   state.routeFeatureCount = data.lines.features.length;
   lineSource.setData(data.lines);
   arrowSource.setData(data.arrows);
+  applyRouteEvidenceStates(data.evidenceStates);
   setRouteLayerVisibility();
 }
 
@@ -961,7 +1139,7 @@ function installArchiveLayers() {
   if (!state.map?.isStyleLoaded()) return;
 
   for (const id of [
-    "archive-place-label", "archive-place-dot", "archive-place-glow",
+    "archive-place-label", "archive-place-dot", "archive-place-route-unlinked", "archive-place-glow",
     "archive-uav-route-arrows", "archive-uav-route-highlight", "archive-uav-route-line",
     "archive-uav-route-casing", "archive-uav-route-glow",
     "archive-russia-border-main", "archive-russia-border-casing", "archive-russia-border-glow",
@@ -1176,6 +1354,7 @@ function installArchiveLayers() {
   });
 
   state.routeSelectionKey = "";
+  state.previousRoutePlaceIds.clear();
 
   state.map.addSource("archive-places", { type: "geojson", data: preparePlacesGeoJson() });
   state.map.addLayer({
@@ -1200,6 +1379,49 @@ function installArchiveLayers() {
       "circle-blur": 0.7,
     },
   });
+  state.map.addLayer({
+    id: "archive-place-route-unlinked",
+    type: "circle",
+    source: "archive-places",
+    layout: {
+      "visibility": state.routesVisible ? "visible" : "none",
+    },
+    paint: {
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 5.6, 7, 8.4, 11, 11.5],
+      "circle-color": ["case",
+        ["boolean", ["feature-state", "active"], false], "#39d8ff",
+        ["boolean", ["feature-state", "report"], false], "#ffb347",
+        "#7893a1"
+      ],
+      "circle-opacity": ["case",
+        ["all",
+          ["boolean", ["feature-state", "routeUnlinked"], false],
+          ["any",
+            ["boolean", ["feature-state", "active"], false],
+            ["boolean", ["feature-state", "report"], false]
+          ]
+        ], 0.055,
+        0
+      ],
+      "circle-stroke-color": ["case",
+        ["boolean", ["feature-state", "active"], false], "#8ceaff",
+        ["boolean", ["feature-state", "report"], false], "#ffd17c",
+        "#91a9b6"
+      ],
+      "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 3, 1.0, 7, 1.35, 11, 1.7],
+      "circle-stroke-opacity": ["case",
+        ["all",
+          ["boolean", ["feature-state", "routeUnlinked"], false],
+          ["any",
+            ["boolean", ["feature-state", "active"], false],
+            ["boolean", ["feature-state", "report"], false]
+          ]
+        ], 0.88,
+        0
+      ],
+    },
+  });
+
   state.map.addLayer({
     id: "archive-place-dot",
     type: "circle",
