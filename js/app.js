@@ -6,14 +6,6 @@ const REGION_GEOJSON_URLS = [
   "https://raw.githubusercontent.com/codeforgermany/click_that_hood/48ba05ad4c6969e3b3c25735492169227ae411f1/public/data/russia.geojson",
 ];
 
-const UAV_ROUTE_ANCHORS = [
-  { id: "chernihiv", lon: 31.55, lat: 52.05, corridor: "north" },
-  { id: "sumy", lon: 34.65, lat: 51.00, corridor: "north" },
-  { id: "kharkiv", lon: 36.70, lat: 50.08, corridor: "northeast" },
-  { id: "donbas", lon: 39.15, lat: 48.35, corridor: "east" },
-  { id: "azov", lon: 36.65, lat: 46.45, corridor: "south" },
-  { id: "black-sea", lon: 32.20, lat: 45.35, corridor: "south" },
-];
 const EMPTY_FEATURE_COLLECTION = Object.freeze({ type: "FeatureCollection", features: [] });
 
 const state = {
@@ -1096,13 +1088,21 @@ function applyRouteEvidenceStates(evidenceStates) {
   }
   state.previousRoutePlaceIds.clear();
 
+  const byPlace = new Map();
   for (const evidence of evidenceStates || []) {
-    const id = state.placeFeatureIds.get(evidence.placeKey);
+    if (!evidence.placeKey) continue;
+    const current = byPlace.get(evidence.placeKey) || { linked: false };
+    current.linked = current.linked || Boolean(evidence.linked);
+    byPlace.set(evidence.placeKey, current);
+  }
+
+  for (const [placeKey, status] of byPlace) {
+    const id = state.placeFeatureIds.get(placeKey);
     if (id == null) continue;
     try {
       state.map.setFeatureState(
         { source: "archive-places", id },
-        evidence.linked ? { routeLinked: true, routeUnlinked: false } : { routeLinked: false, routeUnlinked: true },
+        status.linked ? { routeLinked: true, routeUnlinked: false } : { routeLinked: false, routeUnlinked: true },
       );
       state.previousRoutePlaceIds.add(id);
     } catch (_) {}
