@@ -129,22 +129,43 @@ button, input, select { font: inherit; }
 .legend-region.missile-alert { border: 1px solid #ff6678; background: rgba(255,51,77,.24); }
 .legend-region.missile-report { border: 1px solid #ff9f4a; background: rgba(255,138,51,.16); }
 .legend-border {
-  width: 18px;
-  height: 0;
+  position: relative;
+  width: 19px;
+  height: 6px;
   display: inline-block;
-  border-top: 2px solid;
-  box-shadow: 0 0 5px currentColor;
 }
-.legend-border.ukraine { color: #c9f8ff; border-top-width: 3px; }
-.legend-border.russia { color: #eef5f8; opacity: .88; }
+.legend-border::before,
+.legend-border::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  border-radius: 999px;
+}
+.legend-border::before { height: 5px; background: #031018; }
+.legend-border::after { height: 2px; box-shadow: 0 0 6px currentColor; }
+.legend-border.ukraine { color: #61e3cf; }
+.legend-border.ukraine::after { background: #61e3cf; }
+.legend-border.russia { color: #8dbbd2; }
+.legend-border.russia::after { background: #8dbbd2; }
 .legend-route {
-  width: 18px;
-  height: 7px;
+  position: relative;
+  width: 20px;
+  height: 8px;
   display: inline-block;
-  border-top: 2px solid #ff9b3d;
-  border-radius: 50%;
-  box-shadow: 0 -2px 7px rgba(255,143,47,.65);
+  border-top: 4px solid #6f2c08;
+  border-radius: 55% 45% 50% 50%;
+  box-shadow: 0 -2px 8px rgba(255,114,24,.42);
   transform: rotate(-8deg);
+}
+.legend-route::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0;
+  top: -3px;
+  border-top: 1.5px solid #ff9b2f;
+  border-radius: 50%;
 }
 .route-toggle {
   display: flex;
