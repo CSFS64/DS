@@ -21,6 +21,7 @@ const state = {
   regionFeatureIds: new Map(),
   regionCentroids: new Map(),
   regionGeometryByName: new Map(),
+  regionBoundsByName: new Map(),
   placeFeatureIds: new Map(),
   allowedTerritoryParts: null,
   regionMatchedCount: 0,
@@ -468,6 +469,7 @@ function prepareRegionGeoJson() {
   state.regionFeatureIds.clear();
   state.regionCentroids.clear();
   state.regionGeometryByName.clear();
+  state.regionBoundsByName.clear();
   let nextId = 1;
   let matched = 0;
 
@@ -509,6 +511,7 @@ function prepareRegionGeoJson() {
         });
       }
       state.regionGeometryByName.set(canonical, clone.geometry);
+      if (bounds) state.regionBoundsByName.set(canonical, bounds);
       matched += 1;
     }
     return clone;
@@ -650,6 +653,179 @@ function routeStaysInAllowedTerritory(coords, allowSouthernWater = false) {
     return false;
   }
   return true;
+}
+
+
+function russianRegionAtPoint(point) {
+  for (const [region, geometry] of state.regionGeometryByName) {
+    const bounds = state.regionBoundsByName.get(region);
+    if (bounds && (
+      point.lon < bounds.minLon || point.lon > bounds.maxLon ||
+      point.lat < bounds.minLat || point.lat > bounds.maxLat
+    )) continue;
+    if (pointInGeometry(point, geometry)) return region;
+  }
+  return null;
+}
+
+function pointInRussiaTerritory(point) {
+  return russianRegionAtPoint(point) != null;
+}
+
+function interpolatePoint(a, b, t) {
+  return {
+    lon: a.lon + (b.lon - a.lon) * t,
+    lat: a.lat + (b.lat - a.lat) * t,
+  };
+}
+
+function firstRussiaEntry(origin, terminal) {
+  // Find the first transition into the project's Russia region geometry along
+  // the origin->target ray, then binary-search the boundary crossing.
+  let previous = { ...origin };
+  let previousInside = pointInRussiaTerritory(previous);
+  const steps = 180;
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    const current = interpolatePoint(origin, terminal, t);
+    const inside = pointInRussiaTerritory(current);
+    if (!previousInside && inside) {
+      let lo = (i - 1) / steps, hi = t;
+      for (let k = 0; k < 14; k++) {
+        const mid = (lo + hi) / 2;
+        if (pointInRussiaTerritory(interpolatePoint(origin, terminal, mid))) hi = mid;
+        else lo = mid;
+      }
+      const entry = interpolatePoint(origin, terminal, hi);
+      return {
+        ...entry,
+        borderId: origin.borderId,
+        originRegion: origin.originRegion,
+        originIso: origin.originIso,
+        originMode: origin.originMode,
+        assumedOrigin: { lon: origin.lon, lat: origin.lat },
+      };
+    }
+    previous = current;
+    previousInside = inside;
+  }
+
+  // A north-border candidate can numerically fall just inside the Russian
+  // polygon. In that case use the origin itself if it is already inside.
+  if (pointInRussiaTerritory(origin)) {
+    return {
+      ...origin,
+      assumedOrigin: { lon: origin.lon, lat: origin.lat },
+    };
+  }
+  return null;
+}
+
+function validRussiaEntryForMode(entry, mode) {
+  if (!entry) return false;
+  if (mode === "north") {
+    // North routes must enter along the Ukraine-facing western/southwestern
+    // border belt, never from another side of a Russian region.
+    return entry.lon >= 31.2 && entry.lon <= 39.8 &&
+      entry.lat >= 49.4 && entry.lat <= 53.6;
+  }
+  // East/south routes must enter through the southern/southwestern belt rather
+  // than appearing from Belarus or another northern third-country border.
+  return (entry.lat <= 51.4 && entry.lon >= 35.0) ||
+    (entry.lat <= 47.2 && entry.lon >= 31.0);
+}
+
+function routeStaysInRussia(coords) {
+  if (!coords?.length) return false;
+  // The first coordinate is a boundary crossing and may sit exactly on the
+  // polygon edge. Every following sampled point must be in a Russian region.
+  for (let i = 1; i < coords.length; i++) {
+    const p = { lon: +coords[i][0], lat: +coords[i][1] };
+    if (!pointInRussiaTerritory(p)) return false;
+  }
+  return true;
+}
+
+function selectedWindowUavRegions(startMs, endMs) {
+  const lit = new Set();
+  for (const report of state.archive.reports || []) {
+    const at = Date.parse(report.at);
+    if (at < startMs || at > endMs || threatClass(report) !== "uav") continue;
+    if (report.region) lit.add(report.region);
+  }
+  for (const event of state.archive.events || []) {
+    if (threatClass(event) !== "uav") continue;
+    const start = Date.parse(event.start), end = Date.parse(event.end);
+    if (end < startMs || start > endMs) continue;
+    if (event.region) lit.add(event.region);
+  }
+  return lit;
+}
+
+function routeRegionMetrics(coords, litRegions) {
+  const distanceByRegion = new Map();
+  const sequence = [];
+  let outsideKm = 0;
+
+  for (let i = 1; i < coords.length; i++) {
+    const a = { lon: coords[i - 1][0], lat: coords[i - 1][1] };
+    const b = { lon: coords[i][0], lat: coords[i][1] };
+    const km = haversineKm(a, b);
+    const mid = { lon: (a.lon + b.lon) / 2, lat: (a.lat + b.lat) / 2 };
+    const region = russianRegionAtPoint(mid);
+    if (!region) {
+      outsideKm += km;
+      continue;
+    }
+    distanceByRegion.set(region, (distanceByRegion.get(region) || 0) + km);
+    if (sequence[sequence.length - 1] !== region) sequence.push(region);
+  }
+
+  let litKm = 0, unlitKm = 0;
+  const litSeen = new Set(), unlitSeen = new Set();
+  for (const [region, km] of distanceByRegion) {
+    if (litRegions.has(region)) {
+      litKm += km;
+      litSeen.add(region);
+    } else {
+      unlitKm += km;
+      unlitSeen.add(region);
+    }
+  }
+
+  const litIndices = sequence
+    .map((region, index) => litRegions.has(region) ? index : -1)
+    .filter(index => index >= 0);
+  let bridgeUnlitRegions = 0;
+  let bridgeUnlitRuns = 0;
+  if (litIndices.length >= 2) {
+    const first = litIndices[0], last = litIndices[litIndices.length - 1];
+    let inRun = false;
+    const bridgeSet = new Set();
+    for (let i = first + 1; i < last; i++) {
+      const region = sequence[i];
+      if (!litRegions.has(region)) {
+        bridgeSet.add(region);
+        if (!inRun) bridgeUnlitRuns += 1;
+        inRun = true;
+      } else {
+        inRun = false;
+      }
+    }
+    bridgeUnlitRegions = bridgeSet.size;
+  }
+
+  return {
+    sequence,
+    distanceByRegion,
+    litKm,
+    unlitKm,
+    litRegionCount: litSeen.size,
+    unlitRegionCount: unlitSeen.size,
+    bridgeUnlitRegions,
+    bridgeUnlitRuns,
+    outsideKm,
+  };
 }
 
 function routePlaceCatalog() {
@@ -1105,34 +1281,38 @@ function offsetPointKm(point, xKm, yKm, refLat) {
   };
 }
 
-function naturalSegmentSupports(a, b, seed, segmentIndex) {
+function naturalSegmentSupports(a, b, seed, segmentIndex, bendScale = 1, signFlip = 1) {
   const distance = haversineKm(a, b);
-  if (distance < 75) return [];
+  if (distance < 58) return [];
   const refLat = (a.lat + b.lat) / 2;
   const v = localVectorKm(a, b, refLat);
   const len = Math.sqrt(v.x * v.x + v.y * v.y) || 1;
   const nx = -v.y / len, ny = v.x / len;
-  const routeSign = (routeHash(seed) & 1) ? 1 : -1;
-  const modulation = 0.84 + ((routeHash(seed + "|" + segmentIndex) % 33) / 100);
-  const bendKm = Math.min(24, Math.max(4.5, distance * 0.028)) * routeSign * modulation;
+  const baseSign = (routeHash(seed + "|" + segmentIndex) & 1) ? 1 : -1;
+  const routeSign = baseSign * signFlip;
+  const modulation = 0.90 + ((routeHash(seed + "|curve|" + segmentIndex) % 31) / 100);
+  const bendKm = Math.min(38, Math.max(6.0, distance * 0.038)) *
+    routeSign * modulation * bendScale;
+  const fractions = distance > 230 ? [0.24, 0.52, 0.78] : [0.34, 0.68];
 
-  return [0.34, 0.68].map((fraction, idx) => {
+  return fractions.map((fraction, idx) => {
     const base = {
       lon: a.lon + (b.lon - a.lon) * fraction,
       lat: a.lat + (b.lat - a.lat) * fraction,
     };
     const envelope = Math.sin(Math.PI * fraction);
-    const localBend = bendKm * envelope * (idx === 0 ? 0.92 : 1.0);
+    const profile = fractions.length === 3 ? [0.72, 1.0, 0.76][idx] : [0.92, 1.0][idx];
+    const localBend = bendKm * envelope * profile;
     return offsetPointKm(base, nx * localBend, ny * localBend, refLat);
   });
 }
 
-function expandRouteWithNaturalSupports(points, seed) {
+function expandRouteWithNaturalSupports(points, seed, bendScale = 1, signFlip = 1) {
   const out = [];
   for (let i = 0; i < points.length - 1; i++) {
     const a = points[i], b = points[i + 1];
     if (!out.length) out.push(a);
-    out.push(...naturalSegmentSupports(a, b, seed, i));
+    out.push(...naturalSegmentSupports(a, b, seed, i, bendScale, signFlip));
     out.push(b);
   }
   return out;
@@ -1225,10 +1405,14 @@ function routeLengthKm(coords) {
 
 function buildIllustrativeUavRoutes(startMs, endMs) {
   const catalog = routePlaceCatalog();
+  const litRegions = selectedWindowUavRegions(startMs, endMs);
   const raw = [];
+
   for (const report of state.archive.reports || []) {
     const at = Date.parse(report.at);
-    if (at >= startMs && at <= endMs) raw.push(...routeObservationPoints(report, at, "report", catalog));
+    if (at >= startMs && at <= endMs) {
+      raw.push(...routeObservationPoints(report, at, "report", catalog));
+    }
   }
   for (const event of state.archive.events || []) {
     const start = Date.parse(event.start);
@@ -1251,67 +1435,110 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
 
   terminals = terminals
     .sort((a, b) => {
-      // Spatial ordering makes start assignment more stable and reduces the
-      // spaghetti effect compared with assigning origins purely by report time.
       if (Math.abs(a.lat - b.lat) > 0.15) return b.lat - a.lat;
       return a.lon - b.lon || a.at - b.at;
     })
-    .slice(0, 100);
+    .slice(0, 90);
 
   const lineFeatures = [];
   const arrowFeatures = [];
   const linkedNodeKeys = new Set();
-  const usedBorderStarts = [];
+  const usedVisibleStarts = [];
 
   terminals.forEach((terminal, index) => {
     const seed = [terminal.region, terminal.placeName, terminal.at, index].join("|");
-    const startOptions = rankBorderStarts(terminal, seed, usedBorderStarts).slice(0, 18);
+    const startOptions = rankBorderStarts(terminal, seed, usedVisibleStarts).slice(0, 12);
     let chosen = null;
 
     for (const option of startOptions) {
-      const borderStart = {
-        ...option.point,
-        borderDistanceKm: option.distance,
-        routeOriginPool: option.mode,
+      const mode = option.mode;
+      const entry = firstRussiaEntry(option.point, terminal);
+      if (!validRussiaEntryForMode(entry, mode)) continue;
+
+      const visibleStart = {
+        ...entry,
+        borderDistanceKm: haversineKm(entry, terminal),
+        routeOriginPool: mode,
+        originMode: option.point.originMode,
       };
-      const allowSouthernWater = option.mode === "eastSouth";
-      const supports = bestSupportChain(nodes, terminal, borderStart);
+      const nearestUsed = usedVisibleStarts.length
+        ? Math.min(...usedVisibleStarts.map(p => haversineKm(p, visibleStart)))
+        : Infinity;
+      const visibleCrowdPenalty =
+        nearestUsed < 18 ? (18 - nearestUsed) * 7 :
+        nearestUsed < 45 ? (45 - nearestUsed) * 1.2 : 0;
+
+      const supports = bestSupportChain(nodes, terminal, visibleStart);
       const chain = [...supports, terminal];
-      const evidenceWaypoints = [borderStart, ...chain];
+      const evidenceWaypoints = [visibleStart, ...chain];
 
-      let expanded = expandRouteWithNaturalSupports(evidenceWaypoints, seed);
-      let compact = [];
-      for (const p of expanded) {
-        if (!compact.length || haversineKm(compact[compact.length - 1], p) > 4) compact.push(p);
+      // Try several gentle curvature variants. The region-aware score below
+      // chooses the variant that stays in lit regions longer while crossing the
+      // fewest unlit regions, without allowing large detours.
+      const variants = [
+        { bendScale: 0.95, signFlip: 1 },
+        { bendScale: 1.25, signFlip: 1 },
+        { bendScale: 1.40, signFlip: -1 },
+      ];
+
+      for (const variant of variants) {
+        const expanded = expandRouteWithNaturalSupports(
+          evidenceWaypoints,
+          seed,
+          variant.bendScale,
+          variant.signFlip,
+        );
+        const compact = [];
+        for (const p of expanded) {
+          if (!compact.length || haversineKm(compact[compact.length - 1], p) > 4) compact.push(p);
+        }
+        let coords = smoothInterpolatingRoute(compact, compact.length > 8 ? 7 : 9);
+        if (coords.length < 2 || !routeStaysInRussia(coords)) continue;
+
+        const metrics = routeRegionMetrics(coords, litRegions);
+        if (metrics.outsideKm > 0.5) continue;
+
+        const crossings = countRouteCrossings(coords, lineFeatures);
+        const direct = haversineKm(visibleStart, terminal);
+        const total = routeLengthKm(coords);
+        const detourRatio = direct > 1 ? total / direct : 1;
+
+        // Priority order:
+        // 1) do not bridge lit areas through many dark regions;
+        // 2) minimize all distinct dark regions and dark-region distance;
+        // 3) prefer longer traversal inside lit regions;
+        // 4) keep crossings/detours under control.
+        const score =
+          option.baseScore * 0.35 +
+          visibleCrowdPenalty +
+          metrics.bridgeUnlitRegions * 1450 +
+          metrics.bridgeUnlitRuns * 520 +
+          metrics.unlitRegionCount * 420 +
+          metrics.unlitKm * 1.35 -
+          metrics.litRegionCount * 150 -
+          metrics.litKm * 0.82 +
+          crossings * 780 +
+          Math.max(0, detourRatio - 1.34) * 900 +
+          (terminal.precision === "region-proxy" ? 35 : 0);
+
+        if (!chosen || score < chosen.score) {
+          chosen = {
+            visibleStart,
+            assumedOrigin: option.point,
+            supports,
+            chain,
+            coords,
+            crossings,
+            score,
+            metrics,
+            detourRatio,
+          };
+        }
       }
-      let coords = smoothInterpolatingRoute(compact, compact.length > 8 ? 6 : 8);
-
-      // If decorative curvature would leave Ukraine/Russia geometry, retry with
-      // evidence points only. If even that crosses a third country, reject this
-      // border start entirely.
-      if (!routeStaysInAllowedTerritory(coords, allowSouthernWater)) {
-        compact = evidenceWaypoints;
-        coords = smoothInterpolatingRoute(compact, 7);
-      }
-      if (coords.length < 2 || !routeStaysInAllowedTerritory(coords, allowSouthernWater)) continue;
-
-      const crossings = countRouteCrossings(coords, lineFeatures);
-      const direct = haversineKm(borderStart, terminal);
-      const detourRatio = direct > 1 ? routeLengthKm(coords) / direct : 1;
-      const score =
-        option.baseScore +
-        crossings * 900 +
-        Math.max(0, detourRatio - 1.18) * 700 +
-        (terminal.precision === "region-proxy" ? 45 : 0);
-
-      if (!chosen || score < chosen.score) {
-        chosen = { borderStart, supports, chain, coords, crossings, score };
-      }
-      if (crossings === 0 && detourRatio < 1.28 && option.baseScore <= startOptions[0].baseScore + 35) break;
     }
 
     if (!chosen) return;
-    usedBorderStarts.push(chosen.borderStart);
+    usedVisibleStarts.push(chosen.visibleStart);
     chosen.chain.forEach(node => linkedNodeKeys.add(node.nodeKey));
 
     const evidence = chosen.chain.reduce((sum, n) => sum + n.observations, 0);
@@ -1330,14 +1557,19 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
       route_id: "uav-route-" + index,
       target: terminal.place,
       region: terminal.region,
-      start_border_id: chosen.borderStart.borderId,
-      start_origin_region: chosen.borderStart.originRegion,
-      start_origin_iso: chosen.borderStart.originIso,
-      start_origin_pool: chosen.borderStart.routeOriginPool,
+      start_border_id: chosen.visibleStart.borderId,
+      start_origin_region: chosen.assumedOrigin.originRegion,
+      start_origin_iso: chosen.assumedOrigin.originIso,
+      start_origin_pool: chosen.visibleStart.routeOriginPool,
       evidence_nodes: chosen.chain.length,
       inferred_support_nodes: supportCount,
       region_proxy_nodes: proxyCount,
       route_crossings: chosen.crossings,
+      lit_regions_crossed: chosen.metrics.litRegionCount,
+      unlit_regions_crossed: chosen.metrics.unlitRegionCount,
+      bridge_unlit_regions: chosen.metrics.bridgeUnlitRegions,
+      lit_km: Math.round(chosen.metrics.litKm),
+      unlit_km: Math.round(chosen.metrics.unlitKm),
       observations: evidence,
       confidence,
       earliest_at: new Date(chosen.chain[0].at).toISOString(),
@@ -1352,7 +1584,8 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
     };
     lineFeatures.push(feature);
 
-    const a = chosen.coords[chosen.coords.length - 2], b = chosen.coords[chosen.coords.length - 1];
+    const a = chosen.coords[chosen.coords.length - 2];
+    const b = chosen.coords[chosen.coords.length - 1];
     arrowFeatures.push({
       type: "Feature",
       properties: {

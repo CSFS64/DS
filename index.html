@@ -35,7 +35,7 @@
         <button id="routeToggle" class="route-toggle is-on" type="button" aria-pressed="true">
           <i class="legend-route"></i><span class="route-toggle-label">示意无人机路线 ON · 0</span>
         </button>
-        <small class="legend-note">路线起点按当前可视化规则分两组：北部目标只从乌俄国界候选点出发；东部/南部目标从哈尔科夫、第聂伯彼得罗夫斯克、尼古拉耶夫和敖德萨州边界中选择最靠近目标的一侧。路线继续避开第三国；南部允许经过黑海北部/亚速海水域。只有州级信息时会用州内低置信度代理点参与路线。所有起点和曲线均为示意假设，不代表真实发射点或单机连续航迹。</small>
+        <small class="legend-note">可视化路线从进入俄罗斯区域几何的边界点开始，此后只在俄罗斯区域内绘制；候选线路优先穿过所选时间窗内有无人机活动的州，并尽量减少夹在相邻亮州之间的未亮州，同时奖励在亮州内较长的穿越距离。只有州级信息时仍使用低置信度州内代理点。路线和起点均为示意推断，不代表真实发射点或单机连续航迹。</small>
       </div>
 
       <aside id="detailPanel" class="detail-panel" hidden>
