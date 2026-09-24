@@ -6,7 +6,7 @@ on:
       - "collector/**"
       - "tests/**"
       - "data/sources.json"
-      - "data/country-borders.geojson"
+      - "data/ukraine-regions.geojson"
       - "js/**"
       - "index.html"
       - "css/**"
@@ -16,7 +16,7 @@ on:
       - "collector/**"
       - "tests/**"
       - "data/sources.json"
-      - "data/country-borders.geojson"
+      - "data/ukraine-regions.geojson"
       - "js/**"
       - "index.html"
       - "css/**"
@@ -40,5 +40,5 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Check frontend JavaScript syntax
         run: node --check js/app.js
-      - name: Validate country-border GeoJSON
-        run: python -m json.tool data/country-borders.geojson > /dev/null
+      - name: Validate detailed Ukraine GeoJSON
+        run: python -m json.tool data/ukraine-regions.geojson > /dev/null
