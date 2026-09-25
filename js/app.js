@@ -779,7 +779,7 @@ function selectedWindowUavRegions(startMs, endMs) {
   const lit = new Set();
   for (const report of state.archive.reports || []) {
     const at = Date.parse(report.at);
-    if (at < startMs || at > endMs || threatClass(report) !== "uav") continue;
+    if (at < startMs || at > endMs || !reportRepresentsLiveThreat(report)) continue;
     if (report.region) lit.add(report.region);
   }
   for (const event of state.archive.events || []) {
@@ -902,7 +902,7 @@ function routeCountWeight(record) {
 }
 
 function routeObservationPoints(record, atMs, sourceType, catalog) {
-  if (threatClass(record) !== "uav" || record.signal_class === "alert_clear_signal") return [];
+  if (!reportRepresentsLiveThreat(record)) return [];
   const points = [];
   const seen = new Set();
   const recordKey = String(record.id || record.url || [record.region, record.at || record.start, record.place].join("|"));
@@ -2522,7 +2522,10 @@ function activeEvents() {
 
 function activeReports() {
   const span = 45 * 60 * 1000;
-  return (state.archive.reports || []).filter(r => Math.abs(state.currentMs - Date.parse(r.at)) <= span);
+  return (state.archive.reports || []).filter(r =>
+    reportRepresentsLiveThreat(r) &&
+    Math.abs(state.currentMs - Date.parse(r.at)) <= span
+  );
 }
 
 function cumulativeEvents() {
@@ -2536,7 +2539,7 @@ function cumulativeReports() {
   const end = Math.min(Math.max(state.cumulativeMs, start), selectionEndMs());
   return (state.archive.reports || []).filter(r => {
     const at = Date.parse(r.at);
-    return at >= start && at <= end;
+    return reportRepresentsLiveThreat(r) && at >= start && at <= end;
   });
 }
 
@@ -2553,6 +2556,27 @@ function render(options = {}) {
 
 function threatClass(record) {
   return record?.threat_class || (String(record?.alert_type || "").startsWith("missile") ? "missile" : "uav");
+}
+
+function reportRepresentsLiveThreat(record) {
+  if (!record || threatClass(record) !== "uav") return false;
+  if (record.signal_class === "alert_clear_signal") return false;
+
+  // These are contemporaneous operational signals and may light the map.
+  const liveKinds = new Set([
+    "uav_movement",
+    "uav_detected",
+    "air_defense_action",
+    "official_uav_activity",
+    "alert_start_signal",
+  ]);
+  if (liveKinds.has(record.activity_kind)) return true;
+  if (record.signal_class === "formal_alert_signal") return true;
+
+  // Attack/debris/consequence posts are often published hours after the actual
+  // flight. Keep them in the archive/detail panel, but do not let their publish
+  // time create a fresh "live" map activation or route observation.
+  return false;
 }
 
 function setFeatureActive(source, id, active, missile = false) {
