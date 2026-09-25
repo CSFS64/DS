@@ -1211,6 +1211,50 @@ def _bounded_phrase_present(normalized_text: str, phrase: str) -> bool:
     return f" {phrase} " in f" {normalized_text} "
 
 
+def _region_head_aliases(source: dict[str, Any]) -> tuple[str, ...]:
+    """Return conservative adjective-head variants for coordinated region lists.
+
+    Nationwide summaries often write e.g. "Белгородской, Брянской, ... областей",
+    where the administrative noun appears only once at the end. Full phrase
+    aliases cannot match those entries, so retain just the distinctive adjective
+    head and only use it when a matching administrative noun is present nearby.
+    """
+    cached = source.get("_region_head_aliases")
+    if cached is not None:
+        return cached
+
+    raw = str(source.get("region_label", "") or "").strip()
+    words = raw.split()
+    clean = [w.lower().replace("ё", "е").strip(".,:;()[]{}«»\"'") for w in words]
+    admin_words = {"область", "край", "республика", "округ"}
+    admin_idx = next((i for i, w in enumerate(clean) if w in admin_words), None)
+    out: list[str] = []
+    if admin_idx is not None and admin_idx > 0:
+        prefix = words[:admin_idx]
+        out.append(normalize(" ".join(prefix)))
+        for case in ("prep", "gen", "dat", "inst"):
+            out.append(normalize(" ".join(_ru_adjective_case(w, case) for w in prefix)))
+    cached = tuple(dict.fromkeys(v for v in out if len(v) >= 4))
+    source["_region_head_aliases"] = cached
+    return cached
+
+
+def _region_admin_context_present(normalized_text: str) -> bool:
+    return bool(re.search(
+        r"\b(?:област(?:ь|и|ей|ям|ями|ях)|"
+        r"кра(?:й|я|е|ев|ям|ями|ях)|"
+        r"республик(?:а|и|е|у|ой|ами|ах)?|"
+        r"округ(?:а|е|ов|ам|ами|ах)?)\b",
+        normalized_text,
+    ))
+
+
+def _region_head_present(normalized_text: str, source: dict[str, Any]) -> bool:
+    if not _region_admin_context_present(normalized_text):
+        return False
+    return any(_bounded_phrase_present(normalized_text, head) for head in _region_head_aliases(source))
+
+
 def _prepare_place_match_cache(place: dict[str, Any]) -> None:
     """Precompute place aliases once instead of rebuilding regexes per post.
 
@@ -1299,10 +1343,9 @@ def source_post_applies(post: Post, source: dict[str, Any]) -> bool:
     """Limit shared/national monitoring feeds to the configured region.
 
     Explicit region names always win over ambiguous city/district aliases.
-    If a nationwide post names one or more regions, it may only apply to those
-    named regions; place-name fallback is reserved for posts that name no region
-    at all. This prevents common names such as "Кировский район" from leaking a
-    Kaluga post into unrelated regions that also contain a Kirovsky district.
+    Coordinated Russian lists such as "Белгородской, Брянской ... областей"
+    are also recognized via adjective-head variants. Place-name fallback is
+    reserved for posts that contain no explicit region identity at all.
     """
     if not source.get("require_region_match"):
         return True
@@ -1317,14 +1360,22 @@ def source_post_applies(post: Post, source: dict[str, Any]) -> bool:
         ))
         source["_region_match_aliases"] = region_match_aliases
 
-    if any(_bounded_phrase_present(n, alias) for alias in region_match_aliases):
+    own_full = any(_bounded_phrase_present(n, alias) for alias in region_match_aliases)
+    own_head = _region_head_present(n, source)
+    if own_full or own_head:
         return True
 
     all_region_aliases = source.get("_all_region_match_aliases", ())
     if any(_bounded_phrase_present(n, alias) for alias in all_region_aliases):
         return False
 
-    # Only region-less posts may fall back to city/district matching.
+    all_region_heads = source.get("_all_region_match_heads", ())
+    if _region_admin_context_present(n) and any(
+        _bounded_phrase_present(n, head) for head in all_region_heads
+    ):
+        return False
+
+    # Only posts with no explicit region identity may fall back to city/district matching.
     return bool(extract_places(post.text, source))
 
 
@@ -1820,12 +1871,21 @@ def collect(args) -> dict[str, Any]:
         mtproto_error = str(exc)
         print(f"telegram MTProto setup ERROR: {exc}; falling back to public HTML", file=sys.stderr)
 
-    all_region_match_aliases = tuple(dict.fromkeys(
-        normalize(v)
+    national_sources_for_matching = [
+        dict(s)
         for s in source_cfg.get("sources", [])
         if s.get("enabled", False) and s.get("source_layer") == "monitoring_national"
+    ]
+    all_region_match_aliases = tuple(dict.fromkeys(
+        normalize(v)
+        for s in national_sources_for_matching
         for v in [s.get("region_label", ""), *(s.get("region_aliases", []) or [])]
         if normalize(v)
+    ))
+    all_region_match_heads = tuple(dict.fromkeys(
+        head
+        for s in national_sources_for_matching
+        for head in _region_head_aliases(s)
     ))
 
     telegram_fetch_cache: dict[str, FetchResult] = {}
@@ -1839,6 +1899,7 @@ def collect(args) -> dict[str, Any]:
             source["_catalog_places"] = cities_by_region.get(source.get("region", ""), [])
             if source.get("require_region_match"):
                 source["_all_region_match_aliases"] = all_region_match_aliases
+                source["_all_region_match_heads"] = all_region_match_heads
             channel = source["channel"]
             try:
                 cache_hit = channel in telegram_fetch_cache
