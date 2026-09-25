@@ -28,6 +28,7 @@ from collector.collect import (
     fetch_posts_mtproto_for_window,
     source_post_applies,
     source_collection_sort_key,
+    normalize,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -289,6 +290,25 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual({s['region'] for s in nationwide}, enabled_regions)
         self.assertTrue(all(s.get('require_region_match') for s in nationwide))
         self.assertTrue(all(s.get('fallback_only_if_no_local_activity') for s in nationwide))
+
+    def test_v23_explicit_region_blocks_same_name_district_collision(self):
+        cfg = json.loads((ROOT / 'data' / 'sources.json').read_text(encoding='utf-8'))
+        national = [s for s in cfg['sources'] if s.get('source_layer') == 'monitoring_national']
+        all_aliases = tuple(dict.fromkeys(
+            normalize(v)
+            for s in national
+            for v in [s.get('region_label',''), *(s.get('region_aliases',[]) or [])]
+            if normalize(v)
+        ))
+        astrakhan = next(s.copy() for s in national if s['region'] == 'Astrakhan Oblast')
+        astrakhan['_all_region_match_aliases'] = all_aliases
+        kaluga = next(s.copy() for s in national if s['region'] == 'Kaluga Oblast')
+        kaluga['_all_region_match_aliases'] = all_aliases
+        post = Post('radarrussiia', 96002, datetime(2026,9,25,19,55,tzinfo=timezone.utc),
+                    'Кировский район\nКуйбышевский район\nКалужская область\nФиксации БПЛА',
+                    'https://t.me/radarrussiia/96002')
+        self.assertTrue(source_post_applies(post, kaluga))
+        self.assertFalse(source_post_applies(post, astrakhan))
 
     def test_v22_shared_feed_generic_region_phrase_does_not_match_every_region(self):
         cfg = json.loads((ROOT / 'data' / 'sources.json').read_text(encoding='utf-8'))
