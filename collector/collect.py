@@ -1438,6 +1438,12 @@ def classify_count_sentence(sentence: str) -> list[tuple[int, str, int | None, s
         if "около" in prefix or "примерно" in prefix or "порядка" in prefix: return "approx"
         return None
 
+    # Monitoring/Radar wording: "Фиксация 2 БПЛА", "Фиксация от 3 БПЛА".
+    m = re.search(r"\bфиксац\w*\b\s*(?:от\s+|сразу\s+)?(?:(более|свыше|около|примерно|порядка)\s+)?(\d+)\s*(?:бпла|беспилотник\w*)", n)
+    if m:
+        out.append((int(m.group(2)), "detected_reported", None, None, q(m.group(1))))
+        return out
+
     m = re.search(r"(?:атаки|атакован[а-я]*|атаковали|нанесены удары)\D{0,28}(?:(более|свыше|около|примерно|порядка)\s+)?(\d+)\s*(?:бпла|беспилотник\w*)", n)
     if m:
         primary = int(m.group(2))
@@ -1480,12 +1486,12 @@ def classify_missile_count_sentence(sentence: str) -> list[tuple[int, str, int |
         if "около" in prefix or "примерно" in prefix or "порядка" in prefix: return "approx"
         return None
 
-    m = re.search(r"\\bфиксац\\w*\\b\\s*(?:от\\s+|сразу\\s+)?(?:(более|свыше|около|примерно|порядка)\\s+)?(\\d+)\\s*(?:ракет\\w*)", n)
+    m = re.search(r"\bфиксац\w*\b\s*(?:от\s+|сразу\s+)?(?:(более|свыше|около|примерно|порядка)\s+)?(\d+)\s*(?:ракет\w*)", n)
     if m:
         out.append((int(m.group(2)), "missile_detected_reported", None, None, q(m.group(1))))
         return out
 
-    m = re.search(r"(?:летит|летят|движ\\w*|направля\\w*|подлета\\w*)\\D{0,18}(?:(более|свыше|около|примерно|порядка)\\s+)?(\\d+)\\s*(?:ракет\\w*)", n)
+    m = re.search(r"(?:летит|летят|движ\w*|направля\w*|подлета\w*)\D{0,18}(?:(более|свыше|около|примерно|порядка)\s+)?(\d+)\s*(?:ракет\w*)", n)
     if m:
         out.append((int(m.group(2)), "missile_incoming_reported", None, None, q(m.group(1))))
         return out
@@ -1498,7 +1504,7 @@ def cross_region_aggregate_count_text(text: str) -> bool:
     n = normalize(text)
     if not any(marker in n for marker in ("над территориями", "в регионах", "над регионами")):
         return False
-    admin_groups = len(re.findall(r"\\b(?:област\\w*|кра\\w*|республик\\w*|автономн\\w*\\s+округ\\w*)\\b", n))
+    admin_groups = len(re.findall(r"\b(?:област\w*|кра\w*|республик\w*|автономн\w*\s+округ\w*)\b", n))
     return admin_groups >= 2
 
 
