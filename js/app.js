@@ -2562,7 +2562,8 @@ function showReportDetail(report) {
       ? `UNPAIRED ${missile ? "MISSILE" : "UAV"} ALERT CLEAR SIGNAL`
       : `LOCAL OFFICIAL ${missile ? "MISSILE" : "UAV"} ACTIVITY`;
   els.detailTitle.textContent = report.place;
-  const countLine = explicitObservedCount(report) ? `\nObserved: ${observedCountLabel(explicitObservedCount(report), report.count_qualifier)}` : "";\n  els.detailBody.textContent = `${formatTime(Date.parse(report.at), "Europe/Moscow")} MSK${countLine}\n${report.text || `${report.count ?? "—"} ${report.count_type || "reported"}`}`;
+  const countLine = explicitObservedCount(report) ? `\nObserved: ${observedCountLabel(explicitObservedCount(report), report.count_qualifier)}` : "";
+  els.detailBody.textContent = `${formatTime(Date.parse(report.at), "Europe/Moscow")} MSK${countLine}\n${report.text || `${report.count ?? "—"} ${report.count_type || "reported"}`}`;
   els.detailSource.href = report.url;
   els.detailPanel.hidden = false;
 }
