@@ -1181,6 +1181,7 @@ function isEndpointOnlyKind(kind) {
 function isStrongObservationKind(kind) {
   return [
     "uav_movement",
+    "uav_detected",
     "air_defense_action",
     "uav_attack_activity",
     "impact_or_debris",
@@ -1316,9 +1317,13 @@ function naturalSegmentSupports(a, b, seed, segmentIndex, bendScale = 1, signFli
   const baseSign = (routeHash(seed + "|" + segmentIndex) & 1) ? 1 : -1;
   const routeSign = baseSign * signFlip;
   const modulation = 0.90 + ((routeHash(seed + "|curve|" + segmentIndex) % 31) / 100);
-  const bendKm = Math.min(38, Math.max(6.0, distance * 0.038)) *
+  const bendKm = Math.min(72, Math.max(7.5, distance * 0.055)) *
     routeSign * modulation * bendScale;
-  const fractions = distance > 230 ? [0.24, 0.52, 0.78] : [0.34, 0.68];
+  const fractions = distance > 420
+    ? [0.18, 0.40, 0.62, 0.82]
+    : distance > 230
+      ? [0.22, 0.50, 0.78]
+      : [0.32, 0.68];
 
   return fractions.map((fraction, idx) => {
     const base = {
@@ -1326,7 +1331,11 @@ function naturalSegmentSupports(a, b, seed, segmentIndex, bendScale = 1, signFli
       lat: a.lat + (b.lat - a.lat) * fraction,
     };
     const envelope = Math.sin(Math.PI * fraction);
-    const profile = fractions.length === 3 ? [0.72, 1.0, 0.76][idx] : [0.92, 1.0][idx];
+    const profile = fractions.length === 4
+      ? [0.62, 0.94, 1.0, 0.70][idx]
+      : fractions.length === 3
+        ? [0.72, 1.0, 0.76][idx]
+        : [0.92, 1.0][idx];
     const localBend = bendKm * envelope * profile;
     return offsetPointKm(base, nx * localBend, ny * localBend, refLat);
   });
@@ -1463,7 +1472,7 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
       if (Math.abs(a.lat - b.lat) > 0.15) return b.lat - a.lat;
       return a.lon - b.lon || a.at - b.at;
     })
-    .slice(0, 90);
+    .slice(0, 140);
 
   const lineFeatures = [];
   const arrowFeatures = [];
@@ -1472,7 +1481,7 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
 
   terminals.forEach((terminal, index) => {
     const seed = [terminal.region, terminal.placeName, terminal.at, index].join("|");
-    const startOptions = rankBorderStarts(terminal, seed, usedVisibleStarts).slice(0, 12);
+    const startOptions = rankBorderStarts(terminal, seed, usedVisibleStarts).slice(0, 18);
     let chosen = null;
 
     for (const option of startOptions) {
@@ -1501,9 +1510,11 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
       // chooses the variant that stays in lit regions longer while crossing the
       // fewest unlit regions, without allowing large detours.
       const variants = [
-        { bendScale: 0.95, signFlip: 1 },
-        { bendScale: 1.25, signFlip: 1 },
-        { bendScale: 1.40, signFlip: -1 },
+        { bendScale: 1.00, signFlip: 1 },
+        { bendScale: 1.35, signFlip: 1 },
+        { bendScale: 1.65, signFlip: -1 },
+        { bendScale: 1.95, signFlip: 1 },
+        { bendScale: 2.20, signFlip: -1 },
       ];
 
       for (const variant of variants) {
@@ -1543,7 +1554,7 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
           metrics.litRegionCount * 150 -
           metrics.litKm * 0.82 +
           crossings * 780 +
-          Math.max(0, detourRatio - 1.34) * 900 +
+          Math.max(0, detourRatio - 1.48) * 760 +
           (terminal.precision === "region-proxy" ? 35 : 0);
 
         if (!chosen || score < chosen.score) {
@@ -1864,7 +1875,11 @@ function installArchiveLayers() {
     },
     paint: {
       "line-color": "#ff7218",
-      "line-width": ["*", ["interpolate", ["linear"], ["zoom"], 3, 6.8, 7, 9.5, 11, 12.5], ["coalesce", ["get", "route_weight"], 1]],
+      "line-width": ["interpolate", ["linear"], ["zoom"],
+        3, ["*", 6.8, ["coalesce", ["get", "route_weight"], 1]],
+        7, ["*", 9.5, ["coalesce", ["get", "route_weight"], 1]],
+        11, ["*", 12.5, ["coalesce", ["get", "route_weight"], 1]]
+      ],
       "line-opacity": ["interpolate", ["linear"], ["get", "confidence"], 0.3, 0.10, 1, 0.26],
       "line-blur": 3.6,
     },
@@ -1881,7 +1896,11 @@ function installArchiveLayers() {
     },
     paint: {
       "line-color": "#6f2c08",
-      "line-width": ["*", ["interpolate", ["linear"], ["zoom"], 3, 3.5, 7, 4.5, 11, 5.6], ["coalesce", ["get", "route_weight"], 1]],
+      "line-width": ["interpolate", ["linear"], ["zoom"],
+        3, ["*", 3.5, ["coalesce", ["get", "route_weight"], 1]],
+        7, ["*", 4.5, ["coalesce", ["get", "route_weight"], 1]],
+        11, ["*", 5.6, ["coalesce", ["get", "route_weight"], 1]]
+      ],
       "line-opacity": ["interpolate", ["linear"], ["get", "confidence"], 0.3, 0.50, 1, 0.88],
     },
   }, beforeId);
@@ -1897,7 +1916,11 @@ function installArchiveLayers() {
     },
     paint: {
       "line-color": "#ff8b1f",
-      "line-width": ["*", ["interpolate", ["linear"], ["zoom"], 3, 1.35, 7, 1.85, 11, 2.45], ["coalesce", ["get", "route_weight"], 1]],
+      "line-width": ["interpolate", ["linear"], ["zoom"],
+        3, ["*", 1.35, ["coalesce", ["get", "route_weight"], 1]],
+        7, ["*", 1.85, ["coalesce", ["get", "route_weight"], 1]],
+        11, ["*", 2.45, ["coalesce", ["get", "route_weight"], 1]]
+      ],
       "line-opacity": ["interpolate", ["linear"], ["get", "confidence"], 0.3, 0.62, 1, 0.96],
     },
   }, beforeId);
@@ -1914,7 +1937,11 @@ function installArchiveLayers() {
     },
     paint: {
       "line-color": "#ffc263",
-      "line-width": ["*", ["interpolate", ["linear"], ["zoom"], 3, 0.35, 7, 0.55, 11, 0.8], ["coalesce", ["get", "route_weight"], 1]],
+      "line-width": ["interpolate", ["linear"], ["zoom"],
+        3, ["*", 0.35, ["coalesce", ["get", "route_weight"], 1]],
+        7, ["*", 0.55, ["coalesce", ["get", "route_weight"], 1]],
+        11, ["*", 0.8, ["coalesce", ["get", "route_weight"], 1]]
+      ],
       "line-opacity": ["interpolate", ["linear"], ["get", "confidence"], 0.3, 0.22, 1, 0.62],
     },
   }, beforeId);
