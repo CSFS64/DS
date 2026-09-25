@@ -28,6 +28,7 @@ from collector.collect import (
     fetch_posts_mtproto_for_window,
     source_post_applies,
     source_collection_sort_key,
+    normalize,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
