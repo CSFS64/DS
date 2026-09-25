@@ -35,6 +35,10 @@
         <button id="routeToggle" class="route-toggle is-on" type="button" aria-pressed="true">
           <i class="legend-route"></i><span class="route-toggle-label">示意无人机路线 ON · 0</span>
         </button>
+        <div class="export-controls" aria-label="地图纯画面与图片导出">
+          <button id="cleanViewButton" class="export-button" type="button" aria-pressed="false">CLEAN VIEW</button>
+          <button id="exportPngButton" class="export-button export-primary" type="button">EXPORT PNG</button>
+        </div>
         <small class="legend-note">可视化路线从进入俄罗斯区域几何的边界点开始，此后只在俄罗斯区域内绘制；候选线路优先穿过所选时间窗内有无人机活动的州，并尽量减少夹在相邻亮州之间的未亮州，同时奖励在亮州内较长的穿越距离。只有州级信息时仍使用低置信度州内代理点。路线和起点均为示意推断，不代表真实发射点或单机连续航迹。</small>
       </div>
 
