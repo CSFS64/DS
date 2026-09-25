@@ -1298,10 +1298,11 @@ def is_region_message(text: str, source: dict[str, Any]) -> bool:
 def source_post_applies(post: Post, source: dict[str, Any]) -> bool:
     """Limit shared/national monitoring feeds to the configured region.
 
-    For a shared feed, generic wording such as "по всей области" is not enough:
-    the post must name this configured region or a catalogued place inside it.
-    Region-name checks are intentionally done before the much larger place
-    catalog, making nationwide fallback filtering cheap for the common case.
+    Explicit region names always win over ambiguous city/district aliases.
+    If a nationwide post names one or more regions, it may only apply to those
+    named regions; place-name fallback is reserved for posts that name no region
+    at all. This prevents common names such as "Кировский район" from leaking a
+    Kaluga post into unrelated regions that also contain a Kirovsky district.
     """
     if not source.get("require_region_match"):
         return True
@@ -1319,8 +1320,11 @@ def source_post_applies(post: Post, source: dict[str, Any]) -> bool:
     if any(_bounded_phrase_present(n, alias) for alias in region_match_aliases):
         return True
 
-    # City/district-only posts remain usable, but only after the cheap explicit
-    # region-name path fails.
+    all_region_aliases = source.get("_all_region_match_aliases", ())
+    if any(_bounded_phrase_present(n, alias) for alias in all_region_aliases):
+        return False
+
+    # Only region-less posts may fall back to city/district matching.
     return bool(extract_places(post.text, source))
 
 
@@ -1816,6 +1820,14 @@ def collect(args) -> dict[str, Any]:
         mtproto_error = str(exc)
         print(f"telegram MTProto setup ERROR: {exc}; falling back to public HTML", file=sys.stderr)
 
+    all_region_match_aliases = tuple(dict.fromkeys(
+        normalize(v)
+        for s in source_cfg.get("sources", [])
+        if s.get("enabled", False) and s.get("source_layer") == "monitoring_national"
+        for v in [s.get("region_label", ""), *(s.get("region_aliases", []) or [])]
+        if normalize(v)
+    ))
+
     telegram_fetch_cache: dict[str, FetchResult] = {}
     try:
         for source0 in sorted(source_cfg.get("sources", []), key=source_collection_sort_key):
@@ -1825,6 +1837,8 @@ def collect(args) -> dict[str, Any]:
             if source.get("kind", "telegram") != "telegram":
                 continue
             source["_catalog_places"] = cities_by_region.get(source.get("region", ""), [])
+            if source.get("require_region_match"):
+                source["_all_region_match_aliases"] = all_region_match_aliases
             channel = source["channel"]
             try:
                 cache_hit = channel in telegram_fetch_cache
