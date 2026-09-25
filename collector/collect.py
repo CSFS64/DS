@@ -1204,35 +1204,67 @@ def administrative_head_variants(value: str) -> list[str]:
     return list(dict.fromkeys(v for v in out if len(normalize(v)) >= 4))
 
 
+def _bounded_phrase_present(normalized_text: str, phrase: str) -> bool:
+    phrase = normalize(phrase)
+    if not phrase:
+        return False
+    return f" {phrase} " in f" {normalized_text} "
+
+
+def _prepare_place_match_cache(place: dict[str, Any]) -> None:
+    """Precompute place aliases once instead of rebuilding regexes per post.
+
+    Nationwide shared feeds may be checked against thousands of city/district
+    aliases. Recomputing Russian inflections and compiling regexes for every
+    source/post combination dominated runtime, so keep normalized boundary-safe
+    strings on the in-memory place object.
+    """
+    if "_match_aliases" not in place:
+        aliases = {
+            normalize(v)
+            for raw in (place.get("aliases", []) or [])
+            for v in alias_variants(raw)
+            if normalize(v)
+        }
+        place["_match_aliases"] = tuple(sorted(aliases, key=len, reverse=True))
+    if "_admin_heads" not in place:
+        heads = {
+            normalize(v)
+            for raw in (place.get("aliases", []) or [])
+            for v in administrative_head_variants(raw)
+            if normalize(v)
+        }
+        place["_admin_heads"] = tuple(sorted(heads, key=len, reverse=True))
+
+
 def extract_places(text: str, source: dict[str, Any]) -> list[dict[str, Any]]:
     n = normalize(text)
+    padded = f" {n} "
     matches = []
 
     def alias_present(alias: str) -> bool:
-        if not alias:
-            return False
-        return re.search(r"(?<![а-яa-z0-9])" + re.escape(alias) + r"(?![а-яa-z0-9])", n) is not None
+        return bool(alias) and f" {alias} " in padded
 
     def administrative_head_present(place: dict[str, Any]) -> bool:
         if place.get("type") not in ("district", "municipality", "okrug"):
             return False
-        for raw_alias in place.get("aliases", []) or []:
-            for raw_head in administrative_head_variants(raw_alias):
-                head = normalize(raw_head)
-                if not head:
-                    continue
-                for m in re.finditer(r"(?<![а-яa-z0-9])" + re.escape(head) + r"(?![а-яa-z0-9])", n):
-                    # Shared administrative nouns often appear once after a
-                    # coordinated list of adjectives, so inspect a generous
-                    # local window rather than requiring adjacency.
-                    window = n[max(0, m.start() - 40): min(len(n), m.end() + 180)]
-                    if ADMIN_CONTEXT_RE.search(window):
-                        return True
+        _prepare_place_match_cache(place)
+        for head in place.get("_admin_heads", ()):
+            needle = f" {head} "
+            pos = padded.find(needle)
+            while pos >= 0:
+                # Translate padded-string position back into normalized text.
+                start = max(0, pos - 1)
+                end = min(len(n), start + len(head))
+                window = n[max(0, start - 40): min(len(n), end + 180)]
+                if ADMIN_CONTEXT_RE.search(window):
+                    return True
+                pos = padded.find(needle, pos + 1)
         return False
 
     for place in [*(source.get("places", []) or []), *(source.get("_catalog_places", []) or [])]:
-        aliases = [normalize(v) for a in place.get("aliases", []) for v in alias_variants(a)]
-        if any(alias_present(alias) for alias in aliases) or administrative_head_present(place):
+        _prepare_place_match_cache(place)
+        if any(alias_present(alias) for alias in place.get("_match_aliases", ())) or administrative_head_present(place):
             matches.append(place)
 
     seen = set()
@@ -1266,13 +1298,30 @@ def is_region_message(text: str, source: dict[str, Any]) -> bool:
 def source_post_applies(post: Post, source: dict[str, Any]) -> bool:
     """Limit shared/national monitoring feeds to the configured region.
 
-    Local channels are trusted to be region-scoped by channel identity. Shared
-    feeds must explicitly mention the region or a catalogued place in it, so one
-    nationwide post cannot be attributed to every configured region.
+    For a shared feed, generic wording such as "по всей области" is not enough:
+    the post must name this configured region or a catalogued place inside it.
+    Region-name checks are intentionally done before the much larger place
+    catalog, making nationwide fallback filtering cheap for the common case.
     """
     if not source.get("require_region_match"):
         return True
-    return is_region_message(post.text, source) or bool(extract_places(post.text, source))
+
+    n = normalize(post.text)
+    region_match_aliases = source.get("_region_match_aliases")
+    if region_match_aliases is None:
+        region_match_aliases = tuple(dict.fromkeys(
+            normalize(v)
+            for v in [source.get("region_label", ""), *(source.get("region_aliases", []) or [])]
+            if normalize(v)
+        ))
+        source["_region_match_aliases"] = region_match_aliases
+
+    if any(_bounded_phrase_present(n, alias) for alias in region_match_aliases):
+        return True
+
+    # City/district-only posts remain usable, but only after the cheap explicit
+    # region-name path fails.
+    return bool(extract_places(post.text, source))
 
 
 def alert_scope(place: dict[str, Any] | None) -> str:
@@ -1720,11 +1769,13 @@ def collect(args) -> dict[str, Any]:
     city_cfg = json.loads(city_path.read_text(encoding="utf-8")) if city_path.exists() else {"cities": [], "municipalities": []}
     cities_by_region: dict[str, list[dict[str, Any]]] = {}
     for city in [*(city_cfg.get("cities", []) or []), *(city_cfg.get("municipalities", []) or [])]:
-        cities_by_region.setdefault(city.get("region", ""), []).append({
+        place = {
             "name": city.get("name"), "label": city.get("label") or city.get("name"), "type": city.get("type", "city"),
             "lat": city.get("lat"), "lon": city.get("lon"), "population": city.get("population", 0),
             "aliases": city.get("aliases") or [city.get("label") or city.get("name")],
-        })
+        }
+        _prepare_place_match_cache(place)
+        cities_by_region.setdefault(city.get("region", ""), []).append(place)
     now = datetime.now(timezone.utc)
     window_end = getattr(args, "window_end_override", None) or (now - timedelta(hours=args.safety_lag_hours))
     window_start = getattr(args, "window_start_override", None) or (window_end - timedelta(hours=args.lookback_hours))
