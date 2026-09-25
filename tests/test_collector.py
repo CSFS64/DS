@@ -290,6 +290,21 @@ class CollectorTests(unittest.TestCase):
         self.assertTrue(all(s.get('require_region_match') for s in nationwide))
         self.assertTrue(all(s.get('fallback_only_if_no_local_activity') for s in nationwide))
 
+    def test_v22_shared_feed_generic_region_phrase_does_not_match_every_region(self):
+        cfg = json.loads((ROOT / 'data' / 'sources.json').read_text(encoding='utf-8'))
+        source = next(
+            s for s in cfg['sources']
+            if s.get('region') == 'Voronezh Oblast'
+            and s.get('channel') == 'radarrussiia'
+            and s.get('source_layer') == 'monitoring_national'
+        )
+        generic = Post('radarrussiia', 5, datetime(2026,9,25,1,2,tzinfo=timezone.utc),
+                       'По всей области объявлена опасность по БПЛА.', 'https://t.me/radarrussiia/5')
+        explicit = Post('radarrussiia', 6, datetime(2026,9,25,1,3,tzinfo=timezone.utc),
+                        'В Воронежской области опасность по БПЛА.', 'https://t.me/radarrussiia/6')
+        self.assertFalse(source_post_applies(generic, source))
+        self.assertTrue(source_post_applies(explicit, source))
+
     def test_v21_nationwide_radar_region_isolation(self):
         cfg = json.loads((ROOT / 'data' / 'sources.json').read_text(encoding='utf-8'))
         source = next(
