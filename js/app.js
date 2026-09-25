@@ -853,6 +853,23 @@ function resolveRouteCatalogPlace(catalog, region, ...names) {
   return null;
 }
 
+function routeEvidenceCount(record) {
+  const value = Number(record?.count);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  const allowed = new Set([
+    "detected_reported",
+    "incoming_reported",
+    "attacked",
+  ]);
+  return allowed.has(record.count_type) ? Math.min(64, value) : null;
+}
+
+function routeCountWeight(record) {
+  const count = routeEvidenceCount(record);
+  if (!count) return 1;
+  return 1 + Math.min(1.8, Math.log2(count + 1) * 0.42);
+}
+
 function routeObservationPoints(record, atMs, sourceType, catalog) {
   if (threatClass(record) !== "uav" || record.signal_class === "alert_clear_signal") return [];
   const points = [];
@@ -860,6 +877,8 @@ function routeObservationPoints(record, atMs, sourceType, catalog) {
   const recordKey = String(record.id || record.url || [record.region, record.at || record.start, record.place].join("|"));
   const kind = record.activity_kind || record.alert_type || "";
   const formal = record.signal_class === "formal_alert_signal" || sourceType === "alert";
+  const observedCount = routeEvidenceCount(record);
+  const countWeight = routeCountWeight(record);
 
   const add = (candidate, fallbackName, precision, weight = 1) => {
     const resolved = candidate && Number.isFinite(+candidate.lon) && Number.isFinite(+candidate.lat)
@@ -900,7 +919,8 @@ function routeObservationPoints(record, atMs, sourceType, catalog) {
       kind,
       formal,
       recordKey,
-      weight,
+      observedCount,
+      weight: weight * countWeight,
     });
   };
 
@@ -938,7 +958,8 @@ function routeObservationPoints(record, atMs, sourceType, catalog) {
         kind,
         formal,
         recordKey,
-        weight: 0.42,
+        observedCount,
+        weight: 0.42 * countWeight,
         regionProxy: true,
       });
     }
@@ -1143,6 +1164,7 @@ function dedupeRouteObservations(observations) {
     if (last) {
       last.observations += 1;
       last.weight = Math.max(last.weight, node.weight);
+      last.observedCount = Math.max(last.observedCount || 0, node.observedCount || 0) || null;
       last.at = Math.min(last.at, node.at);
       last.formal = last.formal || node.formal;
       continue;
@@ -1224,7 +1246,9 @@ function bestSupportChain(nodes, terminal, anchor) {
 
   const dp = candidates.map(x => ({
     score: (isStrongObservationKind(x.node.kind) ? 2.0 : 1.0) +
-      x.node.observations * 0.15 - x.proj.crossTrackKm * 0.004 -
+      x.node.observations * 0.15 +
+      Math.min(1.15, Math.max(0, x.node.weight - 1) * 0.62) -
+      x.proj.crossTrackKm * 0.004 -
       (x.node.precision === "region-proxy" ? 0.65 : 0),
     prev: -1,
   }));
@@ -1234,7 +1258,8 @@ function bestSupportChain(nodes, terminal, anchor) {
       if (!plausibleSegment(candidates[j].node, candidates[i].node, terminal, anchor)) continue;
       const score = dp[j].score +
         (isStrongObservationKind(candidates[i].node.kind) ? 2.0 : 1.0) +
-        candidates[i].node.observations * 0.15 -
+        candidates[i].node.observations * 0.15 +
+        Math.min(1.15, Math.max(0, candidates[i].node.weight - 1) * 0.62) -
         candidates[i].proj.crossTrackKm * 0.004 -
         (candidates[i].node.precision === "region-proxy" ? 0.65 : 0);
       if (score > dp[i].score) {
@@ -1542,6 +1567,9 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
     chosen.chain.forEach(node => linkedNodeKeys.add(node.nodeKey));
 
     const evidence = chosen.chain.reduce((sum, n) => sum + n.observations, 0);
+    const weightedEvidence = chosen.chain.reduce((sum, n) => sum + (n.weight || 1), 0);
+    const maxObservedCount = chosen.chain.reduce((best, n) => Math.max(best, n.observedCount || 0), 0);
+    const routeWeight = 1 + Math.min(0.55, Math.max(0, weightedEvidence - chosen.chain.length) * 0.08);
     const supportCount = chosen.supports.length;
     const proxyCount = chosen.chain.filter(n => n.precision === "region-proxy").length;
     const confidence = Math.min(
@@ -1549,6 +1577,7 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
       0.22 +
       supportCount * 0.17 +
       Math.min(0.22, evidence * 0.035) +
+      Math.min(0.10, Math.max(0, weightedEvidence - chosen.chain.length) * 0.018) +
       (isStrongObservationKind(terminal.kind) ? 0.12 : 0) -
       proxyCount * 0.08
     );
@@ -1571,6 +1600,9 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
       lit_km: Math.round(chosen.metrics.litKm),
       unlit_km: Math.round(chosen.metrics.unlitKm),
       observations: evidence,
+      weighted_evidence: Math.round(weightedEvidence * 100) / 100,
+      max_observed_count: maxObservedCount || null,
+      route_weight: Math.round(routeWeight * 1000) / 1000,
       confidence,
       earliest_at: new Date(chosen.chain[0].at).toISOString(),
       latest_at: new Date(terminal.at).toISOString(),
