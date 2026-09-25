@@ -755,6 +755,26 @@ function routeStaysInRussia(coords) {
   return true;
 }
 
+function routePreludeFromOrigin(origin, entry, mode) {
+  // Keep the inferred Ukraine-side boundary origin visible. Previously the
+  // rendered line was clipped to firstRussiaEntry(), which made southern
+  // routes appear to originate on the Russian Sea of Azov coastline.
+  if (!origin || !entry) return [];
+  const distance = haversineKm(origin, entry);
+  if (!Number.isFinite(distance) || distance < 2) return [];
+
+  const steps = Math.max(4, Math.min(48, Math.ceil(distance / 28)));
+  const coords = [];
+  for (let i = 0; i <= steps; i++) {
+    const p = interpolatePoint(origin, entry, i / steps);
+    coords.push([p.lon, p.lat]);
+  }
+
+  // Southern inferred corridors may legitimately traverse the northern Black
+  // Sea / Sea of Azov; north-origin routes must remain over Ukraine/Russia.
+  return routeStaysInAllowedTerritory(coords, mode === "eastSouth") ? coords : [];
+}
+
 function selectedWindowUavRegions(startMs, endMs) {
   const lit = new Set();
   for (const report of state.archive.reports || []) {
@@ -1631,15 +1651,24 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
       illustrative: true,
     };
 
+    const prelude = routePreludeFromOrigin(
+      chosen.assumedOrigin,
+      chosen.visibleStart,
+      chosen.visibleStart.routeOriginPool,
+    );
+    const displayCoords = prelude.length >= 2
+      ? [...prelude.slice(0, -1), ...chosen.coords]
+      : chosen.coords;
+
     const feature = {
       type: "Feature",
       properties: props,
-      geometry: { type: "LineString", coordinates: chosen.coords },
+      geometry: { type: "LineString", coordinates: displayCoords },
     };
     lineFeatures.push(feature);
 
-    const a = chosen.coords[chosen.coords.length - 2];
-    const b = chosen.coords[chosen.coords.length - 1];
+    const a = displayCoords[displayCoords.length - 2];
+    const b = displayCoords[displayCoords.length - 1];
     arrowFeatures.push({
       type: "Feature",
       properties: {
