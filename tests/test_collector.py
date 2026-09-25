@@ -8,6 +8,7 @@ from pathlib import Path
 from collector.collect import (
     Post,
     classify_count_sentence,
+    classify_missile_count_sentence,
     extract_places,
     extract_reports,
     mchs_source,
@@ -289,6 +290,48 @@ class CollectorTests(unittest.TestCase):
             self.assertEqual(args.window_start_override, start)
             self.assertEqual(args.window_end_override, end)
             self.assertAlmostEqual(args.lookback_hours, (end-start).total_seconds()/3600.0, places=6)
+
+    def test_v20_monitoring_explicit_counts(self):
+        uav = classify_count_sentence('Фиксация от 3 БПЛА')
+        self.assertEqual(uav, [(3, 'detected_reported', None, None, None)])
+        uav2 = classify_count_sentence('Фиксация около 2 БПЛА')
+        self.assertEqual(uav2, [(2, 'detected_reported', None, None, 'approx')])
+        missile = classify_missile_count_sentence('Фиксация 2 ракет')
+        self.assertEqual(missile, [(2, 'missile_detected_reported', None, None, None)])
+
+    def test_v20_monitoring_count_report_is_structured(self):
+        source = {
+            'region':'Tambov Oblast','region_label':'Тамбовская область',
+            'channel':'radar_tambov','source_name':'Radar Tambov',
+            'kind':'telegram','source_layer':'monitoring_local',
+            'fallback_to_region_on_unresolved':True,
+            'places':[{'name':'Tambov','label':'Тамбов','type':'city','lat':52.72,'lon':41.45,'aliases':['тамбов']}],
+            'region_aliases':['тамбовская область'],
+        }
+        post = Post('radar_tambov', 1, datetime(2026,9,24,18,0,tzinfo=timezone.utc),
+                    'Тамбов\nТамбовская область\nФиксация от 3 БПЛА', 'https://t.me/radar_tambov/1')
+        reports = extract_reports([post], source,
+            datetime(2026,9,24,17,0,tzinfo=timezone.utc),
+            datetime(2026,9,24,19,0,tzinfo=timezone.utc))
+        self.assertEqual(len(reports), 1)
+        self.assertEqual(reports[0]['count'], 3)
+        self.assertEqual(reports[0]['count_type'], 'detected_reported')
+
+    def test_v20_cross_region_monitoring_total_not_local_count(self):
+        source = {
+            'region':'Rostov Oblast','region_label':'Ростовская область',
+            'channel':'radar_rostovv','source_name':'Radar Rostov',
+            'kind':'telegram','source_layer':'monitoring_local',
+            'fallback_to_region_on_unresolved':True,'places':[],
+            'region_aliases':['ростовская область'],
+        }
+        post = Post('radar_rostovv', 2, datetime(2026,9,24,9,0,tzinfo=timezone.utc),
+                    'За ночь уничтожено 40 БПЛА над территориями Брянской, Белгородской, Курской, Ростовской областей, Краснодарского края и Республики Крым.',
+                    'https://t.me/radar_rostovv/2')
+        reports = extract_reports([post], source,
+            datetime(2026,9,24,8,0,tzinfo=timezone.utc),
+            datetime(2026,9,24,10,0,tzinfo=timezone.utc))
+        self.assertFalse(any(r.get('count') == 40 for r in reports))
 
     def test_v10_broad_alert_wording(self):
         self.assertEqual(text_kind('На территории города Пензы объявлен режим «Воздушная опасность».'), 'start')

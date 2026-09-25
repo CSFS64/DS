@@ -853,6 +853,23 @@ function resolveRouteCatalogPlace(catalog, region, ...names) {
   return null;
 }
 
+function routeEvidenceCount(record) {
+  const value = Number(record?.count);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  const allowed = new Set([
+    "detected_reported",
+    "incoming_reported",
+    "attacked",
+  ]);
+  return allowed.has(record.count_type) ? Math.min(64, value) : null;
+}
+
+function routeCountWeight(record) {
+  const count = routeEvidenceCount(record);
+  if (!count) return 1;
+  return 1 + Math.min(1.8, Math.log2(count + 1) * 0.42);
+}
+
 function routeObservationPoints(record, atMs, sourceType, catalog) {
   if (threatClass(record) !== "uav" || record.signal_class === "alert_clear_signal") return [];
   const points = [];
@@ -860,6 +877,8 @@ function routeObservationPoints(record, atMs, sourceType, catalog) {
   const recordKey = String(record.id || record.url || [record.region, record.at || record.start, record.place].join("|"));
   const kind = record.activity_kind || record.alert_type || "";
   const formal = record.signal_class === "formal_alert_signal" || sourceType === "alert";
+  const observedCount = routeEvidenceCount(record);
+  const countWeight = routeCountWeight(record);
 
   const add = (candidate, fallbackName, precision, weight = 1) => {
     const resolved = candidate && Number.isFinite(+candidate.lon) && Number.isFinite(+candidate.lat)
@@ -900,7 +919,8 @@ function routeObservationPoints(record, atMs, sourceType, catalog) {
       kind,
       formal,
       recordKey,
-      weight,
+      observedCount,
+      weight: weight * countWeight,
     });
   };
 
@@ -938,7 +958,8 @@ function routeObservationPoints(record, atMs, sourceType, catalog) {
         kind,
         formal,
         recordKey,
-        weight: 0.42,
+        observedCount,
+        weight: 0.42 * countWeight,
         regionProxy: true,
       });
     }
@@ -1143,6 +1164,7 @@ function dedupeRouteObservations(observations) {
     if (last) {
       last.observations += 1;
       last.weight = Math.max(last.weight, node.weight);
+      last.observedCount = Math.max(last.observedCount || 0, node.observedCount || 0) || null;
       last.at = Math.min(last.at, node.at);
       last.formal = last.formal || node.formal;
       continue;
@@ -1224,7 +1246,9 @@ function bestSupportChain(nodes, terminal, anchor) {
 
   const dp = candidates.map(x => ({
     score: (isStrongObservationKind(x.node.kind) ? 2.0 : 1.0) +
-      x.node.observations * 0.15 - x.proj.crossTrackKm * 0.004 -
+      x.node.observations * 0.15 +
+      Math.min(1.15, Math.max(0, x.node.weight - 1) * 0.62) -
+      x.proj.crossTrackKm * 0.004 -
       (x.node.precision === "region-proxy" ? 0.65 : 0),
     prev: -1,
   }));
@@ -1234,7 +1258,8 @@ function bestSupportChain(nodes, terminal, anchor) {
       if (!plausibleSegment(candidates[j].node, candidates[i].node, terminal, anchor)) continue;
       const score = dp[j].score +
         (isStrongObservationKind(candidates[i].node.kind) ? 2.0 : 1.0) +
-        candidates[i].node.observations * 0.15 -
+        candidates[i].node.observations * 0.15 +
+        Math.min(1.15, Math.max(0, candidates[i].node.weight - 1) * 0.62) -
         candidates[i].proj.crossTrackKm * 0.004 -
         (candidates[i].node.precision === "region-proxy" ? 0.65 : 0);
       if (score > dp[i].score) {
@@ -1542,6 +1567,9 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
     chosen.chain.forEach(node => linkedNodeKeys.add(node.nodeKey));
 
     const evidence = chosen.chain.reduce((sum, n) => sum + n.observations, 0);
+    const weightedEvidence = chosen.chain.reduce((sum, n) => sum + (n.weight || 1), 0);
+    const maxObservedCount = chosen.chain.reduce((best, n) => Math.max(best, n.observedCount || 0), 0);
+    const routeWeight = 1 + Math.min(0.55, Math.max(0, weightedEvidence - chosen.chain.length) * 0.08);
     const supportCount = chosen.supports.length;
     const proxyCount = chosen.chain.filter(n => n.precision === "region-proxy").length;
     const confidence = Math.min(
@@ -1549,6 +1577,7 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
       0.22 +
       supportCount * 0.17 +
       Math.min(0.22, evidence * 0.035) +
+      Math.min(0.10, Math.max(0, weightedEvidence - chosen.chain.length) * 0.018) +
       (isStrongObservationKind(terminal.kind) ? 0.12 : 0) -
       proxyCount * 0.08
     );
@@ -1571,6 +1600,9 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
       lit_km: Math.round(chosen.metrics.litKm),
       unlit_km: Math.round(chosen.metrics.unlitKm),
       observations: evidence,
+      weighted_evidence: Math.round(weightedEvidence * 100) / 100,
+      max_observed_count: maxObservedCount || null,
+      route_weight: Math.round(routeWeight * 1000) / 1000,
       confidence,
       earliest_at: new Date(chosen.chain[0].at).toISOString(),
       latest_at: new Date(terminal.at).toISOString(),
@@ -1696,7 +1728,7 @@ function installArchiveLayers() {
   if (!state.map?.isStyleLoaded()) return;
 
   for (const id of [
-    "archive-place-label", "archive-place-dot", "archive-place-route-unlinked", "archive-place-glow",
+    "archive-observed-count-label", "archive-place-label", "archive-place-dot", "archive-place-route-unlinked", "archive-place-glow",
     "archive-uav-route-arrows", "archive-uav-route-highlight", "archive-uav-route-line",
     "archive-uav-route-casing", "archive-uav-route-glow",
     "archive-russia-border-main", "archive-russia-border-casing", "archive-russia-border-glow",
@@ -1706,7 +1738,7 @@ function installArchiveLayers() {
     if (state.map.getLayer(id)) state.map.removeLayer(id);
   }
   for (const id of [
-    "archive-places", "archive-uav-route-arrows", "archive-uav-routes",
+    "archive-observed-counts", "archive-places", "archive-uav-route-arrows", "archive-uav-routes",
     "archive-country-borders", "archive-regions"
   ]) {
     if (state.map.getSource(id)) state.map.removeSource(id);
@@ -1832,7 +1864,7 @@ function installArchiveLayers() {
     },
     paint: {
       "line-color": "#ff7218",
-      "line-width": ["interpolate", ["linear"], ["zoom"], 3, 6.8, 7, 9.5, 11, 12.5],
+      "line-width": ["*", ["interpolate", ["linear"], ["zoom"], 3, 6.8, 7, 9.5, 11, 12.5], ["coalesce", ["get", "route_weight"], 1]],
       "line-opacity": ["interpolate", ["linear"], ["get", "confidence"], 0.3, 0.10, 1, 0.26],
       "line-blur": 3.6,
     },
@@ -1849,7 +1881,7 @@ function installArchiveLayers() {
     },
     paint: {
       "line-color": "#6f2c08",
-      "line-width": ["interpolate", ["linear"], ["zoom"], 3, 3.5, 7, 4.5, 11, 5.6],
+      "line-width": ["*", ["interpolate", ["linear"], ["zoom"], 3, 3.5, 7, 4.5, 11, 5.6], ["coalesce", ["get", "route_weight"], 1]],
       "line-opacity": ["interpolate", ["linear"], ["get", "confidence"], 0.3, 0.50, 1, 0.88],
     },
   }, beforeId);
@@ -1865,7 +1897,7 @@ function installArchiveLayers() {
     },
     paint: {
       "line-color": "#ff8b1f",
-      "line-width": ["interpolate", ["linear"], ["zoom"], 3, 1.35, 7, 1.85, 11, 2.45],
+      "line-width": ["*", ["interpolate", ["linear"], ["zoom"], 3, 1.35, 7, 1.85, 11, 2.45], ["coalesce", ["get", "route_weight"], 1]],
       "line-opacity": ["interpolate", ["linear"], ["get", "confidence"], 0.3, 0.62, 1, 0.96],
     },
   }, beforeId);
@@ -1882,7 +1914,7 @@ function installArchiveLayers() {
     },
     paint: {
       "line-color": "#ffc263",
-      "line-width": ["interpolate", ["linear"], ["zoom"], 3, 0.35, 7, 0.55, 11, 0.8],
+      "line-width": ["*", ["interpolate", ["linear"], ["zoom"], 3, 0.35, 7, 0.55, 11, 0.8], ["coalesce", ["get", "route_weight"], 1]],
       "line-opacity": ["interpolate", ["linear"], ["get", "confidence"], 0.3, 0.22, 1, 0.62],
     },
   }, beforeId);
@@ -2023,6 +2055,29 @@ function installArchiveLayers() {
       "text-halo-width": 1.5,
       "text-halo-blur": 0.6,
       "text-opacity": ["case", ["any", ["boolean", ["feature-state", "missileActive"], false], ["boolean", ["feature-state", "active"], false], ["boolean", ["feature-state", "missileReport"], false], ["boolean", ["feature-state", "report"], false]], 1, 0],
+    },
+  });
+  state.map.addSource("archive-observed-counts", { type: "geojson", data: EMPTY_FEATURE_COLLECTION });
+  state.map.addLayer({
+    id: "archive-observed-count-label",
+    type: "symbol",
+    source: "archive-observed-counts",
+    minzoom: 3.1,
+    layout: {
+      "text-field": ["get", "label"],
+      "text-font": ["Noto Sans Regular"],
+      "text-size": ["interpolate", ["linear"], ["zoom"], 3, 10, 7, 12, 11, 14],
+      "text-offset": [0.75, -0.75],
+      "text-anchor": "bottom-left",
+      "text-allow-overlap": true,
+      "text-ignore-placement": true,
+    },
+    paint: {
+      "text-color": ["case", ["==", ["get", "threat"], "missile"], "#ffb15c", "#ffd071"],
+      "text-halo-color": "#071018",
+      "text-halo-width": 2.2,
+      "text-halo-blur": 0.7,
+      "text-opacity": 0.98,
     },
   });
 }
@@ -2234,6 +2289,80 @@ function setFeatureActive(source, id, active, missile = false) {
   try { state.map.setFeatureState({ source, id }, { active, missileActive: active && missile }); } catch (_) {}
 }
 
+function explicitObservedCount(report) {
+  const count = Number(report?.count);
+  return Number.isFinite(count) && count > 0 ? Math.round(count) : null;
+}
+
+function observedCountLabel(count, qualifier) {
+  if (!count) return "";
+  if (qualifier === "at_least") return "≥" + count;
+  if (qualifier === "approx") return "≈" + count;
+  return "×" + count;
+}
+
+function buildObservedCountLabels(reports = []) {
+  const catalog = routePlaceCatalog();
+  const latest = new Map();
+
+  for (const report of reports) {
+    const count = explicitObservedCount(report);
+    if (!count) continue;
+
+    let lon = Number(report.lon), lat = Number(report.lat);
+    let place = report.place || report.region;
+    if (!Number.isFinite(lon) || !Number.isFinite(lat)) {
+      const resolved = report.scope === "region"
+        ? null
+        : resolveRouteCatalogPlace(catalog, report.region || "", report.place, report.place_label);
+      if (resolved) {
+        lon = +resolved.lon;
+        lat = +resolved.lat;
+        place = resolved.label || resolved.name || place;
+      } else {
+        const proxy = regionRepresentativePoint(report.region);
+        if (proxy) {
+          lon = proxy.lon;
+          lat = proxy.lat;
+          place = report.region;
+        }
+      }
+    }
+    if (!Number.isFinite(lon) || !Number.isFinite(lat)) continue;
+
+    const key = [report.region || "", report.scope || "", report.place || place].join("::");
+    const at = Date.parse(report.at) || 0;
+    const prior = latest.get(key);
+    if (prior && (prior.at > at || (prior.at === at && prior.count >= count))) continue;
+    latest.set(key, {
+      type: "Feature",
+      properties: {
+        key,
+        label: observedCountLabel(count, report.count_qualifier),
+        count,
+        qualifier: report.count_qualifier || "",
+        threat: threatClass(report),
+        place,
+        at,
+      },
+      geometry: { type: "Point", coordinates: [lon, lat] },
+      at,
+      count,
+    });
+  }
+
+  return {
+    type: "FeatureCollection",
+    features: [...latest.values()].map(({ at, count, ...feature }) => feature),
+  };
+}
+
+function updateObservedCountLabels(reports = []) {
+  const source = state.map?.getSource("archive-observed-counts");
+  if (!source) return;
+  source.setData(buildObservedCountLabels(reports));
+}
+
 function clearThreatFeatureState(source, id) {
   if (!state.mapReady || !state.map.getSource(source) || id == null) return;
   try { state.map.setFeatureState({ source, id }, { active: false, missileActive: false, report: false, missileReport: false }); } catch (_) {}
@@ -2299,6 +2428,7 @@ function renderMap(active, reports = []) {
         }
       }
     }
+    updateObservedCountLabels(reports);
   }
   els.archiveLamp.classList.toggle("on", active.length > 0 || reports.length > 0);
 }
@@ -2432,7 +2562,8 @@ function showReportDetail(report) {
       ? `UNPAIRED ${missile ? "MISSILE" : "UAV"} ALERT CLEAR SIGNAL`
       : `LOCAL OFFICIAL ${missile ? "MISSILE" : "UAV"} ACTIVITY`;
   els.detailTitle.textContent = report.place;
-  els.detailBody.textContent = `${formatTime(Date.parse(report.at), "Europe/Moscow")} MSK\n${report.text || `${report.count ?? "—"} ${report.count_type || "reported"}`}`;
+  const countLine = explicitObservedCount(report) ? `\nObserved: ${observedCountLabel(explicitObservedCount(report), report.count_qualifier)}` : "";
+  els.detailBody.textContent = `${formatTime(Date.parse(report.at), "Europe/Moscow")} MSK${countLine}\n${report.text || `${report.count ?? "—"} ${report.count_type || "reported"}`}`;
   els.detailSource.href = report.url;
   els.detailPanel.hidden = false;
 }
