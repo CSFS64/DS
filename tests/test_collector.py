@@ -277,6 +277,56 @@ class CollectorTests(unittest.TestCase):
         self.assertTrue(source_post_applies(yes, source))
         self.assertFalse(source_post_applies(no, source))
 
+    def test_v21_nationwide_radar_fallback_covers_every_region(self):
+        cfg = json.loads((ROOT / 'data' / 'sources.json').read_text(encoding='utf-8'))
+        regions_cfg = json.loads((ROOT / 'data' / 'regions.json').read_text(encoding='utf-8'))
+        enabled_regions = {r['region'] for r in regions_cfg['regions'] if r.get('enabled')}
+        nationwide = [
+            s for s in cfg['sources']
+            if s.get('channel') == 'radarrussiia' and s.get('source_layer') == 'monitoring_national'
+        ]
+        self.assertEqual({s['region'] for s in nationwide}, enabled_regions)
+        self.assertEqual(len(nationwide), len(enabled_regions))
+        self.assertTrue(all(s.get('require_region_match') for s in nationwide))
+        self.assertTrue(all(s.get('fallback_only_if_no_local_activity') for s in nationwide))
+
+    def test_v21_confirmed_local_radar_channels_are_primary(self):
+        cfg = json.loads((ROOT / 'data' / 'sources.json').read_text(encoding='utf-8'))
+        local = {(s['region'], s['channel']) for s in cfg['sources'] if s.get('source_layer') == 'monitoring_local'}
+        required = {
+            ('Voronezh Oblast','radar_voronezh'),
+            ('Moscow Oblast','radar_moscoww'),
+            ('Tver Oblast','radar_tver'),
+            ('Tula Oblast','radar_tuIa'),
+            ('Bryansk Oblast','radar_bryanskk'),
+            ('Belgorod Oblast','radar_beIgorod'),
+            ('Kursk Oblast','radar_kurskk'),
+            ('Samara Oblast','radar_samaraa'),
+            ('Republic of Bashkortostan','radar_bashkortostan'),
+            ('Astrakhan Oblast','radar_astrakhann'),
+            ('Penza Oblast','radar_penzaa'),
+            ('Pskov Oblast','radar_pskovv'),
+            ('Crimea','radar_crimeaa'),
+            ('Krasnodar Krai','radar_kras'),
+        }
+        self.assertTrue(required <= local)
+        self.assertGreaterEqual(len({r for r, _ in local}), 36)
+
+    def test_v21_national_region_scoping_with_generated_aliases(self):
+        cfg = json.loads((ROOT / 'data' / 'sources.json').read_text(encoding='utf-8'))
+        source = next(
+            s for s in cfg['sources']
+            if s.get('region') == 'Voronezh Oblast'
+            and s.get('channel') == 'radarrussiia'
+            and s.get('source_layer') == 'monitoring_national'
+        )
+        yes = Post('radarrussiia', 3, datetime(2026,9,25,1,0,tzinfo=timezone.utc),
+                   'В Воронежской области внимание по БПЛА.', 'https://t.me/radarrussiia/3')
+        no = Post('radarrussiia', 4, datetime(2026,9,25,1,1,tzinfo=timezone.utc),
+                  'В Курской области внимание по БПЛА.', 'https://t.me/radarrussiia/4')
+        self.assertTrue(source_post_applies(yes, source))
+        self.assertFalse(source_post_applies(no, source))
+
     def test_v18_replay_previous_window_uses_exact_old_window(self):
         with tempfile.TemporaryDirectory() as td:
             out = Path(td) / 'events.json'
