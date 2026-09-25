@@ -2176,7 +2176,7 @@ async function toggleCleanView() {
   }
 }
 
-function waitForMapIdle(timeoutMs = 4000) {
+function waitForMapRender(timeoutMs = 5000) {
   return new Promise(resolve => {
     if (!state.map) return resolve();
     let settled = false;
@@ -2187,12 +2187,59 @@ function waitForMapIdle(timeoutMs = 4000) {
       resolve();
     };
     const timer = setTimeout(finish, timeoutMs);
-    state.map.once("idle", finish);
+
+    // Resizing a WebGL canvas clears/reallocates its drawing buffer. Wait for
+    // an actual post-resize render event, not merely "idle", before capture.
+    state.map.once("render", () => {
+      requestAnimationFrame(() => requestAnimationFrame(finish));
+    });
+    state.map.resize();
     state.map.triggerRepaint();
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      if (state.map?.areTilesLoaded?.() && !state.map?.isMoving?.()) finish();
-    }));
   });
+}
+
+function snapshotMapCanvas() {
+  const source = state.map?.getCanvas?.();
+  if (!source || !source.width || !source.height) return null;
+
+  // Copy the freshly rendered WebGL frame immediately into a normal 2D canvas.
+  // This freezes the image before any later WebGL redraw can affect export.
+  const frozen = document.createElement("canvas");
+  frozen.width = source.width;
+  frozen.height = source.height;
+  const ctx = frozen.getContext("2d", { alpha: false, willReadFrequently: true });
+  if (!ctx) return null;
+  ctx.fillStyle = "#050a0f";
+  ctx.fillRect(0, 0, frozen.width, frozen.height);
+  ctx.drawImage(source, 0, 0);
+  return frozen;
+}
+
+function snapshotLooksBlank(canvas) {
+  if (!canvas) return true;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return false;
+
+  const sampleX = [0.12, 0.28, 0.44, 0.60, 0.76, 0.90];
+  const sampleY = [0.14, 0.31, 0.48, 0.65, 0.82];
+  const colors = [];
+  for (const fx of sampleX) {
+    for (const fy of sampleY) {
+      const x = Math.min(canvas.width - 1, Math.max(0, Math.floor(canvas.width * fx)));
+      const y = Math.min(canvas.height - 1, Math.max(0, Math.floor(canvas.height * fy)));
+      const p = ctx.getImageData(x, y, 1, 1).data;
+      colors.push([p[0], p[1], p[2]]);
+    }
+  }
+
+  let minR = 255, minG = 255, minB = 255, maxR = 0, maxG = 0, maxB = 0;
+  for (const [r, g, b] of colors) {
+    minR = Math.min(minR, r); maxR = Math.max(maxR, r);
+    minG = Math.min(minG, g); maxG = Math.max(maxG, g);
+    minB = Math.min(minB, b); maxB = Math.max(maxB, b);
+  }
+  const spread = (maxR - minR) + (maxG - minG) + (maxB - minB);
+  return spread < 9;
 }
 
 function exportFileStamp(ms) {
@@ -2222,10 +2269,20 @@ async function exportCleanPng() {
   try {
     if (!wasClean) applyCleanView(true);
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    await waitForMapIdle();
+    await waitForMapRender();
 
-    const canvas = state.map.getCanvas();
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/png"));
+    let frozen = snapshotMapCanvas();
+    if (snapshotLooksBlank(frozen)) {
+      // One retry handles browsers that dispatch the first render while the
+      // resized WebGL backing buffer is still settling.
+      await waitForMapRender();
+      frozen = snapshotMapCanvas();
+    }
+    if (!frozen || snapshotLooksBlank(frozen)) {
+      throw new Error("Map render was blank after retry");
+    }
+
+    const blob = await new Promise(resolve => frozen.toBlob(resolve, "image/png"));
     if (!blob) throw new Error("PNG export returned an empty image");
 
     const start = selectionStartMs();
