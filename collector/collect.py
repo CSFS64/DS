@@ -1468,6 +1468,40 @@ def classify_count_sentence(sentence: str) -> list[tuple[int, str, int | None, s
 
     return out
 
+def classify_missile_count_sentence(sentence: str) -> list[tuple[int, str, int | None, str | None, str | None]]:
+    n = normalize(sentence)
+    out = []
+
+    def q(prefix: str | None) -> str | None:
+        if not prefix:
+            return None
+        prefix = normalize(prefix)
+        if "более" in prefix or "свыше" in prefix: return "at_least"
+        if "около" in prefix or "примерно" in prefix or "порядка" in prefix: return "approx"
+        return None
+
+    m = re.search(r"\\bфиксац\\w*\\b\\s*(?:от\\s+|сразу\\s+)?(?:(более|свыше|около|примерно|порядка)\\s+)?(\\d+)\\s*(?:ракет\\w*)", n)
+    if m:
+        out.append((int(m.group(2)), "missile_detected_reported", None, None, q(m.group(1))))
+        return out
+
+    m = re.search(r"(?:летит|летят|движ\\w*|направля\\w*|подлета\\w*)\\D{0,18}(?:(более|свыше|около|примерно|порядка)\\s+)?(\\d+)\\s*(?:ракет\\w*)", n)
+    if m:
+        out.append((int(m.group(2)), "missile_incoming_reported", None, None, q(m.group(1))))
+        return out
+
+    return out
+
+
+def cross_region_aggregate_count_text(text: str) -> bool:
+    """Detect nationwide/multi-region aggregate totals that must not be assigned to one region."""
+    n = normalize(text)
+    if not any(marker in n for marker in ("над территориями", "в регионах", "над регионами")):
+        return False
+    admin_groups = len(re.findall(r"\\b(?:област\\w*|кра\\w*|республик\\w*|автономн\\w*\\s+округ\\w*)\\b", n))
+    return admin_groups >= 2
+
+
 def infer_report_places(sentence: str, source: dict[str, Any]) -> list[dict[str, Any]]:
     places = extract_places(sentence, source)
     return places
@@ -1492,40 +1526,57 @@ def extract_reports(posts: list[Post], source: dict[str, Any], window_start: dat
 
         produced_threats: set[str] = set()
 
-        # Existing numeric extraction is UAV-specific. Preserve those detailed
-        # counts; missile activity is still retained below without requiring a count.
+        # Preserve explicit UAV/missile quantities when the source states them.
+        # Multi-region aggregate totals are not assigned to one local region.
         for sentence in sentence_split(post.text):
-            counts = classify_count_sentence(sentence)
-            if not counts:
-                continue
-            uav_kind = uav_activity_kind(sentence) or next((kind for threat, kind in whole_signals if threat == "uav"), None)
-            if uav_kind is None:
-                continue
-            mentioned = infer_report_places(sentence, source) or infer_report_places(post.text, source)
-            primary_place = mentioned[0] if mentioned else None
-            place = primary_place["name"] if primary_place else source["region"]
-            scope = alert_scope(primary_place) if primary_place else "region"
-            mentioned_places = [
-                {"name": p["name"], "label": p.get("label", p["name"]), "type": p.get("type", "city"),
-                 "lat": p.get("lat"), "lon": p.get("lon")}
-                for p in mentioned[:120]
+            numeric_sets = [
+                ("uav", classify_count_sentence(sentence)),
+                ("missile", classify_missile_count_sentence(sentence)),
             ]
-            for count, ctype, secondary_count, secondary_type, qualifier in counts:
-                reports.append({
-                    "id": stable_id(source.get("channel", source.get("source_id", "source")), str(post.post_id), place, ctype, str(count), "uav"),
-                    "region": source["region"], "place": place, "scope": scope,
-                    "at": post.published_at.isoformat(), "count": count, "count_type": ctype,
-                    "signal_class": "uav_activity_signal",
-                    "threat_class": "uav",
-                    "activity_kind": uav_kind,
-                    "count_qualifier": qualifier, "secondary_count": secondary_count, "secondary_type": secondary_type,
-                    "text": sentence, "source_name": source["source_name"], "url": post.url,
-                    "source_kind": source.get("kind", "official"),
-                    "lat": primary_place.get("lat") if primary_place else None,
-                    "lon": primary_place.get("lon") if primary_place else None,
-                    "mentioned_places": mentioned_places,
-                })
-                produced_threats.add("uav")
+            for threat_class, counts in numeric_sets:
+                if not counts:
+                    continue
+                if (
+                    str(source.get("source_layer") or "").startswith("monitoring_")
+                    and cross_region_aggregate_count_text(sentence)
+                ):
+                    continue
+
+                activity_kind = (
+                    uav_activity_kind(sentence)
+                    if threat_class == "uav"
+                    else missile_activity_kind(sentence)
+                ) or next((kind for threat, kind in whole_signals if threat == threat_class), None)
+                if activity_kind is None:
+                    continue
+
+                mentioned = infer_report_places(sentence, source) or infer_report_places(post.text, source)
+                primary_place = mentioned[0] if mentioned else None
+                place = primary_place["name"] if primary_place else source["region"]
+                scope = alert_scope(primary_place) if primary_place else "region"
+                mentioned_places = [
+                    {"name": p["name"], "label": p.get("label", p["name"]), "type": p.get("type", "city"),
+                     "lat": p.get("lat"), "lon": p.get("lon")}
+                    for p in mentioned[:120]
+                ]
+                signal_class = "missile_activity_signal" if threat_class == "missile" else "uav_activity_signal"
+
+                for count, ctype, secondary_count, secondary_type, qualifier in counts:
+                    reports.append({
+                        "id": stable_id(source.get("channel", source.get("source_id", "source")), str(post.post_id), place, ctype, str(count), threat_class),
+                        "region": source["region"], "place": place, "scope": scope,
+                        "at": post.published_at.isoformat(), "count": count, "count_type": ctype,
+                        "signal_class": signal_class,
+                        "threat_class": threat_class,
+                        "activity_kind": activity_kind,
+                        "count_qualifier": qualifier, "secondary_count": secondary_count, "secondary_type": secondary_type,
+                        "text": sentence, "source_name": source["source_name"], "url": post.url,
+                        "source_kind": source.get("kind", "official"),
+                        "lat": primary_place.get("lat") if primary_place else None,
+                        "lon": primary_place.get("lon") if primary_place else None,
+                        "mentioned_places": mentioned_places,
+                    })
+                    produced_threats.add(threat_class)
 
         # Display-first policy for both UAV and missile activity.
         for threat_class, activity_kind in whole_signals:
