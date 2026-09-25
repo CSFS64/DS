@@ -215,6 +215,8 @@ class CollectorTests(unittest.TestCase):
             self.assertGreater(args.lookback_hours, 5.9)
             self.assertLess(args.lookback_hours, 6.1)
 
+    def test_fractional_lookback_env_is_supported(self):
+        self.assertAlmostEqual(float("16.25"), 16.25)
     def test_v9_backfill_keeps_requested_window(self):
         args = Namespace(
             output="missing.json", safety_lag_hours=0, lookback_hours=168,
