@@ -291,6 +291,28 @@ class CollectorTests(unittest.TestCase):
         self.assertTrue(all(s.get('require_region_match') for s in nationwide))
         self.assertTrue(all(s.get('fallback_only_if_no_local_activity') for s in nationwide))
 
+    def test_v24_compact_multi_region_list_keeps_named_oblast(self):
+        cfg = json.loads((ROOT / 'data' / 'sources.json').read_text(encoding='utf-8'))
+        national = [s for s in cfg['sources'] if s.get('source_layer') == 'monitoring_national']
+        all_aliases = tuple(dict.fromkeys(
+            normalize(v)
+            for s in national
+            for v in [s.get('region_label',''), *(s.get('region_aliases',[]) or [])]
+            if normalize(v)
+        ))
+        from collector.collect import _region_head_aliases
+        all_heads = tuple(dict.fromkeys(head for s in national for head in _region_head_aliases(s.copy())))
+        bel = next(s.copy() for s in national if s['region'] == 'Belgorod Oblast')
+        ast = next(s.copy() for s in national if s['region'] == 'Astrakhan Oblast')
+        for s in (bel, ast):
+            s['_all_region_match_aliases'] = all_aliases
+            s['_all_region_match_heads'] = all_heads
+        post = Post('radarrussiia', 95974, datetime(2026,9,25,5,51,tzinfo=timezone.utc),
+                    'Над территориями Белгородской, Брянской, Волгоградской, Воронежской, Калужской областей уничтожены БПЛА.',
+                    'https://t.me/radarrussiia/95974')
+        self.assertTrue(source_post_applies(post, bel))
+        self.assertFalse(source_post_applies(post, ast))
+
     def test_v23_explicit_region_blocks_same_name_district_collision(self):
         cfg = json.loads((ROOT / 'data' / 'sources.json').read_text(encoding='utf-8'))
         national = [s for s in cfg['sources'] if s.get('source_layer') == 'monitoring_national']
