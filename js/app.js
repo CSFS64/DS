@@ -40,6 +40,8 @@ const state = {
   routesVisible: true,
   routeSelectionKey: "",
   routeFeatureCount: 0,
+  cleanView: false,
+  exportBusy: false,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -52,7 +54,7 @@ const els = {
   handleStart: $("handleStart"), handleEnd: $("handleEnd"), handleCumulative: $("handleCumulative"),
   playButton: $("playButton"), scrubber: $("scrubber"), currentTimeLabel: $("currentTimeLabel"), speedSelect: $("speedSelect"),
   clockMoscow: $("clockMoscow"), clockKyiv: $("clockKyiv"), clockBeijing: $("clockBeijing"),
-  routeToggle: $("routeToggle"),
+  routeToggle: $("routeToggle"), cleanViewButton: $("cleanViewButton"), exportPngButton: $("exportPngButton"),
 };
 
 function parseMoscowDate(dateStr, endOfDay = false) {
@@ -304,6 +306,7 @@ function initMap() {
     attributionControl: true,
     cooperativeGestures: false,
     renderWorldCopies: false,
+    preserveDrawingBuffer: true,
   });
 
   state.map.addControl(new MapLibre.NavigationControl({ showCompass: false }), "bottom-right");
@@ -2137,6 +2140,119 @@ function initializeDates() {
   els.dateEnd.value = isoDateInZone(maxMs);
 }
 
+function scheduleMapResize() {
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (state.map) {
+      state.map.resize();
+      state.map.triggerRepaint();
+    }
+  }));
+}
+
+function applyCleanView(enabled) {
+  state.cleanView = Boolean(enabled);
+  document.body.classList.toggle("clean-map-view", state.cleanView);
+  if (els.cleanViewButton) {
+    els.cleanViewButton.classList.toggle("is-on", state.cleanView);
+    els.cleanViewButton.setAttribute("aria-pressed", String(state.cleanView));
+    els.cleanViewButton.textContent = state.cleanView ? "EXIT CLEAN VIEW" : "CLEAN VIEW";
+  }
+  if (state.cleanView && els.detailPanel) els.detailPanel.hidden = true;
+  scheduleMapResize();
+}
+
+async function toggleCleanView() {
+  if (state.cleanView) {
+    if (document.fullscreenElement && document.exitFullscreen) {
+      try { await document.exitFullscreen(); } catch (_) {}
+    }
+    applyCleanView(false);
+    return;
+  }
+
+  applyCleanView(true);
+  if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+    try { await document.documentElement.requestFullscreen({ navigationUI: "hide" }); } catch (_) {}
+  }
+}
+
+function waitForMapIdle(timeoutMs = 4000) {
+  return new Promise(resolve => {
+    if (!state.map) return resolve();
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve();
+    };
+    const timer = setTimeout(finish, timeoutMs);
+    state.map.once("idle", finish);
+    state.map.triggerRepaint();
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (state.map?.areTilesLoaded?.() && !state.map?.isMoving?.()) finish();
+    }));
+  });
+}
+
+function exportFileStamp(ms) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Kyiv", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hour12: false,
+  }).formatToParts(new Date(ms));
+  const p = Object.fromEntries(parts.map(x => [x.type, x.value]));
+  return `${p.year}${p.month}${p.day}_${p.hour}${p.minute}`;
+}
+
+function currentExportEndMs() {
+  if (state.viewMode === "cumulative") return Math.min(state.cumulativeMs, selectionEndMs());
+  return Math.min(Math.max(state.currentMs, selectionStartMs()), selectionEndMs());
+}
+
+async function exportCleanPng() {
+  if (!state.mapReady || !state.map || state.exportBusy) return;
+  state.exportBusy = true;
+  const wasClean = state.cleanView;
+  const originalText = els.exportPngButton?.textContent || "EXPORT PNG";
+  if (els.exportPngButton) {
+    els.exportPngButton.disabled = true;
+    els.exportPngButton.textContent = "RENDERING…";
+  }
+
+  try {
+    if (!wasClean) applyCleanView(true);
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    await waitForMapIdle();
+
+    const canvas = state.map.getCanvas();
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/png"));
+    if (!blob) throw new Error("PNG export returned an empty image");
+
+    const start = selectionStartMs();
+    const end = currentExportEndMs();
+    const filename = `deepstrike_${exportFileStamp(start)}-${exportFileStamp(end)}_KYIV.png`;
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (err) {
+    console.error("PNG export failed", err);
+    if (els.exportPngButton) els.exportPngButton.textContent = "EXPORT FAILED";
+    await new Promise(resolve => setTimeout(resolve, 900));
+  } finally {
+    if (!wasClean) applyCleanView(false);
+    state.exportBusy = false;
+    if (els.exportPngButton) {
+      els.exportPngButton.disabled = false;
+      els.exportPngButton.textContent = originalText;
+    }
+  }
+}
+
 function wireControls() {
   els.dateStart.addEventListener("change", rebuildTimeline);
   els.dateEnd.addEventListener("change", rebuildTimeline);
@@ -2164,6 +2280,14 @@ function wireControls() {
       if (state.routesVisible) updateRouteOverlay(true);
     });
   }
+  if (els.cleanViewButton) els.cleanViewButton.addEventListener("click", toggleCleanView);
+  if (els.exportPngButton) els.exportPngButton.addEventListener("click", exportCleanPng);
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape" && state.cleanView) applyCleanView(false);
+  });
+  document.addEventListener("fullscreenchange", () => {
+    if (state.cleanView && !document.fullscreenElement) applyCleanView(false);
+  });
   els.detailClose.addEventListener("click", () => { els.detailPanel.hidden = true; });
 }
 
