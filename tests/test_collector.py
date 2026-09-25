@@ -26,6 +26,7 @@ from collector.collect import (
     revalidate_archive_reports,
     fetch_posts_mtproto_for_window,
     source_post_applies,
+    source_collection_sort_key,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -223,6 +224,28 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(args.lookback_hours, 168)
         self.assertIsNone(args.window_start_override)
         self.assertIsNone(args.window_end_override)
+
+    def test_v19_monitoring_collection_precedes_official(self):
+        cfg = json.loads((ROOT / 'data' / 'sources.json').read_text(encoding='utf-8'))
+        ordered = sorted([s for s in cfg['sources'] if s.get('enabled')], key=source_collection_sort_key)
+        layers = [s.get('source_layer','official_local') for s in ordered]
+        first_official = next(i for i, layer in enumerate(layers) if not layer.startswith('monitoring_'))
+        self.assertTrue(all(layer.startswith('monitoring_') for layer in layers[:first_official]))
+
+    def test_v19_volgograd_national_fallback_is_region_scoped(self):
+        cfg = json.loads((ROOT / 'data' / 'sources.json').read_text(encoding='utf-8'))
+        source = next(s for s in cfg['sources'] if s['region']=='Volgograd Oblast' and s['channel']=='radarrussiia')
+        self.assertEqual(source['coverage_role'], 'monitoring_fallback')
+        self.assertTrue(source['require_region_match'])
+        self.assertTrue(source['fallback_only_if_no_local_activity'])
+        source = dict(source)
+        source['_catalog_places'] = []
+        yes = Post('radarrussiia', 1, datetime(2026,9,24,1,0,tzinfo=timezone.utc),
+                   'Волгоградская область. Опасность по БПЛА.', 'https://t.me/radarrussiia/1')
+        no = Post('radarrussiia', 2, datetime(2026,9,24,1,1,tzinfo=timezone.utc),
+                  'Ростовская область. Опасность по БПЛА.', 'https://t.me/radarrussiia/2')
+        self.assertTrue(source_post_applies(yes, source))
+        self.assertFalse(source_post_applies(no, source))
 
     def test_v18_monitoring_wording_and_registry(self):
         self.assertEqual(uav_activity_kind('Сернурский район. Фиксация БПЛА.'), 'uav_detected')
