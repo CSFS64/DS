@@ -40,6 +40,12 @@ const state = {
   routesVisible: true,
   routeSelectionKey: "",
   routeFeatureCount: 0,
+  interactiveRenderFrame: 0,
+  routeUpdateTimer: null,
+  observedCountSignature: "",
+  routeCatalogCache: null,
+  regionVisualStates: new Map(),
+  placeVisualStates: new Map(),
   cleanView: false,
   exportBusy: false,
 };
@@ -832,6 +838,7 @@ function routeRegionMetrics(coords, litRegions) {
 }
 
 function routePlaceCatalog() {
+  if (state.routeCatalogCache) return state.routeCatalogCache;
   const exact = sourcePlaceIndex();
   const aliases = new Map();
   for (const [key, place] of exact) {
@@ -842,7 +849,8 @@ function routePlaceCatalog() {
       if (!aliases.has(aliasKey)) aliases.set(aliasKey, { ...place, key });
     }
   }
-  return { exact, aliases };
+  state.routeCatalogCache = { exact, aliases };
+  return state.routeCatalogCache;
 }
 
 function resolveRouteCatalogPlace(catalog, region, ...names) {
@@ -1740,6 +1748,9 @@ function updateRouteOverlay(force = false) {
 
 function installArchiveLayers() {
   if (!state.map?.isStyleLoaded()) return;
+  state.regionVisualStates.clear();
+  state.placeVisualStates.clear();
+  state.observedCountSignature = "";
 
   for (const id of [
     "archive-observed-count-label", "archive-place-label", "archive-place-dot", "archive-place-route-unlinked", "archive-place-glow",
@@ -2310,11 +2321,29 @@ async function exportCleanPng() {
   }
 }
 
+function scheduleInteractiveRender() {
+  if (state.interactiveRenderFrame) return;
+  state.interactiveRenderFrame = requestAnimationFrame(() => {
+    state.interactiveRenderFrame = 0;
+    render({ skipRoutes: true });
+  });
+}
+
+function scheduleRouteRefresh(delayMs = 180, force = true) {
+  if (state.routeUpdateTimer) clearTimeout(state.routeUpdateTimer);
+  state.routeUpdateTimer = setTimeout(() => {
+    state.routeUpdateTimer = null;
+    if (state.routesVisible) updateRouteOverlay(force);
+  }, Math.max(0, delayMs));
+}
+
 function wireControls() {
   els.dateStart.addEventListener("change", rebuildTimeline);
   els.dateEnd.addEventListener("change", rebuildTimeline);
-  els.rangeStart.addEventListener("input", () => updateSelection("start"));
-  els.rangeEnd.addEventListener("input", () => updateSelection("end"));
+  els.rangeStart.addEventListener("input", () => updateSelection("start", true));
+  els.rangeEnd.addEventListener("input", () => updateSelection("end", true));
+  els.rangeStart.addEventListener("change", () => scheduleRouteRefresh(0, true));
+  els.rangeEnd.addEventListener("change", () => scheduleRouteRefresh(0, true));
   els.rangeCumulative.addEventListener("input", () => {
     stopPlayback();
     state.viewMode = "cumulative";
@@ -2322,12 +2351,12 @@ function wireControls() {
     state.cumulativeMs = Math.min(Math.max(state.cumulativeMs, selectionStartMs()), selectionEndMs());
     state.currentMs = state.cumulativeMs;
     updateCumulativeHandle();
-    render();
+    scheduleInteractiveRender();
   });
   els.scrubber.addEventListener("input", () => {
     state.viewMode = "realtime";
     state.currentMs = selectionStartMs() + (selectionEndMs() - selectionStartMs()) * (+els.scrubber.value / 1000);
-    render();
+    scheduleInteractiveRender();
   });
   els.playButton.addEventListener("click", togglePlayback);
   if (els.routeToggle) {
@@ -2372,7 +2401,7 @@ function selectionStartMs() { return timelineMsFromRange(+els.rangeStart.value);
 function selectionEndMs() { return timelineMsFromRange(+els.rangeEnd.value); }
 function pctInTimeline(ms) { return ((ms - state.timelineStartMs) / (state.timelineEndMs - state.timelineStartMs)) * 100; }
 
-function updateSelection(changed) {
+function updateSelection(changed, interactive = false) {
   let a = +els.rangeStart.value, b = +els.rangeEnd.value;
   if (a > b) {
     if (changed === "start") b = a; else a = b;
@@ -2389,7 +2418,12 @@ function updateSelection(changed) {
   const cp = (state.cumulativeMs - state.timelineStartMs) / (state.timelineEndMs - state.timelineStartMs);
   els.rangeCumulative.value = Math.round(Math.min(1, Math.max(0, cp)) * 1000);
   updateCumulativeHandle();
-  render();
+  if (interactive) {
+    scheduleInteractiveRender();
+    scheduleRouteRefresh(180, true);
+  } else {
+    render();
+  }
 }
 
 function updateCumulativeHandle() {
@@ -2477,12 +2511,12 @@ function cumulativeReports() {
   });
 }
 
-function render() {
+function render(options = {}) {
   const cumulative = state.viewMode === "cumulative";
   const active = cumulative ? cumulativeEvents() : activeEvents();
   const reports = cumulative ? cumulativeReports() : activeReports();
   renderMap(active, reports);
-  updateRouteOverlay();
+  if (!options.skipRoutes) updateRouteOverlay();
   renderClocks(active, reports);
   renderScrubber();
   updateCumulativeHandle();
@@ -2568,9 +2602,50 @@ function buildObservedCountLabels(reports = []) {
 function updateObservedCountLabels(reports = []) {
   const source = state.map?.getSource("archive-observed-counts");
   if (!source) return;
-  source.setData(buildObservedCountLabels(reports));
+  const counted = reports.filter(r => explicitObservedCount(r));
+  const signature = counted.map(r =>
+    [r.id || r.url || "", r.count || "", r.count_qualifier || "", r.at || ""].join(":")
+  ).join("|");
+  if (signature === state.observedCountSignature) return;
+  state.observedCountSignature = signature;
+  source.setData(buildObservedCountLabels(counted));
 }
 
+function visualStateMask(value) {
+  if (!value) return 0;
+  return (value.active ? 1 : 0) |
+    (value.missileActive ? 2 : 0) |
+    (value.report ? 4 : 0) |
+    (value.missileReport ? 8 : 0);
+}
+
+function mergeVisualState(target, id, patch) {
+  if (id == null) return;
+  const current = target.get(id) || { active: false, missileActive: false, report: false, missileReport: false };
+  target.set(id, {
+    active: current.active || Boolean(patch.active),
+    missileActive: current.missileActive || Boolean(patch.missileActive),
+    report: current.report || Boolean(patch.report),
+    missileReport: current.missileReport || Boolean(patch.missileReport),
+  });
+}
+
+function applyVisualStateDiff(source, previous, desired) {
+  if (!state.mapReady || !state.map.getSource(source)) return;
+  const ids = new Set([...previous.keys(), ...desired.keys()]);
+  for (const id of ids) {
+    const oldState = previous.get(id);
+    const newState = desired.get(id);
+    if (visualStateMask(oldState) === visualStateMask(newState)) continue;
+    try {
+      state.map.setFeatureState({ source, id }, newState || {
+        active: false, missileActive: false, report: false, missileReport: false,
+      });
+    } catch (_) {}
+  }
+  previous.clear();
+  for (const [id, value] of desired) previous.set(id, value);
+}
 function clearThreatFeatureState(source, id) {
   if (!state.mapReady || !state.map.getSource(source) || id == null) return;
   try { state.map.setFeatureState({ source, id }, { active: false, missileActive: false, report: false, missileReport: false }); } catch (_) {}
@@ -2578,64 +2653,46 @@ function clearThreatFeatureState(source, id) {
 
 function renderMap(active, reports = []) {
   if (state.mapReady) {
-    for (const id of new Set([...state.previousActiveRegionIds, ...state.previousReportRegionIds])) clearThreatFeatureState("archive-regions", id);
-    for (const id of new Set([...state.previousActivePlaceIds, ...state.previousReportPlaceIds])) clearThreatFeatureState("archive-places", id);
-    state.previousActiveRegionIds.clear();
-    state.previousActivePlaceIds.clear();
-    state.previousReportRegionIds.clear();
-    state.previousReportPlaceIds.clear();
+    const desiredRegions = new Map();
+    const desiredPlaces = new Map();
 
-    // Hierarchy rule: a local alert necessarily means its parent region is active.
-    // The city/municipality dot gives precision; the region fill gives containment.
+    // Hierarchy rule: a local alert also marks its parent region.
     for (const event of active) {
       const missile = threatClass(event) === "missile";
       const rid = state.regionFeatureIds.get(event.region);
-      if (rid != null) {
-        setFeatureActive("archive-regions", rid, true, missile);
-        state.previousActiveRegionIds.add(rid);
-      }
+      mergeVisualState(desiredRegions, rid, { active: true, missileActive: missile });
       if (event.scope !== "region") {
         const key = `${event.region}::${event.place}`;
         const id = state.placeFeatureIds.get(key);
-        if (id != null) {
-          setFeatureActive("archive-places", id, true, missile);
-          state.previousActivePlaceIds.add(id);
-        }
+        mergeVisualState(desiredPlaces, id, { active: true, missileActive: missile });
       }
     }
 
-
-    // Official local reports are shown as amber activity, not mislabelled as a
-    // formal alert. This makes Moscow-style governor/mayor incident reporting
-    // visible even when no explicit START/END warning was published.
     for (const report of reports) {
       const formalSignal = report.signal_class === "formal_alert_signal";
       const missile = threatClass(report) === "missile";
       const rid = state.regionFeatureIds.get(report.region);
-      if (rid != null) {
-        if (formalSignal) {
-          setFeatureActive("archive-regions", rid, true, missile);
-          state.previousActiveRegionIds.add(rid);
-        } else {
-          try { state.map.setFeatureState({ source: "archive-regions", id: rid }, missile ? { missileReport: true } : { report: true }); } catch (_) {}
-          state.previousReportRegionIds.add(rid);
-        }
+
+      if (formalSignal) {
+        mergeVisualState(desiredRegions, rid, { active: true, missileActive: missile });
+      } else {
+        mergeVisualState(desiredRegions, rid, missile ? { missileReport: true } : { report: true });
       }
+
       const mentioned = (report.mentioned_places?.length ? report.mentioned_places : [report]);
       for (const place of mentioned) {
         const key = `${report.region}::${place.name || report.place}`;
         const id = state.placeFeatureIds.get(key);
-        if (id != null) {
-          if (formalSignal) {
-            setFeatureActive("archive-places", id, true, missile);
-            state.previousActivePlaceIds.add(id);
-          } else {
-            try { state.map.setFeatureState({ source: "archive-places", id }, missile ? { missileReport: true } : { report: true }); } catch (_) {}
-            state.previousReportPlaceIds.add(id);
-          }
+        if (formalSignal) {
+          mergeVisualState(desiredPlaces, id, { active: true, missileActive: missile });
+        } else {
+          mergeVisualState(desiredPlaces, id, missile ? { missileReport: true } : { report: true });
         }
       }
     }
+
+    applyVisualStateDiff("archive-regions", state.regionVisualStates, desiredRegions);
+    applyVisualStateDiff("archive-places", state.placeVisualStates, desiredPlaces);
     updateObservedCountLabels(reports);
   }
   els.archiveLamp.classList.toggle("on", active.length > 0 || reports.length > 0);
