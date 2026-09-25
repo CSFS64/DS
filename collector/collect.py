@@ -2280,7 +2280,7 @@ def main():
     p.add_argument("--cities", default=str(DEFAULT_CITIES))
     p.add_argument("--output", default=str(DEFAULT_OUTPUT))
     p.add_argument("--telegram-peer-cache", default=str(DEFAULT_TELEGRAM_PEERS))
-    p.add_argument("--lookback-hours", type=int, default=int(os.getenv("LOOKBACK_HOURS", "120")))
+    p.add_argument("--lookback-hours", type=float, default=float(os.getenv("LOOKBACK_HOURS", "120")))
     p.add_argument("--safety-lag-hours", type=int, default=int(os.getenv("SAFETY_LAG_HOURS", "0")))
     p.add_argument("--max-pages", type=int, default=int(os.getenv("TELEGRAM_MAX_PAGES", "50")))
     p.add_argument("--context-hours", type=int, default=int(os.getenv("TELEGRAM_CONTEXT_HOURS", "48")))
