@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-09-24T23:38:33.858962+00:00",
+  "updated_at": "2026-09-25T23:11:41.254790+00:00",
   "note": "Entity metadata only; no Telegram auth/session credential is stored here.",
   "peers": {
     "adygheya_gov": {
@@ -374,11 +374,39 @@
       "username": "rada_saratov",
       "source": "resolved"
     },
+    "radar_astrakhann": {
+      "peer_type": "channel",
+      "id": 2622118413,
+      "access_hash": 2585369250444504558,
+      "username": "radar_astrakhann",
+      "source": "resolved"
+    },
+    "radar_bashkortostan": {
+      "peer_type": "channel",
+      "id": 2413381201,
+      "access_hash": -7158189844688426513,
+      "username": "radar_bashkortostan",
+      "source": "resolved"
+    },
+    "radar_bryanskk": {
+      "peer_type": "channel",
+      "id": 2246809028,
+      "access_hash": 1757898964383408271,
+      "username": "radar_bryanskk",
+      "source": "resolved"
+    },
     "radar_chuvashiya": {
       "peer_type": "channel",
       "id": 2798798009,
       "access_hash": 646290445102899893,
       "username": "radar_chuvashiya",
+      "source": "resolved"
+    },
+    "radar_crimeaa": {
+      "peer_type": "channel",
+      "id": 2198420797,
+      "access_hash": -2516695399439714361,
+      "username": "radar_crimeaa",
       "source": "resolved"
     },
     "radar_kaluga": {
@@ -388,11 +416,32 @@
       "username": "radar_kaluga",
       "source": "resolved"
     },
+    "radar_kras": {
+      "peer_type": "channel",
+      "id": 2154136985,
+      "access_hash": -137159618739059797,
+      "username": "radar_kras",
+      "source": "resolved"
+    },
+    "radar_kurskk": {
+      "peer_type": "channel",
+      "id": 2051612137,
+      "access_hash": -2249963419522498420,
+      "username": "radar_kurskk",
+      "source": "resolved"
+    },
     "radar_lipetskk": {
       "peer_type": "channel",
       "id": 2121903297,
       "access_hash": -2856860646305238723,
       "username": "radar_lipetskk",
+      "source": "resolved"
+    },
+    "radar_moscoww": {
+      "peer_type": "channel",
+      "id": 2489960634,
+      "access_hash": 1431348603777651670,
+      "username": "radar_moscoww",
       "source": "resolved"
     },
     "radar_nizhniinovgorod": {
@@ -409,6 +458,20 @@
       "username": "radar_orei",
       "source": "resolved"
     },
+    "radar_penzaa": {
+      "peer_type": "channel",
+      "id": 2686864722,
+      "access_hash": 8912481571175018102,
+      "username": "radar_penzaa",
+      "source": "resolved"
+    },
+    "radar_pskovv": {
+      "peer_type": "channel",
+      "id": 2756052335,
+      "access_hash": 4394150859168874823,
+      "username": "radar_pskovv",
+      "source": "resolved"
+    },
     "radar_rostovv": {
       "peer_type": "channel",
       "id": 1675707937,
@@ -421,6 +484,13 @@
       "id": 2343153331,
       "access_hash": 1612764875596985116,
       "username": "radar_ryazan",
+      "source": "resolved"
+    },
+    "radar_samaraa": {
+      "peer_type": "channel",
+      "id": 2275060354,
+      "access_hash": -5002853826532376050,
+      "username": "radar_samaraa",
       "source": "resolved"
     },
     "radar_smolensk": {
@@ -444,6 +514,20 @@
       "username": "radar_tatarstann",
       "source": "resolved"
     },
+    "radar_tuia": {
+      "peer_type": "channel",
+      "id": 2305146195,
+      "access_hash": 8330040348760237985,
+      "username": "radar_tuia",
+      "source": "resolved"
+    },
+    "radar_tver": {
+      "peer_type": "channel",
+      "id": 2434783896,
+      "access_hash": -8748061557862544815,
+      "username": "radar_tver",
+      "source": "resolved"
+    },
     "radar_ulyanovsk": {
       "peer_type": "channel",
       "id": 2839461208,
@@ -456,6 +540,13 @@
       "id": 2306648579,
       "access_hash": 2379944163050744499,
       "username": "radar_volgograd",
+      "source": "resolved"
+    },
+    "radar_voronezh": {
+      "peer_type": "channel",
+      "id": 2212141451,
+      "access_hash": -7519231337643199263,
+      "username": "radar_voronezh",
       "source": "resolved"
     },
     "radarrussiia": {
