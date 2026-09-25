@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "Incremental pulls from cursor to now; replay_previous re-runs the last exact window; backfill uses backfill_hours"
+        description: "Incremental pulls from cursor to the delayed archive cutoff; replay_previous re-runs the last exact window; backfill uses backfill_hours"
         required: false
         default: "incremental"
         type: choice
@@ -54,7 +54,7 @@ jobs:
           FULL_BACKFILL: ${{ github.event.inputs.mode == 'backfill' && '1' || '0' }}
           REPLAY_PREVIOUS_WINDOW: ${{ github.event.inputs.mode == 'replay_previous' && '1' || '0' }}
           INCREMENTAL_OVERLAP_HOURS: "0"
-          SAFETY_LAG_HOURS: "0"
+          SAFETY_LAG_HOURS: "24"
           TELEGRAM_MAX_PAGES: "80"
           TELEGRAM_CONTEXT_HOURS: "48"
           TELEGRAM_MT_MAX_MESSAGES: "20000"
