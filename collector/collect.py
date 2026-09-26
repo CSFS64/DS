@@ -2271,36 +2271,71 @@ def merge_existing_archive(data: dict[str, Any], output_path: Path) -> dict[str,
 
 
 def revalidate_archive_reports(data: dict[str, Any]) -> dict[str, Any]:
-    """Re-run non-formal archived activity through the current classifier."""
+    """Re-run archived report semantics through the current classifier.
+
+    Formal START/END records are rechecked too, so parser improvements can heal
+    old false alerts such as "режим опасности ... не вводился" or cancellation
+    wording that was previously misread as a START.
+    """
     kept: list[dict[str, Any]] = []
     removed = 0
     reclassified = 0
+
     for report in data.get("reports", []) or []:
         signal_class = report.get("signal_class")
         threat = report.get("threat_class")
         text = str(report.get("text") or "").strip()
-
-        if signal_class in {"formal_alert_signal", "alert_clear_signal"} or not text:
+        if not text:
             kept.append(report)
             continue
 
-        kind = None
-        if threat == "uav" and signal_class == "uav_activity_signal":
+        if threat == "uav" and signal_class in {
+            "uav_activity_signal", "formal_alert_signal", "alert_clear_signal"
+        }:
             kind = uav_activity_kind(text)
-        elif threat == "missile" and signal_class == "missile_activity_signal":
+            activity_signal = "uav_activity_signal"
+        elif threat == "missile" and signal_class in {
+            "missile_activity_signal", "formal_alert_signal", "alert_clear_signal"
+        }:
             kind = missile_activity_kind(text)
+            activity_signal = "missile_activity_signal"
         else:
             kept.append(report)
             continue
 
-        if kind is None or kind in {"alert_start_signal", "alert_end_signal"}:
-            removed += 1
+        if kind is None:
+            # Keep previously formal records conservatively if the newer parser
+            # cannot classify them at all; ordinary activity false positives may
+            # still be dropped as before.
+            if signal_class in {"formal_alert_signal", "alert_clear_signal"}:
+                kept.append(report)
+            else:
+                removed += 1
             continue
+
+        if kind == "alert_start_signal":
+            expected_signal = "formal_alert_signal"
+            expected_count_type = "alert_start_signal"
+        elif kind == "alert_end_signal":
+            expected_signal = "alert_clear_signal"
+            expected_count_type = "alert_end_signal"
+        else:
+            expected_signal = activity_signal
+            expected_count_type = "historical_summary" if kind == "historical_summary" else "official_activity"
+
+        changed = False
         if report.get("activity_kind") != kind:
             report["activity_kind"] = kind
-            if report.get("count") is None:
-                report["count_type"] = "official_activity"
+            changed = True
+        if report.get("signal_class") != expected_signal:
+            report["signal_class"] = expected_signal
+            changed = True
+        if report.get("count") is None and report.get("count_type") != expected_count_type:
+            report["count_type"] = expected_count_type
+            changed = True
+        if changed:
             reclassified += 1
+
         kept.append(report)
 
     data["reports"] = kept
@@ -2313,7 +2348,6 @@ def revalidate_archive_reports(data: dict[str, Any]) -> dict[str, Any]:
     }
     coverage["archive_regions_with_records"] = len(archive_regions)
     return data
-
 
 def reenrich_archive_places(data: dict[str, Any], source_cfg: dict[str, Any],
                             city_cfg: dict[str, Any]) -> dict[str, Any]:
