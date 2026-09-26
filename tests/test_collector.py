@@ -862,6 +862,31 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(out['reports'][0]['activity_kind'], 'uav_attack_activity')
         self.assertEqual(out['coverage']['reports_revalidated_removed'], 0)
 
+    def test_v24_retrospective_night_summary_is_historical(self):
+        self.assertEqual(
+            uav_activity_kind(
+                'Минувшей ночью в ходе отражения воздушной атаки на Ростовскую область '
+                'уничтожены около 50 БПЛА в 6 районах области.'
+            ),
+            'historical_summary',
+        )
+        self.assertEqual(
+            uav_activity_kind(
+                'За прошедшую ночь силами ПВО уничтожено 645 БПЛА над несколькими регионами.'
+            ),
+            'historical_summary',
+        )
+
+    def test_v24_sochi_cancellation_is_uav_alert_end(self):
+        self.assertEqual(
+            text_kind('Отмена угрозы атаки БПЛА в Сочи.'),
+            'end',
+        )
+        self.assertEqual(
+            uav_activity_kind('Отмена угрозы атаки БПЛА в Сочи.'),
+            'alert_end_signal',
+        )
+
     def test_v16_cached_mtproto_peer_still_works_during_resolve_floodwait(self):
         class FakeClient:
             _archive_resolve_flooded = True
