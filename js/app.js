@@ -902,7 +902,7 @@ function routeCountWeight(record) {
 }
 
 function routeObservationPoints(record, atMs, sourceType, catalog) {
-  if (!reportRepresentsLiveThreat(record)) return [];
+  if (threatClass(record) !== "uav" || !reportRepresentsLiveThreat(record)) return [];
   const points = [];
   const seen = new Set();
   const recordKey = String(record.id || record.url || [record.region, record.at || record.start, record.place].join("|"));
@@ -2558,25 +2558,37 @@ function threatClass(record) {
   return record?.threat_class || (String(record?.alert_type || "").startsWith("missile") ? "missile" : "uav");
 }
 
-function reportRepresentsLiveThreat(record) {
-  if (!record || threatClass(record) !== "uav") return false;
-  if (record.signal_class === "alert_clear_signal") return false;
+function reportLooksRetrospective(record) {
+  const text = String(record?.text || "").toLowerCase().replace(/ё/g, "е");
+  return /\b(?:минувш(?:ей|ую)\s+ноч|прошедш(?:ей|ую)\s+ноч|за\s+(?:минувш|прошедш)[^.!?\n]{0,40}ноч|за\s+вчера|вчерашн|по\s+итогам\s+(?:ночи|суток)|рано\s+утром)\b/.test(text);
+}
 
-  // These are contemporaneous operational signals and may light the map.
+function reportLooksLikeClear(record) {
+  const text = String(record?.text || "").toLowerCase().replace(/ё/g, "е");
+  return /\b(?:отбой|отмена\s+(?:угрозы|опасности)|снят\w*\s+режим|угроза\s+миновала)\b/.test(text);
+}
+
+function reportRepresentsLiveThreat(record) {
+  if (!record) return false;
+  if (record.signal_class === "alert_clear_signal" || reportLooksLikeClear(record)) return false;
+  if (reportLooksRetrospective(record) || record.activity_kind === "historical_summary") return false;
+
+  // Formal starts are live regardless of threat type (UAV or missile).
+  if (record.signal_class === "formal_alert_signal" || record.activity_kind === "alert_start_signal") {
+    return true;
+  }
+
   const liveKinds = new Set([
     "uav_movement",
     "uav_detected",
     "air_defense_action",
     "official_uav_activity",
-    "alert_start_signal",
+    "missile_detected",
+    "missile_movement",
+    "missile_launch",
+    "official_missile_activity",
   ]);
-  if (liveKinds.has(record.activity_kind)) return true;
-  if (record.signal_class === "formal_alert_signal") return true;
-
-  // Attack/debris/consequence posts are often published hours after the actual
-  // flight. Keep them in the archive/detail panel, but do not let their publish
-  // time create a fresh "live" map activation or route observation.
-  return false;
+  return liveKinds.has(record.activity_kind);
 }
 
 function setFeatureActive(source, id, active, missile = false) {
