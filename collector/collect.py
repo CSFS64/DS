@@ -102,6 +102,7 @@ END_PATTERNS = tuple(re.compile(p) for p in (
     r"\bбеспилотн\w*\s+опасност\w*.{0,100}\b(?:снят|снята|снято|сняты|отменен|отменена|отменено|отменены)\b",
     r"\b(?:снят|снята|отменен|отменена|отмена)\b.{0,100}\bугроз\w*\s+атак\w*\s+(?:бпла|беспилотн\w*)",
     r"\bотмен\w*\b.{0,70}\bсигнал\w*.{0,50}\bопасност\w*\s+атак\w*\s+бпла\b",
+    r"\bотмен\w*\b.{0,70}\bсигнал\w*.{0,80}\b(?:атак\w*\s+бпла|бпла|беспилотн\w*)\b",
     r"\bугроз\w*\s+атак\w*\s+(?:бпла|беспилотн\w*).{0,100}\b(?:снят|снята|отменен|отменена)\b",
     r"\bугроз\w*\s+(?:снят|снята|снято|отменен|отменена|отменено)\b",
     r"\b(?:снят|снята|снято|отменен|отменена|отменено)\b.{0,50}\bугроз\w*\b",
@@ -294,15 +295,35 @@ def uav_activity_kind(text: str) -> str | None:
     if formal == "end":
         return "alert_end_signal"
 
-    # Morning/next-day summaries describe activity that happened earlier.
-    # Preserve them in the archive as historical context, but do not treat the
-    # publication timestamp as a fresh operational observation.
-    if re.search(
-        r"\b(?:минувш(?:ей|ую)\s+ноч|прошедш(?:ей|ую)\s+ноч|"
-        r"за\s+(?:минувш|прошедш)[^.!?\n]{0,40}ноч|за\s+вчера|вчерашн|"
-        r"по\s+итогам\s+(?:ночи|суток)|рано\s+утром)\b",
+    # Retrospective and fixed-period summaries describe activity that happened
+    # earlier. Preserve them in the archive, but never use the publication time
+    # as a fresh operational observation.
+    historical_period = (
+        re.search(
+            r"\b(?:минувш\w*|прошедш\w*)\s+(?:ноч\w*|вечер\w*|сутк\w*|день\w*)\b",
+            whole,
+        )
+        or re.search(r"\bза\s+(?:вчера|минувш\w*|прошедш\w*)\b", whole)
+        or re.search(r"\bвчерашн\w*\b", whole)
+        or re.search(r"\bпо\s+итогам\s+(?:ночи|суток|дня)\b", whole)
+        or re.search(
+            r"\b(?:за|в)\s+период\s+с\s+\d{1,2}[.:]\d{2}[^.!?\n]{0,35}"
+            r"\bдо\s+\d{1,2}[.:]\d{2}\b",
+            whole,
+        )
+        or re.search(
+            r"\bв\s+течение\s+(?:дня|суток|ночи)\b[^.!?\n]{0,80}"
+            r"\bс\s+\d{1,2}[.:]\d{2}[^.!?\n]{0,35}\bдо\s+\d{1,2}[.:]\d{2}\b",
+            whole,
+        )
+    )
+    earlier_today = re.search(
+        r"\bсегодня\s+(?:ночью|утром)\b[^.!?\n]{0,180}"
+        r"\b(?:соверш\w*|произош\w*|были?\s+(?:обнаруж\w*|уничтож\w*|сбит\w*)|"
+        r"уничтож\w*|сбит\w*|атаков\w*)\b",
         whole,
-    ):
+    )
+    if historical_period or earlier_today:
         return "historical_summary"
 
     chunks = [s.strip() for s in re.split(r"(?<=[.!?])\s+|\n+", str(text)) if s.strip()] or [str(text)]
@@ -1023,6 +1044,22 @@ def text_kind(text: str) -> str | None:
     chunks = [s.strip() for s in re.split(r"(?<=[.!?;])\s+", str(text)) if s.strip()] or [str(text)]
     for chunk in chunks:
         n = normalize(chunk)
+
+        # Explicit negation must beat generic "опасность атаки БПЛА" wording.
+        # Example: "режим опасности атаки БПЛА ... не вводился".
+        if (
+            re.search(
+                r"\b(?:режим\s+)?(?:опасност\w*|угроз\w*)[^.!?\n]{0,100}"
+                r"\bне\s+(?:вводил\w*|объявлял\w*|действовал\w*)\b",
+                n,
+            )
+            or re.search(
+                r"\bне\s+(?:вводил\w*|объявлял\w*)[^.!?\n]{0,100}"
+                r"\b(?:режим\s+)?(?:опасност\w*|угроз\w*)\b",
+                n,
+            )
+        ):
+            continue
 
         # Explicit continuation wording is a formal ongoing UAV state. This must
         # win over a nearby clear verb that belongs to another threat type, e.g.
