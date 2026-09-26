@@ -100,7 +100,7 @@ END_PATTERNS = tuple(re.compile(p) for p in (
     r"\bотбой\b.{0,80}\b(?:беспилотн\w*|бпла)\b",
     r"\b(?:снят|снята|снято|сняты|отменен|отменена|отменено|отменены|отмена)\b.{0,100}\bбеспилотн\w*\s+опасност\w*",
     r"\bбеспилотн\w*\s+опасност\w*.{0,100}\b(?:снят|снята|снято|сняты|отменен|отменена|отменено|отменены)\b",
-    r"\b(?:снят|снята|отменен|отменена)\b.{0,100}\bугроз\w*\s+атак\w*\s+(?:бпла|беспилотн\w*)",
+    r"\b(?:снят|снята|отменен|отменена|отмена)\b.{0,100}\bугроз\w*\s+атак\w*\s+(?:бпла|беспилотн\w*)",
     r"\bотмен\w*\b.{0,70}\bсигнал\w*.{0,50}\bопасност\w*\s+атак\w*\s+бпла\b",
     r"\bугроз\w*\s+атак\w*\s+(?:бпла|беспилотн\w*).{0,100}\b(?:снят|снята|отменен|отменена)\b",
     r"\bугроз\w*\s+(?:снят|снята|снято|отменен|отменена|отменено)\b",
@@ -293,6 +293,17 @@ def uav_activity_kind(text: str) -> str | None:
         return "alert_start_signal"
     if formal == "end":
         return "alert_end_signal"
+
+    # Morning/next-day summaries describe activity that happened earlier.
+    # Preserve them in the archive as historical context, but do not treat the
+    # publication timestamp as a fresh operational observation.
+    if re.search(
+        r"\b(?:минувш(?:ей|ую)\s+ноч|прошедш(?:ей|ую)\s+ноч|"
+        r"за\s+(?:минувш|прошедш)[^.!?\n]{0,40}ноч|за\s+вчера|вчерашн|"
+        r"по\s+итогам\s+(?:ночи|суток)|рано\s+утром)\b",
+        whole,
+    ):
+        return "historical_summary"
 
     chunks = [s.strip() for s in re.split(r"(?<=[.!?])\s+|\n+", str(text)) if s.strip()] or [str(text)]
     for chunk in chunks:
