@@ -2560,17 +2560,37 @@ function threatClass(record) {
 
 function reportLooksRetrospective(record) {
   const text = String(record?.text || "").toLowerCase().replace(/ё/g, "е");
-  return /\b(?:минувш(?:ей|ую)\s+ноч|прошедш(?:ей|ую)\s+ноч|за\s+(?:минувш|прошедш)[^.!?\n]{0,40}ноч|за\s+вчера|вчерашн|по\s+итогам\s+(?:ночи|суток)|рано\s+утром)\b/.test(text);
+  const historicalPeriod =
+    /\b(?:минувш\w*|прошедш\w*)\s+(?:ноч\w*|вечер\w*|сутк\w*|день\w*)\b/.test(text) ||
+    /\bза\s+(?:вчера|минувш\w*|прошедш\w*)\b/.test(text) ||
+    /\bвчерашн\w*\b/.test(text) ||
+    /\bпо\s+итогам\s+(?:ночи|суток|дня)\b/.test(text) ||
+    /\b(?:за|в)\s+период\s+с\s+\d{1,2}[.:]\d{2}[^.!?\n]{0,35}\bдо\s+\d{1,2}[.:]\d{2}\b/.test(text) ||
+    /\bв\s+течение\s+(?:дня|суток|ночи)\b[^.!?\n]{0,80}\bс\s+\d{1,2}[.:]\d{2}[^.!?\n]{0,35}\bдо\s+\d{1,2}[.:]\d{2}\b/.test(text);
+
+  const earlierToday =
+    /\bсегодня\s+(?:ночью|утром)\b[^.!?\n]{0,180}\b(?:соверш\w*|произош\w*|были?\s+(?:обнаруж\w*|уничтож\w*|сбит\w*)|уничтож\w*|сбит\w*|атаков\w*)\b/.test(text);
+
+  return historicalPeriod || earlierToday;
 }
 
 function reportLooksLikeClear(record) {
   const text = String(record?.text || "").toLowerCase().replace(/ё/g, "е");
-  return /\b(?:отбой|отмена\s+(?:угрозы|опасности)|снят\w*\s+режим|угроза\s+миновала)\b/.test(text);
+  return /\b(?:отбой|отмена\s+(?:угрозы|опасности|сигнал\w*)|отмен\w*\s+сигнал\w*|снят\w*\s+режим|угроза\s+миновала)\b/.test(text);
+}
+
+function reportExplicitlyNegatesThreat(record) {
+  const text = String(record?.text || "").toLowerCase().replace(/ё/g, "е");
+  return (
+    /\b(?:режим\s+)?(?:опасност\w*|угроз\w*)[^.!?\n]{0,100}\bне\s+(?:вводил\w*|объявлял\w*|действовал\w*)\b/.test(text) ||
+    /\bне\s+(?:вводил\w*|объявлял\w*)[^.!?\n]{0,100}\b(?:режим\s+)?(?:опасност\w*|угроз\w*)\b/.test(text)
+  );
 }
 
 function reportRepresentsLiveThreat(record) {
   if (!record) return false;
   if (record.signal_class === "alert_clear_signal" || reportLooksLikeClear(record)) return false;
+  if (reportExplicitlyNegatesThreat(record)) return false;
   if (reportLooksRetrospective(record) || record.activity_kind === "historical_summary") return false;
 
   // Formal starts are live regardless of threat type (UAV or missile).
