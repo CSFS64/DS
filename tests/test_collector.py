@@ -887,6 +887,74 @@ class CollectorTests(unittest.TestCase):
             'alert_end_signal',
         )
 
+    def test_v25_retrospective_evening_daily_and_fixed_period_summaries(self):
+        voronezh = (
+            'Минувшим вечером дежурными силами ПВО были обнаружены и уничтожены два БПЛА. '
+            'Исходя из оперативной обстановки, режим опасности атаки БПЛА на территории региона не вводился.'
+        )
+        self.assertIsNone(text_kind(voronezh))
+        self.assertEqual(uav_activity_kind(voronezh), 'historical_summary')
+
+        self.assertEqual(
+            uav_activity_kind(
+                'За минувшие сутки наши военные и ПВО нейтрализовали пять вражеских беспилотников.'
+            ),
+            'historical_summary',
+        )
+        self.assertEqual(
+            uav_activity_kind(
+                'В течение дня в период с 8.00 мск до 20.00 мск дежурными силами ПВО '
+                'перехвачены и уничтожены 105 беспилотных летательных аппаратов самолетного типа.'
+            ),
+            'historical_summary',
+        )
+
+    def test_v25_explicit_alert_negation_does_not_start_uav_alert(self):
+        self.assertIsNone(
+            text_kind('Режим опасности атаки БПЛА на территории региона не вводился.')
+        )
+        self.assertIsNone(
+            text_kind('Опасность атаки БПЛА не объявлялась.')
+        )
+
+    def test_v25_anapa_signal_cancellation_is_alert_end(self):
+        text = (
+            'ОТМЕНА СИГНАЛА «Атака БПЛА В АНАПЕ». '
+            'Угроза применения беспилотников в Краснодарском крае пока сохраняется.'
+        )
+        self.assertEqual(text_kind(text), 'end')
+        self.assertEqual(uav_activity_kind(text), 'alert_end_signal')
+
+    def test_v25_archive_formal_false_start_self_heals(self):
+        data = {
+            'coverage': {},
+            'events': [],
+            'reports': [{
+                'id': 'voronezh-false-formal',
+                'region': 'Voronezh Oblast',
+                'place': 'Voronezh Oblast',
+                'scope': 'region',
+                'at': '2026-09-26T11:32:41+00:00',
+                'signal_class': 'formal_alert_signal',
+                'threat_class': 'uav',
+                'activity_kind': 'alert_start_signal',
+                'count': None,
+                'count_type': 'alert_start_signal',
+                'text': (
+                    'Минувшим вечером дежурными силами ПВО были обнаружены и уничтожены два БПЛА. '
+                    'Исходя из оперативной обстановки, режим опасности атаки БПЛА '
+                    'на территории региона не вводился.'
+                ),
+            }],
+        }
+        out = revalidate_archive_reports(data)
+        self.assertEqual(len(out['reports']), 1)
+        report = out['reports'][0]
+        self.assertEqual(report['activity_kind'], 'historical_summary')
+        self.assertEqual(report['signal_class'], 'uav_activity_signal')
+        self.assertEqual(report['count_type'], 'historical_summary')
+        self.assertEqual(out['coverage']['reports_revalidated_reclassified'], 1)
+
     def test_v16_cached_mtproto_peer_still_works_during_resolve_floodwait(self):
         class FakeClient:
             _archive_resolve_flooded = True
