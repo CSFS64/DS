@@ -40,6 +40,7 @@ const state = {
   routesVisible: true,
   routeSelectionKey: "",
   routeFeatureCount: 0,
+  routeBatchCount: 0,
   interactiveRenderFrame: 0,
   routeUpdateTimer: null,
   observedCountSignature: "",
@@ -1816,7 +1817,8 @@ function setRouteLayerVisibility() {
     els.routeToggle.setAttribute("aria-pressed", String(state.routesVisible));
     const label = els.routeToggle.querySelector(".route-toggle-label");
     if (label) {
-      label.textContent = "示意无人机路线 " + (state.routesVisible ? "ON" : "OFF") + " · " + state.routeFeatureCount;
+      label.textContent = "示意无人机路线 " + (state.routesVisible ? "ON" : "OFF") +
+        " · " + state.routeBatchCount + " BATCHES · " + state.routeFeatureCount + " ROUTES";
     }
   }
 }
@@ -1874,6 +1876,7 @@ function updateRouteOverlay(force = false) {
   state.routeSelectionKey = key;
   const data = buildIllustrativeUavRoutes(start, end);
   state.routeFeatureCount = data.lines.features.length;
+  state.routeBatchCount = data.batchCount || 0;
   lineSource.setData(data.lines);
   arrowSource.setData(data.arrows);
   applyRouteEvidenceStates(data.evidenceStates);
@@ -2022,7 +2025,7 @@ function installArchiveLayers() {
       "visibility": state.routesVisible ? "visible" : "none",
     },
     paint: {
-      "line-color": "#ff7218",
+      "line-color": ["coalesce", ["get", "batch_glow"], "#ff7218"],
       "line-width": ["interpolate", ["linear"], ["zoom"],
         3, ["*", 6.8, ["coalesce", ["get", "route_weight"], 1]],
         7, ["*", 9.5, ["coalesce", ["get", "route_weight"], 1]],
@@ -2043,7 +2046,7 @@ function installArchiveLayers() {
       "visibility": state.routesVisible ? "visible" : "none",
     },
     paint: {
-      "line-color": "#6f2c08",
+      "line-color": ["coalesce", ["get", "batch_casing"], "#6f2c08"],
       "line-width": ["interpolate", ["linear"], ["zoom"],
         3, ["*", 3.5, ["coalesce", ["get", "route_weight"], 1]],
         7, ["*", 4.5, ["coalesce", ["get", "route_weight"], 1]],
@@ -2063,7 +2066,7 @@ function installArchiveLayers() {
       "visibility": state.routesVisible ? "visible" : "none",
     },
     paint: {
-      "line-color": "#ff8b1f",
+      "line-color": ["coalesce", ["get", "batch_color"], "#ff8b1f"],
       "line-width": ["interpolate", ["linear"], ["zoom"],
         3, ["*", 1.35, ["coalesce", ["get", "route_weight"], 1]],
         7, ["*", 1.85, ["coalesce", ["get", "route_weight"], 1]],
@@ -2084,7 +2087,7 @@ function installArchiveLayers() {
       "visibility": state.routesVisible ? "visible" : "none",
     },
     paint: {
-      "line-color": "#ffc263",
+      "line-color": ["coalesce", ["get", "batch_highlight"], "#ffc263"],
       "line-width": ["interpolate", ["linear"], ["zoom"],
         3, ["*", 0.35, ["coalesce", ["get", "route_weight"], 1]],
         7, ["*", 0.55, ["coalesce", ["get", "route_weight"], 1]],
@@ -2110,8 +2113,8 @@ function installArchiveLayers() {
       "text-ignore-placement": true,
     },
     paint: {
-      "text-color": "#ff9a2f",
-      "text-halo-color": "#5e2608",
+      "text-color": ["coalesce", ["get", "batch_arrow"], "#ff9a2f"],
+      "text-halo-color": ["coalesce", ["get", "batch_halo"], "#5e2608"],
       "text-halo-width": 1.1,
       "text-opacity": ["interpolate", ["linear"], ["get", "confidence"], 0.3, 0.55, 1, 1],
     },
