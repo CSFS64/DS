@@ -1468,6 +1468,91 @@ function routeLengthKm(coords) {
   return total;
 }
 
+const ROUTE_BATCH_STYLES = [
+  { line: "#ff8b1f", glow: "#ff7218", casing: "#6f2c08", highlight: "#ffc263", arrow: "#ff9a2f", halo: "#5e2608" },
+  { line: "#3dd6d0", glow: "#22bdb8", casing: "#0b5553", highlight: "#8cf3ee", arrow: "#50e3dc", halo: "#164d4b" },
+  { line: "#b986ff", glow: "#9f66f0", casing: "#4d2a78", highlight: "#d9bbff", arrow: "#c79cff", halo: "#432666" },
+  { line: "#ff5f8f", glow: "#e74978", casing: "#70263e", highlight: "#ffa3bd", arrow: "#ff789f", halo: "#662238" },
+  { line: "#78d94f", glow: "#60bd3b", casing: "#315c23", highlight: "#b5f396", arrow: "#8ae466", halo: "#2c5220" },
+  { line: "#4ea3ff", glow: "#378ce8", casing: "#214d78", highlight: "#9cccff", arrow: "#66b0ff", halo: "#20466b" },
+  { line: "#ffd447", glow: "#e4b92d", casing: "#6b571c", highlight: "#ffe899", arrow: "#ffdd65", halo: "#5d4b18" },
+  { line: "#ff7657", glow: "#e85e40", casing: "#713326", highlight: "#ffb09d", arrow: "#ff896e", halo: "#642d22" },
+  { line: "#55d48b", glow: "#3fbb74", casing: "#245b3c", highlight: "#9bf0bd", arrow: "#6be09a", halo: "#205236" },
+  { line: "#df72e8", glow: "#c75bce", casing: "#633069", highlight: "#f0b0f5", arrow: "#e889ef", halo: "#592b5e" },
+];
+
+function routeBatchStyle(batchIndex) {
+  return ROUTE_BATCH_STYLES[Math.abs(batchIndex || 0) % ROUTE_BATCH_STYLES.length];
+}
+
+function routeBatchCompatibility(node, batch) {
+  if (!batch?.nodes?.length) return Infinity;
+  const mode = originModeForTerminal(node);
+  if (batch.mode !== mode) return Infinity;
+
+  const sameRecord = batch.nodes.some(other => other.recordKey === node.recordKey);
+  if (sameRecord) return -1000;
+
+  const firstGapHours = (node.at - batch.firstAt) / 3600000;
+  const lastGapHours = (node.at - batch.lastAt) / 3600000;
+  if (firstGapHours > 5.5 || lastGapHours > 3.0) return Infinity;
+
+  let best = Infinity;
+  for (const other of batch.nodes) {
+    const dtHours = Math.abs(node.at - other.at) / 3600000;
+    if (dtHours > 3.0) continue;
+    const distance = haversineKm(node, other);
+
+    // Near-simultaneous alerts can cover a broad branch of one wave; as time
+    // separates, require a plausible spatial continuation rather than merely
+    // sharing the selected window.
+    const maxDistance = dtHours <= 0.35
+      ? 280
+      : Math.min(720, 170 + dtHours * 240);
+    if (distance > maxDistance) continue;
+
+    const sameRegionBonus = node.region === other.region ? 55 : 0;
+    const score = dtHours * 75 + distance * 0.45 - sameRegionBonus;
+    if (score < best) best = score;
+  }
+  return best;
+}
+
+function assignRouteBatches(nodes) {
+  const batches = [];
+  const sorted = [...nodes].sort((a, b) => a.at - b.at || a.lon - b.lon);
+
+  for (const node of sorted) {
+    let bestBatch = null;
+    let bestScore = Infinity;
+    for (const batch of batches) {
+      const score = routeBatchCompatibility(node, batch);
+      if (score < bestScore) {
+        bestScore = score;
+        bestBatch = batch;
+      }
+    }
+
+    if (!bestBatch || !Number.isFinite(bestScore)) {
+      bestBatch = {
+        id: batches.length,
+        mode: originModeForTerminal(node),
+        firstAt: node.at,
+        lastAt: node.at,
+        nodes: [],
+      };
+      batches.push(bestBatch);
+    }
+
+    node.routeBatch = bestBatch.id;
+    bestBatch.nodes.push(node);
+    bestBatch.firstAt = Math.min(bestBatch.firstAt, node.at);
+    bestBatch.lastAt = Math.max(bestBatch.lastAt, node.at);
+  }
+
+  return { nodes: sorted, batches };
+}
+
 function buildIllustrativeUavRoutes(startMs, endMs) {
   const catalog = routePlaceCatalog();
   const litRegions = selectedWindowUavRegions(startMs, endMs);
