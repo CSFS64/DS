@@ -2849,59 +2849,132 @@ function sourceStatusText(region) {
   }).join("\n");
 }
 
+function detailViewEvents() {
+  return state.viewMode === "cumulative" ? cumulativeEvents() : activeEvents();
+}
+
+function detailViewReports() {
+  return state.viewMode === "cumulative" ? cumulativeReports() : activeReports();
+}
+
+function reportMatchesPlace(report, place) {
+  if (report.place === place) return true;
+  return (report.mentioned_places || []).some(p => p?.name === place);
+}
+
+function chooseHighlightCause(events, reports) {
+  const newest = rows => [...rows].sort((a, b) => b.time - a.time)[0]?.value || null;
+  const eventRows = events.map(value => ({
+    value,
+    time: Math.max(Date.parse(value.start) || 0, Date.parse(value.end) || 0),
+    missile: threatClass(value) === "missile",
+  }));
+  const reportRows = reports.map(value => ({
+    value,
+    time: Date.parse(value.at) || 0,
+    missile: threatClass(value) === "missile",
+    formal: value.signal_class === "formal_alert_signal",
+  }));
+
+  // Keep detail priority identical to renderMap:
+  // missileActive > active > missileReport > report.
+  let value = newest([
+    ...eventRows.filter(x => x.missile),
+    ...reportRows.filter(x => x.missile && x.formal),
+  ]);
+  if (value) return { type: value.start ? "event" : "report", value };
+
+  value = newest([
+    ...eventRows,
+    ...reportRows.filter(x => x.formal),
+  ]);
+  if (value) return { type: value.start ? "event" : "report", value };
+
+  value = newest(reportRows.filter(x => x.missile));
+  if (value) return { type: "report", value };
+
+  value = newest(reportRows);
+  return value ? { type: "report", value } : null;
+}
+
+function formatDetailCause(cause, region) {
+  if (!cause) return sourceStatusText(region);
+  if (cause.type === "event") {
+    const event = cause.value;
+    const start = Date.parse(event.start), end = Date.parse(event.end);
+    let body = formatTime(start, "Europe/Moscow") + " → " + formatTime(end, "Europe/Moscow") + " MSK\nDuration " + formatDuration(start, end);
+    if (event.precision === "parent_region_fallback") body += "\nPrecision: parent-region fallback";
+    return body;
+  }
+
+  const report = cause.value;
+  const count = explicitObservedCount(report);
+  const countLine = count ? "\nObserved: " + observedCountLabel(count, report.count_qualifier) : "";
+  const text = report.text || ((report.count ?? "—") + " " + (report.count_type || "reported"));
+  return formatTime(Date.parse(report.at), "Europe/Moscow") + " MSK" + countLine + "\n" + text;
+}
+
+function detailCauseSource(cause, fallback = "#") {
+  if (!cause) return fallback;
+  if (cause.type === "event") return cause.value.start_url || cause.value.source_url || fallback;
+  return cause.value.url || fallback;
+}
+
 function showPlaceDetail(key) {
   const split = key.indexOf("::");
   const region = split >= 0 ? key.slice(0, split) : "";
   const place = split >= 0 ? key.slice(split + 2) : key;
-  const candidates = (state.archive.events || []).filter(e => e.region === region && e.place === place);
-  const current = candidates.find(e => state.currentMs >= Date.parse(e.start) && state.currentMs <= Date.parse(e.end));
-  const nearest = current || [...candidates].sort((a,b) => Math.abs(Date.parse(a.start) - state.currentMs) - Math.abs(Date.parse(b.start) - state.currentMs))[0];
-  const reports = (state.archive.reports || []).filter(r => r.region === region && (r.place === place || r.place === region));
-  if (!nearest && !reports.length) {
-    els.detailEyebrow.textContent = "CONFIGURED HIGH-RES PLACE";
+
+  // Use only records that are actually feeding the current map render.
+  const visibleEvents = detailViewEvents().filter(e => e.region === region && e.place === place);
+  const regionReports = detailViewReports().filter(r => r.region === region);
+  const exactReports = regionReports.filter(r => reportMatchesPlace(r, place));
+  const visibleReports = exactReports.length
+    ? exactReports
+    : (place === region ? regionReports.filter(r => r.scope === "region" || r.place === region) : []);
+
+  const cause = chooseHighlightCause(visibleEvents, visibleReports);
+  if (!cause) {
+    els.detailEyebrow.textContent = "NO ACTIVE SIGNAL IN CURRENT VIEW";
     els.detailTitle.textContent = place;
     els.detailBody.textContent = sourceStatusText(region);
-    const src = (state.sources.sources || []).find(s => s.region === region);
+    const src = (state.sources.sources || []).find(source => source.region === region);
     els.detailSource.href = src?.source_url || "#";
     els.detailPanel.hidden = false;
     return;
   }
 
-  els.detailEyebrow.textContent = current ? "ACTIVE AT PLAYBACK TIME" : "ARCHIVED EVENT";
+  els.detailEyebrow.textContent = state.viewMode === "cumulative"
+    ? "WHY THIS POINT IS HIGHLIGHTED"
+    : "ACTIVE AT PLAYBACK TIME";
   els.detailTitle.textContent = place;
-  if (nearest) {
-    const s = Date.parse(nearest.start), e = Date.parse(nearest.end);
-    const related = reports.filter(r => Date.parse(r.at) >= s - 2 * 3600000 && Date.parse(r.at) <= e + 6 * 3600000);
-    let text = `${formatTime(s, "Europe/Moscow")} → ${formatTime(e, "Europe/Moscow")} MSK\nDuration ${formatDuration(s,e)}`;
-    if (nearest.precision === "parent_region_fallback") text += "\nPrecision: parent-region fallback";
-    if (related.length) text += `\n\nLocal reports:\n${related.map(r => `• ${r.count ?? "—"} ${r.count_type || "reported"}`).join("\n")}`;
-    text += `\n\n${sourceStatusText(region)}`;
-    els.detailBody.textContent = text;
-    els.detailSource.href = nearest.start_url || nearest.source_url;
-  } else {
-    els.detailBody.textContent = `${reports[0].text || `${reports[0].count ?? "—"} ${reports[0].count_type || "reported"}`}\n\n${sourceStatusText(region)}`;
-    els.detailSource.href = reports[0].url;
-  }
+  let body = formatDetailCause(cause, region);
+  const contributing = visibleEvents.length + visibleReports.length;
+  if (contributing > 1) body += "\n\n" + contributing + " qualifying signals contribute in the current view.";
+  body += "\n\n" + sourceStatusText(region);
+  els.detailBody.textContent = body;
+  els.detailSource.href = detailCauseSource(cause);
   els.detailPanel.hidden = false;
 }
 
 function showRegionDetail(regionName) {
   const regionCfg = (state.regions.regions || []).find(r => r.region === regionName);
-  const candidates = (state.archive.events || []).filter(e => e.region === regionName && e.scope === "region");
-  const current = candidates.find(e => state.currentMs >= Date.parse(e.start) && state.currentMs <= Date.parse(e.end));
-  const nearest = current || [...candidates].sort((a,b) => Math.abs(Date.parse(a.start) - state.currentMs) - Math.abs(Date.parse(b.start) - state.currentMs))[0];
-  const localActive = activeEvents().filter(e => e.region === regionName && e.scope !== "region");
+  const visibleEvents = detailViewEvents().filter(e => e.region === regionName);
+  const visibleReports = detailViewReports().filter(r => r.region === regionName);
+  const cause = chooseHighlightCause(visibleEvents, visibleReports);
 
-  els.detailEyebrow.textContent = current ? "REGION ALERT ACTIVE" : "REGION ARCHIVE";
+  els.detailEyebrow.textContent = cause
+    ? (state.viewMode === "cumulative" ? "WHY THIS REGION IS HIGHLIGHTED" : "REGION ACTIVE AT PLAYBACK TIME")
+    : "REGION NOT ACTIVE IN CURRENT VIEW";
   els.detailTitle.textContent = regionCfg?.region_label || regionName;
-  let body = sourceStatusText(regionName);
-  if (nearest) {
-    const s = Date.parse(nearest.start), e = Date.parse(nearest.end);
-    body = `${formatTime(s, "Europe/Moscow")} → ${formatTime(e, "Europe/Moscow")} MSK\nDuration ${formatDuration(s,e)}\n\n${body}`;
+  let body = cause ? formatDetailCause(cause, regionName) : sourceStatusText(regionName);
+  if (cause) {
+    const contributing = visibleEvents.length + visibleReports.length;
+    if (contributing > 1) body += "\n\n" + contributing + " qualifying signals contribute in the current view.";
+    body += "\n\n" + sourceStatusText(regionName);
   }
-  if (localActive.length) body += `\n\nLocal alerts now:\n${localActive.map(e => `• ${e.place}`).join("\n")}`;
   els.detailBody.textContent = body;
-  els.detailSource.href = nearest?.start_url || regionCfg?.mchs_operational_url || "#";
+  els.detailSource.href = detailCauseSource(cause, regionCfg?.mchs_operational_url || "#");
   els.detailPanel.hidden = false;
 }
 
