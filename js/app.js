@@ -2603,6 +2603,9 @@ function reportRepresentsLiveThreat(record) {
     "uav_movement",
     "uav_detected",
     "air_defense_action",
+    // If there is no explicit retrospective time anchor, an attack report is
+    // treated as recent activity even when the exact strike time is unknown.
+    "uav_attack_activity",
     "official_uav_activity",
     "missile_detected",
     "missile_movement",
