@@ -1571,20 +1571,24 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
     raw.push(...routeObservationPoints(event, Math.max(start, startMs), "alert", catalog));
   }
 
-  const nodes = dedupeRouteObservations(raw);
-  let terminals = nodes.filter((node, idx) => {
-    if (isStrongObservationKind(node.kind) || node.precision === "region-proxy") return true;
-    return !nodes.some((other, j) =>
-      j !== idx &&
-      other.at >= node.at &&
-      other.at - node.at <= 90 * 60 * 1000 &&
-      haversineKm(node, other) < 45 &&
-      isStrongObservationKind(other.kind)
-    );
-  });
+  const batchData = assignRouteBatches(dedupeRouteObservations(raw));
+  const nodes = batchData.nodes;
+  let terminals = batchData.batches.flatMap(batch =>
+    batch.nodes.filter((node, idx) => {
+      if (isStrongObservationKind(node.kind) || node.precision === "region-proxy") return true;
+      return !batch.nodes.some((other, j) =>
+        j !== idx &&
+        other.at >= node.at &&
+        other.at - node.at <= 90 * 60 * 1000 &&
+        haversineKm(node, other) < 45 &&
+        isStrongObservationKind(other.kind)
+      );
+    })
+  );
 
   terminals = terminals
     .sort((a, b) => {
+      if (a.routeBatch !== b.routeBatch) return a.routeBatch - b.routeBatch;
       if (Math.abs(a.lat - b.lat) > 0.15) return b.lat - a.lat;
       return a.lon - b.lon || a.at - b.at;
     })
@@ -1596,8 +1600,10 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
   const usedVisibleStarts = [];
 
   terminals.forEach((terminal, index) => {
-    const seed = [terminal.region, terminal.placeName, terminal.at, index].join("|");
-    const startOptions = rankBorderStarts(terminal, seed, usedVisibleStarts).slice(0, 18);
+    const batchNodes = nodes.filter(node => node.routeBatch === terminal.routeBatch);
+    const batchStarts = usedVisibleStarts.filter(point => point.routeBatch === terminal.routeBatch);
+    const seed = [terminal.routeBatch, terminal.region, terminal.placeName, terminal.at, index].join("|");
+    const startOptions = rankBorderStarts(terminal, seed, batchStarts).slice(0, 18);
     let chosen = null;
 
     for (const option of startOptions) {
@@ -1611,14 +1617,15 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
         routeOriginPool: mode,
         originMode: option.point.originMode,
       };
-      const nearestUsed = usedVisibleStarts.length
-        ? Math.min(...usedVisibleStarts.map(p => haversineKm(p, visibleStart)))
+      const nearestUsed = batchStarts.length
+        ? Math.min(...batchStarts.map(p => haversineKm(p, visibleStart)))
         : Infinity;
       const visibleCrowdPenalty =
         nearestUsed < 18 ? (18 - nearestUsed) * 7 :
         nearestUsed < 45 ? (45 - nearestUsed) * 1.2 : 0;
 
-      const supports = bestSupportChain(nodes, terminal, visibleStart);
+      // A route may only borrow support observations from its own wave.
+      const supports = bestSupportChain(batchNodes, terminal, visibleStart);
       const chain = [...supports, terminal];
       const evidenceWaypoints = [visibleStart, ...chain];
 
@@ -1690,7 +1697,7 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
     }
 
     if (!chosen) return;
-    usedVisibleStarts.push(chosen.visibleStart);
+    usedVisibleStarts.push({ ...chosen.visibleStart, routeBatch: terminal.routeBatch });
     chosen.chain.forEach(node => linkedNodeKeys.add(node.nodeKey));
 
     const evidence = chosen.chain.reduce((sum, n) => sum + n.observations, 0);
@@ -1709,8 +1716,20 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
       proxyCount * 0.08
     );
 
+    const batchStyle = routeBatchStyle(terminal.routeBatch);
+    const batchMeta = batchData.batches[terminal.routeBatch];
     const props = {
       route_id: "uav-route-" + index,
+      batch_id: "wave-" + (terminal.routeBatch + 1),
+      batch_index: terminal.routeBatch,
+      batch_start: new Date(batchMeta.firstAt).toISOString(),
+      batch_end: new Date(batchMeta.lastAt).toISOString(),
+      batch_color: batchStyle.line,
+      batch_glow: batchStyle.glow,
+      batch_casing: batchStyle.casing,
+      batch_highlight: batchStyle.highlight,
+      batch_arrow: batchStyle.arrow,
+      batch_halo: batchStyle.halo,
       target: terminal.place,
       region: terminal.region,
       start_border_id: chosen.visibleStart.borderId,
@@ -1775,6 +1794,7 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
     lines: { type: "FeatureCollection", features: lineFeatures },
     arrows: { type: "FeatureCollection", features: arrowFeatures },
     evidenceStates,
+    batchCount: batchData.batches.length,
   };
 }
 
