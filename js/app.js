@@ -40,7 +40,6 @@ const state = {
   routesVisible: true,
   routeSelectionKey: "",
   routeFeatureCount: 0,
-  routeBatchCount: 0,
   interactiveRenderFrame: 0,
   routeUpdateTimer: null,
   observedCountSignature: "",
@@ -1469,91 +1468,6 @@ function routeLengthKm(coords) {
   return total;
 }
 
-const ROUTE_BATCH_STYLES = [
-  { line: "#ff8b1f", glow: "#ff7218", casing: "#6f2c08", highlight: "#ffc263", arrow: "#ff9a2f", halo: "#5e2608" },
-  { line: "#3dd6d0", glow: "#22bdb8", casing: "#0b5553", highlight: "#8cf3ee", arrow: "#50e3dc", halo: "#164d4b" },
-  { line: "#b986ff", glow: "#9f66f0", casing: "#4d2a78", highlight: "#d9bbff", arrow: "#c79cff", halo: "#432666" },
-  { line: "#ff5f8f", glow: "#e74978", casing: "#70263e", highlight: "#ffa3bd", arrow: "#ff789f", halo: "#662238" },
-  { line: "#78d94f", glow: "#60bd3b", casing: "#315c23", highlight: "#b5f396", arrow: "#8ae466", halo: "#2c5220" },
-  { line: "#4ea3ff", glow: "#378ce8", casing: "#214d78", highlight: "#9cccff", arrow: "#66b0ff", halo: "#20466b" },
-  { line: "#ffd447", glow: "#e4b92d", casing: "#6b571c", highlight: "#ffe899", arrow: "#ffdd65", halo: "#5d4b18" },
-  { line: "#ff7657", glow: "#e85e40", casing: "#713326", highlight: "#ffb09d", arrow: "#ff896e", halo: "#642d22" },
-  { line: "#55d48b", glow: "#3fbb74", casing: "#245b3c", highlight: "#9bf0bd", arrow: "#6be09a", halo: "#205236" },
-  { line: "#df72e8", glow: "#c75bce", casing: "#633069", highlight: "#f0b0f5", arrow: "#e889ef", halo: "#592b5e" },
-];
-
-function routeBatchStyle(batchIndex) {
-  return ROUTE_BATCH_STYLES[Math.abs(batchIndex || 0) % ROUTE_BATCH_STYLES.length];
-}
-
-function routeBatchCompatibility(node, batch) {
-  if (!batch?.nodes?.length) return Infinity;
-  const mode = originModeForTerminal(node);
-  if (batch.mode !== mode) return Infinity;
-
-  const sameRecord = batch.nodes.some(other => other.recordKey === node.recordKey);
-  if (sameRecord) return -1000;
-
-  const firstGapHours = (node.at - batch.firstAt) / 3600000;
-  const lastGapHours = (node.at - batch.lastAt) / 3600000;
-  if (firstGapHours > 5.5 || lastGapHours > 3.0) return Infinity;
-
-  let best = Infinity;
-  for (const other of batch.nodes) {
-    const dtHours = Math.abs(node.at - other.at) / 3600000;
-    if (dtHours > 3.0) continue;
-    const distance = haversineKm(node, other);
-
-    // Near-simultaneous alerts can cover a broad branch of one wave; as time
-    // separates, require a plausible spatial continuation rather than merely
-    // sharing the selected window.
-    const maxDistance = dtHours <= 0.35
-      ? 280
-      : Math.min(720, 170 + dtHours * 240);
-    if (distance > maxDistance) continue;
-
-    const sameRegionBonus = node.region === other.region ? 55 : 0;
-    const score = dtHours * 75 + distance * 0.45 - sameRegionBonus;
-    if (score < best) best = score;
-  }
-  return best;
-}
-
-function assignRouteBatches(nodes) {
-  const batches = [];
-  const sorted = [...nodes].sort((a, b) => a.at - b.at || a.lon - b.lon);
-
-  for (const node of sorted) {
-    let bestBatch = null;
-    let bestScore = Infinity;
-    for (const batch of batches) {
-      const score = routeBatchCompatibility(node, batch);
-      if (score < bestScore) {
-        bestScore = score;
-        bestBatch = batch;
-      }
-    }
-
-    if (!bestBatch || !Number.isFinite(bestScore)) {
-      bestBatch = {
-        id: batches.length,
-        mode: originModeForTerminal(node),
-        firstAt: node.at,
-        lastAt: node.at,
-        nodes: [],
-      };
-      batches.push(bestBatch);
-    }
-
-    node.routeBatch = bestBatch.id;
-    bestBatch.nodes.push(node);
-    bestBatch.firstAt = Math.min(bestBatch.firstAt, node.at);
-    bestBatch.lastAt = Math.max(bestBatch.lastAt, node.at);
-  }
-
-  return { nodes: sorted, batches };
-}
-
 function buildIllustrativeUavRoutes(startMs, endMs) {
   const catalog = routePlaceCatalog();
   const litRegions = selectedWindowUavRegions(startMs, endMs);
@@ -1572,24 +1486,20 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
     raw.push(...routeObservationPoints(event, Math.max(start, startMs), "alert", catalog));
   }
 
-  const batchData = assignRouteBatches(dedupeRouteObservations(raw));
-  const nodes = batchData.nodes;
-  let terminals = batchData.batches.flatMap(batch =>
-    batch.nodes.filter((node, idx) => {
-      if (isStrongObservationKind(node.kind) || node.precision === "region-proxy") return true;
-      return !batch.nodes.some((other, j) =>
-        j !== idx &&
-        other.at >= node.at &&
-        other.at - node.at <= 90 * 60 * 1000 &&
-        haversineKm(node, other) < 45 &&
-        isStrongObservationKind(other.kind)
-      );
-    })
-  );
+  const nodes = dedupeRouteObservations(raw);
+  let terminals = nodes.filter((node, idx) => {
+    if (isStrongObservationKind(node.kind) || node.precision === "region-proxy") return true;
+    return !nodes.some((other, j) =>
+      j !== idx &&
+      other.at >= node.at &&
+      other.at - node.at <= 90 * 60 * 1000 &&
+      haversineKm(node, other) < 45 &&
+      isStrongObservationKind(other.kind)
+    );
+  });
 
   terminals = terminals
     .sort((a, b) => {
-      if (a.routeBatch !== b.routeBatch) return a.routeBatch - b.routeBatch;
       if (Math.abs(a.lat - b.lat) > 0.15) return b.lat - a.lat;
       return a.lon - b.lon || a.at - b.at;
     })
@@ -1601,10 +1511,8 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
   const usedVisibleStarts = [];
 
   terminals.forEach((terminal, index) => {
-    const batchNodes = nodes.filter(node => node.routeBatch === terminal.routeBatch);
-    const batchStarts = usedVisibleStarts.filter(point => point.routeBatch === terminal.routeBatch);
-    const seed = [terminal.routeBatch, terminal.region, terminal.placeName, terminal.at, index].join("|");
-    const startOptions = rankBorderStarts(terminal, seed, batchStarts).slice(0, 18);
+    const seed = [terminal.region, terminal.placeName, terminal.at, index].join("|");
+    const startOptions = rankBorderStarts(terminal, seed, usedVisibleStarts).slice(0, 18);
     let chosen = null;
 
     for (const option of startOptions) {
@@ -1618,15 +1526,14 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
         routeOriginPool: mode,
         originMode: option.point.originMode,
       };
-      const nearestUsed = batchStarts.length
-        ? Math.min(...batchStarts.map(p => haversineKm(p, visibleStart)))
+      const nearestUsed = usedVisibleStarts.length
+        ? Math.min(...usedVisibleStarts.map(p => haversineKm(p, visibleStart)))
         : Infinity;
       const visibleCrowdPenalty =
         nearestUsed < 18 ? (18 - nearestUsed) * 7 :
         nearestUsed < 45 ? (45 - nearestUsed) * 1.2 : 0;
 
-      // A route may only borrow support observations from its own wave.
-      const supports = bestSupportChain(batchNodes, terminal, visibleStart);
+      const supports = bestSupportChain(nodes, terminal, visibleStart);
       const chain = [...supports, terminal];
       const evidenceWaypoints = [visibleStart, ...chain];
 
@@ -1698,7 +1605,7 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
     }
 
     if (!chosen) return;
-    usedVisibleStarts.push({ ...chosen.visibleStart, routeBatch: terminal.routeBatch });
+    usedVisibleStarts.push(chosen.visibleStart);
     chosen.chain.forEach(node => linkedNodeKeys.add(node.nodeKey));
 
     const evidence = chosen.chain.reduce((sum, n) => sum + n.observations, 0);
@@ -1717,20 +1624,8 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
       proxyCount * 0.08
     );
 
-    const batchStyle = routeBatchStyle(terminal.routeBatch);
-    const batchMeta = batchData.batches[terminal.routeBatch];
     const props = {
       route_id: "uav-route-" + index,
-      batch_id: "wave-" + (terminal.routeBatch + 1),
-      batch_index: terminal.routeBatch,
-      batch_start: new Date(batchMeta.firstAt).toISOString(),
-      batch_end: new Date(batchMeta.lastAt).toISOString(),
-      batch_color: batchStyle.line,
-      batch_glow: batchStyle.glow,
-      batch_casing: batchStyle.casing,
-      batch_highlight: batchStyle.highlight,
-      batch_arrow: batchStyle.arrow,
-      batch_halo: batchStyle.halo,
       target: terminal.place,
       region: terminal.region,
       start_border_id: chosen.visibleStart.borderId,
@@ -1795,7 +1690,6 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
     lines: { type: "FeatureCollection", features: lineFeatures },
     arrows: { type: "FeatureCollection", features: arrowFeatures },
     evidenceStates,
-    batchCount: batchData.batches.length,
   };
 }
 
@@ -1817,8 +1711,7 @@ function setRouteLayerVisibility() {
     els.routeToggle.setAttribute("aria-pressed", String(state.routesVisible));
     const label = els.routeToggle.querySelector(".route-toggle-label");
     if (label) {
-      label.textContent = "示意无人机路线 " + (state.routesVisible ? "ON" : "OFF") +
-        " · " + state.routeBatchCount + " BATCHES · " + state.routeFeatureCount + " ROUTES";
+      label.textContent = "示意无人机路线 " + (state.routesVisible ? "ON" : "OFF") + " · " + state.routeFeatureCount;
     }
   }
 }
@@ -1876,7 +1769,6 @@ function updateRouteOverlay(force = false) {
   state.routeSelectionKey = key;
   const data = buildIllustrativeUavRoutes(start, end);
   state.routeFeatureCount = data.lines.features.length;
-  state.routeBatchCount = data.batchCount || 0;
   lineSource.setData(data.lines);
   arrowSource.setData(data.arrows);
   applyRouteEvidenceStates(data.evidenceStates);
@@ -2025,7 +1917,7 @@ function installArchiveLayers() {
       "visibility": state.routesVisible ? "visible" : "none",
     },
     paint: {
-      "line-color": ["coalesce", ["get", "batch_glow"], "#ff7218"],
+      "line-color": "#ff7218",
       "line-width": ["interpolate", ["linear"], ["zoom"],
         3, ["*", 6.8, ["coalesce", ["get", "route_weight"], 1]],
         7, ["*", 9.5, ["coalesce", ["get", "route_weight"], 1]],
@@ -2046,7 +1938,7 @@ function installArchiveLayers() {
       "visibility": state.routesVisible ? "visible" : "none",
     },
     paint: {
-      "line-color": ["coalesce", ["get", "batch_casing"], "#6f2c08"],
+      "line-color": "#6f2c08",
       "line-width": ["interpolate", ["linear"], ["zoom"],
         3, ["*", 3.5, ["coalesce", ["get", "route_weight"], 1]],
         7, ["*", 4.5, ["coalesce", ["get", "route_weight"], 1]],
@@ -2066,7 +1958,7 @@ function installArchiveLayers() {
       "visibility": state.routesVisible ? "visible" : "none",
     },
     paint: {
-      "line-color": ["coalesce", ["get", "batch_color"], "#ff8b1f"],
+      "line-color": "#ff8b1f",
       "line-width": ["interpolate", ["linear"], ["zoom"],
         3, ["*", 1.35, ["coalesce", ["get", "route_weight"], 1]],
         7, ["*", 1.85, ["coalesce", ["get", "route_weight"], 1]],
@@ -2087,7 +1979,7 @@ function installArchiveLayers() {
       "visibility": state.routesVisible ? "visible" : "none",
     },
     paint: {
-      "line-color": ["coalesce", ["get", "batch_highlight"], "#ffc263"],
+      "line-color": "#ffc263",
       "line-width": ["interpolate", ["linear"], ["zoom"],
         3, ["*", 0.35, ["coalesce", ["get", "route_weight"], 1]],
         7, ["*", 0.55, ["coalesce", ["get", "route_weight"], 1]],
@@ -2113,8 +2005,8 @@ function installArchiveLayers() {
       "text-ignore-placement": true,
     },
     paint: {
-      "text-color": ["coalesce", ["get", "batch_arrow"], "#ff9a2f"],
-      "text-halo-color": ["coalesce", ["get", "batch_halo"], "#5e2608"],
+      "text-color": "#ff9a2f",
+      "text-halo-color": "#5e2608",
       "text-halo-width": 1.1,
       "text-opacity": ["interpolate", ["linear"], ["get", "confidence"], 0.3, 0.55, 1, 1],
     },
