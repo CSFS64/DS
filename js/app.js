@@ -1559,16 +1559,36 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
   const arrowFeatures = [];
   const linkedNodeKeys = new Set();
   const usedVisibleStarts = [];
+  const consumedTerminalNodeKeys = new Set();
 
   terminals.forEach((terminal, index) => {
+    // If this observation is already an upstream support for a longer
+    // downstream route, do not draw a second independent border-origin route.
+    if (consumedTerminalNodeKeys.has(terminal.nodeKey)) return;
+
     const seed = [terminal.region, terminal.placeName, terminal.at, index].join("|");
     const startOptions = rankBorderStarts(terminal, seed, usedVisibleStarts).slice(0, 18);
+    const preferredGateway = originModeForTerminal(terminal) === "north"
+      ? preferredNorthGatewayNode(nodes, terminal, litRegions)
+      : null;
     let chosen = null;
 
     for (const option of startOptions) {
       const mode = option.mode;
       const entry = firstRussiaEntry(option.point, terminal);
       if (!validRussiaEntryForMode(entry, mode)) continue;
+
+      const entryRegion = routeEntryRegion(entry, terminal);
+      if (mode === "north") {
+        // A northern route may only cross through a Ukraine-facing border state
+        // that is actually lit in the selected window.
+        if (!entryRegion || !NORTH_UKRAINE_BORDER_REGIONS.has(entryRegion) || !litRegions.has(entryRegion)) {
+          continue;
+        }
+        // For inland targets, prefer the lit upstream border state represented
+        // by actual evidence (for example Kursk before Oryol).
+        if (preferredGateway && entryRegion !== preferredGateway.region) continue;
+      }
 
       const visibleStart = {
         ...entry,
@@ -1583,7 +1603,33 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
         nearestUsed < 18 ? (18 - nearestUsed) * 7 :
         nearestUsed < 45 ? (45 - nearestUsed) * 1.2 : 0;
 
-      const supports = bestSupportChain(nodes, terminal, visibleStart);
+      let supports = bestSupportChain(nodes, terminal, visibleStart);
+
+      // If the route enters through a lit border state with an actual upstream
+      // observation, keep that observation on the path even when its post time
+      // is approximate. This turns Ukraine → Kursk → Oryol into one corridor
+      // instead of two unrelated border-origin lines.
+      if (
+        mode === "north" &&
+        preferredGateway &&
+        preferredGateway !== terminal &&
+        !supports.some(node => node.nodeKey === preferredGateway.nodeKey)
+      ) {
+        const gatewayProj = corridorProjection(visibleStart, terminal, preferredGateway);
+        const terminalProj = corridorProjection(visibleStart, terminal, terminal);
+        if (
+          gatewayProj.progressKm > 8 &&
+          gatewayProj.progressKm < terminalProj.progressKm - 8 &&
+          gatewayProj.crossTrackKm <= Math.max(75, terminalProj.routeLengthKm * 0.22)
+        ) {
+          supports.push(preferredGateway);
+          supports.sort((a, b) =>
+            corridorProjection(visibleStart, terminal, a).progressKm -
+            corridorProjection(visibleStart, terminal, b).progressKm
+          );
+        }
+      }
+
       const chain = [...supports, terminal];
       const evidenceWaypoints = [visibleStart, ...chain];
 
@@ -1658,6 +1704,14 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
     usedVisibleStarts.push(chosen.visibleStart);
     chosen.chain.forEach(node => linkedNodeKeys.add(node.nodeKey));
 
+    // Upstream terminals that form part of this longer route should not later
+    // spawn their own independent line from the border.
+    for (const support of chosen.supports) {
+      if (terminals.some(node => node.nodeKey === support.nodeKey)) {
+        consumedTerminalNodeKeys.add(support.nodeKey);
+      }
+    }
+
     const evidence = chosen.chain.reduce((sum, n) => sum + n.observations, 0);
     const weightedEvidence = chosen.chain.reduce((sum, n) => sum + (n.weight || 1), 0);
     const maxObservedCount = chosen.chain.reduce((best, n) => Math.max(best, n.observedCount || 0), 0);
@@ -1701,11 +1755,16 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
       illustrative: true,
     };
 
-    const prelude = routePreludeFromOrigin(
-      chosen.assumedOrigin,
-      chosen.visibleStart,
-      chosen.visibleStart.routeOriginPool,
-    );
+    // Northern routes start exactly at the international border crossing.
+    // Do not render the Ukraine-side candidate prelude there. Southern routes
+    // keep their maritime/Ukraine-side prelude behavior.
+    const prelude = chosen.visibleStart.routeOriginPool === "north"
+      ? []
+      : routePreludeFromOrigin(
+          chosen.assumedOrigin,
+          chosen.visibleStart,
+          chosen.visibleStart.routeOriginPool,
+        );
     const displayCoords = prelude.length >= 2
       ? [...prelude.slice(0, -1), ...chosen.coords]
       : chosen.coords;
