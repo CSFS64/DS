@@ -1139,6 +1139,46 @@ function originModeForTerminal(terminal) {
   return "eastSouth";
 }
 
+const NORTH_UKRAINE_BORDER_REGIONS = new Set([
+  "Bryansk Oblast",
+  "Kursk Oblast",
+  "Belgorod Oblast",
+]);
+
+function routeEntryRegion(entry, terminal) {
+  if (!entry || !terminal) return null;
+  // The exact crossing can lie numerically on the polygon edge. Sample just
+  // inside Russia along the route to identify the state actually entered.
+  for (const t of [0.01, 0.02, 0.04, 0.07]) {
+    const region = russianRegionAtPoint(interpolatePoint(entry, terminal, t));
+    if (region) return region;
+  }
+  return russianRegionAtPoint(entry);
+}
+
+function preferredNorthGatewayNode(nodes, terminal, litRegions) {
+  if (NORTH_UKRAINE_BORDER_REGIONS.has(terminal.region) && litRegions.has(terminal.region)) {
+    return terminal;
+  }
+
+  const candidates = nodes
+    .filter(node => node !== terminal)
+    .filter(node => NORTH_UKRAINE_BORDER_REGIONS.has(node.region))
+    .filter(node => litRegions.has(node.region))
+    .filter(node => node.at <= terminal.at)
+    .filter(node => haversineKm(node, terminal) <= 420)
+    .map(node => ({
+      node,
+      distance: haversineKm(node, terminal),
+      ageHours: Math.max(0, terminal.at - node.at) / 3600000,
+    }))
+    .sort((a, b) =>
+      (a.distance + a.ageHours * 12) - (b.distance + b.ageHours * 12)
+    );
+
+  return candidates[0]?.node || null;
+}
+
 function rankBorderStarts(terminal, seed, usedStarts) {
   const pools = buildUkraineBorderCandidates();
   const mode = originModeForTerminal(terminal);
@@ -1206,7 +1246,14 @@ function dedupeRouteObservations(observations) {
 }
 
 function isEndpointOnlyKind(kind) {
-  return ["uav_attack_activity", "impact_or_debris"].includes(kind);
+  // Damage/debris follow-ups are endpoints only. A recent attack report with no
+  // explicit retrospective time anchor may represent the same continuing wave
+  // and can therefore support a later downstream observation.
+  return kind === "impact_or_debris";
+}
+
+function routeTimestampIsApproximate(kind) {
+  return kind === "uav_attack_activity";
 }
 
 function isStrongObservationKind(kind) {
@@ -1239,12 +1286,15 @@ function corridorProjection(anchor, terminal, point) {
 function plausibleSegment(a, b, terminal, anchor) {
   if (a.recordKey === b.recordKey) return false;
   const dtHours = (b.at - a.at) / 3600000;
-  if (dtHours < 0.12 || dtHours > 5.5) return false;
+  const approximateTime = routeTimestampIsApproximate(a.kind) || routeTimestampIsApproximate(b.kind);
+  if (dtHours < 0.12 || dtHours > (approximateTime ? 8.5 : 5.5)) return false;
 
   const distance = haversineKm(a, b);
   if (distance < 15 || distance > 800) return false;
   const speed = distance / dtHours;
-  if (speed < 55 || speed > 560) return false;
+  // Attack posts may be published after the actual strike, so their timestamp
+  // is not precise enough to enforce a minimum apparent transit speed.
+  if ((!approximateTime && speed < 55) || speed > 560) return false;
 
   const pa = corridorProjection(anchor, terminal, a);
   const pb = corridorProjection(anchor, terminal, b);
