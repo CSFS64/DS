@@ -955,6 +955,63 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(report['count_type'], 'historical_summary')
         self.assertEqual(out['coverage']['reports_revalidated_reclassified'], 1)
 
+    def test_v26_ulyanovsk_aftermath_followups_are_historical(self):
+        self.assertEqual(
+            uav_activity_kind(
+                'Постановление подписано после атаки БПЛА 25 сентября. '
+                'Продолжается восстановление поврежденных домов.'
+            ),
+            'historical_summary',
+        )
+        self.assertEqual(
+            uav_activity_kind(
+                'По пострадавшим в результате массированной атаки БПЛА на Ульяновск. '
+                'Специалисты продолжают оценку ущерба и восстановление пострадавшей инфраструктуры.'
+            ),
+            'historical_summary',
+        )
+        self.assertEqual(
+            uav_activity_kind(
+                'Губернатор сообщил о последствиях атаки БПЛА на Ульяновск.'
+            ),
+            'historical_summary',
+        )
+
+    def test_v26_recent_undated_strike_remains_live(self):
+        self.assertEqual(
+            uav_activity_kind(
+                'Вражеский дрон атаковал поселок. Кроме этого, беспилотник нанес удар по СНТ.'
+            ),
+            'uav_attack_activity',
+        )
+
+    def test_v26_archive_aftermath_self_heals(self):
+        data = {
+            'coverage': {},
+            'events': [],
+            'reports': [{
+                'id': 'ulyanovsk-aftermath',
+                'region': 'Ulyanovsk Oblast',
+                'place': 'Ulyanovsk',
+                'scope': 'city',
+                'at': '2026-09-28T08:29:32+00:00',
+                'signal_class': 'uav_activity_signal',
+                'threat_class': 'uav',
+                'activity_kind': 'uav_attack_activity',
+                'count': None,
+                'count_type': 'official_activity',
+                'text': (
+                    'В Ульяновске действует режим чрезвычайной ситуации локального характера. '
+                    'Постановление подписано после атаки БПЛА 25 сентября. '
+                    'Продолжается восстановление поврежденных домов.'
+                ),
+            }],
+        }
+        out = revalidate_archive_reports(data)
+        self.assertEqual(out['reports'][0]['activity_kind'], 'historical_summary')
+        self.assertEqual(out['reports'][0]['count_type'], 'historical_summary')
+        self.assertEqual(out['coverage']['reports_revalidated_reclassified'], 1)
+
     def test_v16_cached_mtproto_peer_still_works_during_resolve_floodwait(self):
         class FakeClient:
             _archive_resolve_flooded = True
