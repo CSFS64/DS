@@ -324,7 +324,38 @@ def uav_activity_kind(text: str) -> str | None:
         r"уничтож\w*|сбит\w*|атаков\w*)\b",
         whole,
     )
-    if historical_period or earlier_today:
+
+    # Explicit aftermath/follow-up wording must not relight a region at the
+    # publication time. Keep this intentionally narrower than generic casualty
+    # wording so a freshly reported undated strike still counts as recent.
+    explicit_past_attack = (
+        re.search(
+            r"\bпосле\s+(?:массированн\w*\s+)?(?:атак\w*|удар\w*)"
+            r"[^.!?\n]{0,100}\b\d{1,2}\s+"
+            r"(?:январ\w*|феврал\w*|март\w*|апрел\w*|ма[йя]\w*|июн\w*|"
+            r"июл\w*|август\w*|сентябр\w*|октябр\w*|ноябр\w*|декабр\w*)\b",
+            whole,
+        )
+        or re.search(r"\b(?:ранее|накануне|нескольк\w*\s+дн\w*\s+назад)\b", whole)
+    )
+    aftermath_wording = re.search(
+        r"\b(?:последств\w*\s+(?:атак\w*|удар\w*)|"
+        r"пострадавш\w*\s+в\s+результате\s+(?:массированн\w*\s+)?атак\w*)\b",
+        whole,
+    )
+    recovery_followup = (
+        re.search(
+            r"\b(?:восстанов\w*|компенсац\w*|оценк\w*\s+ущерб\w*|"
+            r"помощ\w*\s+пострадавш\w*|пункт\w*\s+временн\w*\s+размещен\w*|"
+            r"расчист\w*\s+завал\w*|ремонт\w*|обследован\w*|"
+            r"изготовлен\w*\s+нов\w*\s+стеклопакет\w*|горяч\w*\s+лини\w*)\b",
+            whole,
+        )
+        and re.search(r"\b(?:атак\w*|удар\w*)\b", whole)
+        and has_uav_reference(whole)
+    )
+
+    if historical_period or earlier_today or explicit_past_attack or aftermath_wording or recovery_followup:
         return "historical_summary"
 
     chunks = [s.strip() for s in re.split(r"(?<=[.!?])\s+|\n+", str(text)) if s.strip()] or [str(text)]
