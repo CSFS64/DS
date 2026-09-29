@@ -48,7 +48,7 @@
     "unmatched_starts": 32,
     "protected_higher_quality_records": 0,
     "archive_events_total": 271,
-    "archive_reports_total": 1507,
+    "archive_reports_total": 1504,
     "archive_regions_with_records": 50,
     "archive_regions_with_local_records": 34,
     "reports_revalidated_removed": 0,
@@ -3239,7 +3239,7 @@
       "end_match": "direct",
       "source_kind": "telegram",
       "lat": 51.25,
-      "lon": 38.0,
+      "lon": 38,
       "source_id": "operativno31",
       "transport": "telegram_mtproto",
       "transport_quality": 30,
@@ -9018,7 +9018,7 @@
           "label": "Starooskolsky Urban Okrug",
           "type": "municipality",
           "lat": 51.25,
-          "lon": 38.0
+          "lon": 38
         },
         {
           "name": "Yakovlevskiy Rayon",
@@ -9945,7 +9945,7 @@
           "label": "Starooskolsky Urban Okrug",
           "type": "municipality",
           "lat": 51.25,
-          "lon": 38.0
+          "lon": 38
         },
         {
           "name": "Valuyskiy Rayon",
@@ -10432,7 +10432,7 @@
           "label": "Korenevskiy Rayon",
           "type": "municipality",
           "lat": 51.41667,
-          "lon": 35.0
+          "lon": 35
         },
         {
           "name": "Oboyanskiy Rayon",
@@ -10900,14 +10900,14 @@
       "url": "https://t.me/pavelmalkov_official/7261",
       "source_kind": "telegram",
       "lat": 54.33333,
-      "lon": 42.0,
+      "lon": 42,
       "mentioned_places": [
         {
           "name": "Sasovsky District",
           "label": "Sasovsky District",
           "type": "municipality",
           "lat": 54.33333,
-          "lon": 42.0
+          "lon": 42
         }
       ]
     },
@@ -13371,7 +13371,7 @@
           "label": "Korenevskiy Rayon",
           "type": "municipality",
           "lat": 51.41667,
-          "lon": 35.0
+          "lon": 35
         }
       ]
     },
@@ -14821,7 +14821,7 @@
           "label": "Korenevskiy Rayon",
           "type": "municipality",
           "lat": 51.41667,
-          "lon": 35.0
+          "lon": 35
         }
       ]
     },
@@ -20691,7 +20691,7 @@
           "label": "Starooskolsky Urban Okrug",
           "type": "municipality",
           "lat": 51.25,
-          "lon": 38.0
+          "lon": 38
         },
         {
           "name": "Veydelevskiy Rayon",
@@ -23124,7 +23124,7 @@
           "label": "Starooskolsky Urban Okrug",
           "type": "municipality",
           "lat": 51.25,
-          "lon": 38.0
+          "lon": 38
         }
       ]
     },
@@ -23805,7 +23805,7 @@
           "label": "Starooskolsky Urban Okrug",
           "type": "municipality",
           "lat": 51.25,
-          "lon": 38.0
+          "lon": 38
         },
         {
           "name": "Valuyskiy Rayon",
@@ -26204,7 +26204,7 @@
           "label": "Starooskolsky Urban Okrug",
           "type": "municipality",
           "lat": 51.25,
-          "lon": 38.0
+          "lon": 38
         },
         {
           "name": "Veydelevskiy Rayon",
@@ -27165,7 +27165,7 @@
           "label": "Starooskolsky Urban Okrug",
           "type": "municipality",
           "lat": 51.25,
-          "lon": 38.0
+          "lon": 38
         },
         {
           "name": "Veydelevskiy Rayon",
@@ -33408,7 +33408,7 @@
           "label": "Starooskolsky Urban Okrug",
           "type": "municipality",
           "lat": 51.25,
-          "lon": 38.0
+          "lon": 38
         },
         {
           "name": "Veydelevskiy Rayon",
@@ -37059,14 +37059,14 @@
       "source_name": "Radar monitoring — Чувашская Республика - Чувашии",
       "url": "https://t.me/radar_chuvashiya/1385",
       "source_kind": "telegram",
-      "lat": 56.0,
+      "lat": 56,
       "lon": 46.75,
       "mentioned_places": [
         {
           "name": "Morgaushskiy Rayon",
           "label": "Morgaushskiy Rayon",
           "type": "municipality",
-          "lat": 56.0,
+          "lat": 56,
           "lon": 46.75
         }
       ],
@@ -37410,7 +37410,7 @@
           "label": "Bolkhovskiy Rayon",
           "type": "municipality",
           "lat": 53.41667,
-          "lon": 36.0
+          "lon": 36
         },
         {
           "name": "Mtsensky District",
@@ -37723,14 +37723,14 @@
       "url": "https://t.me/radar_chuvashiya/1388",
       "source_kind": "telegram",
       "lat": 55.25,
-      "lon": 47.0,
+      "lon": 47,
       "mentioned_places": [
         {
           "name": "Ibresinskiy Rayon",
           "label": "Ibresinskiy Rayon",
           "type": "municipality",
           "lat": 55.25,
-          "lon": 47.0
+          "lon": 47
         }
       ],
       "source_id": "radar_chuvashiya",
@@ -38658,7 +38658,7 @@
           "label": "Bolkhovskiy Rayon",
           "type": "municipality",
           "lat": 53.41667,
-          "lon": 36.0
+          "lon": 36
         }
       ],
       "source_id": "radar_oreI",
@@ -41146,7 +41146,7 @@
           "label": "Smolensky District",
           "type": "municipality",
           "lat": 54.83333,
-          "lon": 32.0
+          "lon": 32
         }
       ],
       "source_id": "radar_smolensk",
@@ -41790,7 +41790,7 @@
           "label": "Starooskolsky Urban Okrug",
           "type": "municipality",
           "lat": 51.25,
-          "lon": 38.0
+          "lon": 38
         },
         {
           "name": "Veydelevskiy Rayon",
@@ -48389,14 +48389,14 @@
       "url": "https://t.me/radar_rostovv/8766",
       "source_kind": "telegram",
       "lat": 47.58333,
-      "lon": 39.0,
+      "lon": 39,
       "mentioned_places": [
         {
           "name": "Matveyevo-Kurgansky District",
           "label": "Matveyevo-Kurgansky District",
           "type": "municipality",
           "lat": 47.58333,
-          "lon": 39.0
+          "lon": 39
         },
         {
           "name": "Neklinovsky District",
@@ -51427,7 +51427,7 @@
           "label": "Mikhaylovsky District",
           "type": "municipality",
           "lat": 54.25,
-          "lon": 39.0
+          "lon": 39
         }
       ],
       "source_id": "radar_ryazan",
@@ -63538,7 +63538,7 @@
           "label": "Bolkhovskiy Rayon",
           "type": "municipality",
           "lat": 53.41667,
-          "lon": 36.0
+          "lon": 36
         },
         {
           "name": "Mtsensky District",
@@ -64089,7 +64089,7 @@
           "label": "Mikhaylovsky District",
           "type": "municipality",
           "lat": 54.25,
-          "lon": 39.0
+          "lon": 39
         }
       ],
       "source_id": "radar_ryazan",
@@ -65753,7 +65753,7 @@
           "label": "Shilovsky District",
           "type": "municipality",
           "lat": 54.33333,
-          "lon": 41.0
+          "lon": 41
         }
       ],
       "source_id": "radar_ryazan",
@@ -66715,7 +66715,7 @@
           "label": "Mikhaylovsky District",
           "type": "municipality",
           "lat": 54.25,
-          "lon": 39.0
+          "lon": 39
         },
         {
           "name": "Skopinsky District",
@@ -67281,7 +67281,7 @@
           "label": "Starozhilovsky District",
           "type": "municipality",
           "lat": 54.25,
-          "lon": 40.0
+          "lon": 40
         }
       ],
       "source_id": "radar_ryazan",
@@ -70394,52 +70394,6 @@
       "verification_weight": 100
     },
     {
-      "id": "21d7958377a6ca9f",
-      "region": "Ulyanovsk Oblast",
-      "place": "Ulyanovsk",
-      "scope": "city",
-      "at": "2026-09-28T08:29:32+00:00",
-      "count": null,
-      "count_type": "official_activity",
-      "activity_kind": "uav_attack_activity",
-      "signal_class": "uav_activity_signal",
-      "threat_class": "uav",
-      "count_qualifier": null,
-      "secondary_count": null,
-      "secondary_type": null,
-      "text": "❗️В Ульяновске действует режим чрезвычайной ситуации локального характера\n\nПостановление о принятии режима подписано главой города Александром Болдакиным после атаки БПЛА 25 сентября. \n\nГлавным вопросом остаётся помощь жителям многоквартирных домов на улицах Розы Люксембург и Юности. Организован обмер окон во всех домах, где взрывной волной выбило стёкла и рамы, данные частично переданы на изготовление новых стеклопакетов. Восстановлено газоснабжение 1-го, 4-го и 5-го подъездов. Также готовится инструментальное обследование несущих конструкций наиболее повреждённых квартир для выработки технического решения по их восстановлению. Установлено 13 дополнительных подпорок на четвёртом этаже, их общее количество составляет 180.\n\nЧасть эвакуированных ульяновцев остаётся в гостинице «Волга», где получает всё необходимое. Готовятся документы на компенсацию утраченного имущества, с экспертизой помогает Торгово-промышленная палата. \n\n💬 Подписаться на Пул N73 в Макс",
-      "source_name": "Правительство Ульяновской области",
-      "url": "https://t.me/ulgovru/24076",
-      "source_kind": "telegram",
-      "lat": 54.3142,
-      "lon": 48.4031,
-      "mentioned_places": [
-        {
-          "name": "Ulyanovsk",
-          "label": "Ульяновск",
-          "type": "city",
-          "lat": 54.3142,
-          "lon": 48.4031
-        },
-        {
-          "name": "Gorodskoy Okrug Ul'yanovsk",
-          "label": "Gorodskoy Okrug Ul’yanovsk",
-          "type": "municipality",
-          "lat": 54.30642,
-          "lon": 48.33661
-        }
-      ],
-      "source_id": "ulgovru",
-      "transport": "telegram_mtproto",
-      "transport_quality": 30,
-      "transport_window_complete": true,
-      "source_layer": "official_local",
-      "verified_official": true,
-      "coverage_role": "cross_validation",
-      "coverage_priority": 2,
-      "verification_weight": 100
-    },
-    {
       "id": "6bd5e7bc10291f5d",
       "region": "Kursk Oblast",
       "place": "Kursk Oblast",
@@ -71187,52 +71141,6 @@
       "verification_weight": 100
     },
     {
-      "id": "6ee81281987a9af2",
-      "region": "Ulyanovsk Oblast",
-      "place": "Ulyanovsk",
-      "scope": "city",
-      "at": "2026-09-28T13:20:25+00:00",
-      "count": null,
-      "count_type": "official_activity",
-      "activity_kind": "uav_attack_activity",
-      "signal_class": "uav_activity_signal",
-      "threat_class": "uav",
-      "count_qualifier": null,
-      "secondary_count": null,
-      "secondary_type": null,
-      "text": "Коротко по итогам еженедельного штаба:\n\n▫️По пострадавшим в результате массированной атаки БПЛА на Ульяновск. Всего 17 человек получили медицинскую помощь, большинство из них — амбулаторную. В больницах остаются 6 пациентов. Состояние всех оценивается как средней степени тяжести, динамика самочувствия положительная. Проведены телемедицинские консультации со специалистами Центрального института стоматологии и челюстно-лицевой хирургии Минздрава России по поводу дальнейшей схемы лечения 17-летней девушки, которую прооперировали врачи областной больницы. При необходимости переведём пациентку для дальнейшего лечения в Москву.\n\n▫️Специалисты соцзащиты продолжают обход и оценку ущерба для оказания дальнейшей адресной помощи жителям пострадавших домов. В Минсоцразвития поступило 306 заявлений. Поставил задачу вести индивидуальную работу с каждой семьёй для определения объёма необходимой поддержки. Достигнута договорённость со Следственным комитетом о выдаче копий постановления о возбуждении уголовного дела. Это позволит провести работу по оказанию помощи с использованием средств из резервного фонда Правительства РФ. Продолжает работу горячая линия Минсоцразвития: 8-800-350-46-46.\n\n▫️Поставил задачу МинЖКХ в круглосуточном режиме заниматься вопросами восстановления пострадавшей инфраструктуры. В наиболее пострадавшем доме закончены работы по укреплению этажей и подвального помещения второго подъезда. Во втором и третьем подъездах расчистили завалы. Демонтированы повреждённые балконы со второго по пятый этаж второго подъезда. Восстановлено газоснабжение в первом, четвёртом и пятом подъездах, вывозят строительный мусор. Системы жизнеобеспечения дома восстановлены, кроме второго и третьего подъездов. Сейчас проводится обследование второго подъезда. Поставил задачу как можно оперативнее представить итоговое заключение по всем подъездам. Также в этом доме и двух соседних сделаны замеры для остекления.\n\n▫️Благодарю экстренные службы, силовые структуры, силы ПВО и наши мобильные огневые группы за работу. Поддержку и помощь пострадавшим оказывают региональные общественные организации, ОНФ, волонтёры и неравнодушные ульяновцы. Все объединились, чтобы помочь. Народный фронт и Российский Красный Крест открыли дополнительные сборы для пострадавших. В гостинице «Волга» продолжает работать наш пункт временного размещения. Там сейчас остаются 17 человек. Все они обеспечены номерами и горячим питанием.\n\n🇷🇺Мой канал в MAX",
-      "source_name": "Правительство Ульяновской области",
-      "url": "https://t.me/ulgovru/24079",
-      "source_kind": "telegram",
-      "lat": 54.3142,
-      "lon": 48.4031,
-      "mentioned_places": [
-        {
-          "name": "Ulyanovsk",
-          "label": "Ульяновск",
-          "type": "city",
-          "lat": 54.3142,
-          "lon": 48.4031
-        },
-        {
-          "name": "Gorodskoy Okrug Ul'yanovsk",
-          "label": "Gorodskoy Okrug Ul’yanovsk",
-          "type": "municipality",
-          "lat": 54.30642,
-          "lon": 48.33661
-        }
-      ],
-      "source_id": "ulgovru",
-      "transport": "telegram_mtproto",
-      "transport_quality": 30,
-      "transport_window_complete": true,
-      "source_layer": "official_local",
-      "verified_official": true,
-      "coverage_role": "cross_validation",
-      "coverage_priority": 2,
-      "verification_weight": 100
-    },
-    {
       "id": "9e8bdfceedd8b05e",
       "region": "Kaluga Oblast",
       "place": "Kaluga",
@@ -71608,63 +71516,10 @@
           "label": "Smolensky District",
           "type": "municipality",
           "lat": 54.83333,
-          "lon": 32.0
+          "lon": 32
         }
       ],
       "source_id": "anohin67",
-      "transport": "telegram_mtproto",
-      "transport_quality": 30,
-      "transport_window_complete": true,
-      "source_layer": "official_local",
-      "verified_official": true,
-      "coverage_role": "cross_validation",
-      "coverage_priority": 2,
-      "verification_weight": 100
-    },
-    {
-      "id": "e22e37a9183bde8a",
-      "region": "Ulyanovsk Oblast",
-      "place": "Ulyanovsk",
-      "scope": "city",
-      "at": "2026-09-28T15:25:02+00:00",
-      "count": null,
-      "count_type": "official_activity",
-      "activity_kind": "uav_attack_activity",
-      "signal_class": "uav_activity_signal",
-      "threat_class": "uav",
-      "count_qualifier": null,
-      "secondary_count": null,
-      "secondary_type": null,
-      "text": "✅ 28 сентября\n\n▶️ Губернатор Алексей Русских сообщил о последствиях атаки БПЛА на Ульяновск\n\n▶️ В Ульяновске открыли сбор помощи для пострадавших от БПЛА\n\n▶️ В Ульяновске стартовал отопительный сезон для социальной сферы\n\n▶️ В Ульяновске может появиться ещё один автобусный завод \n\n▶️ Автопарк ульяновского центра медицины катастроф пополнил новый реанимобиль\n\n▶️ Более 45 тысяч подарков. Что получают ульяновские мамы при выписке из роддома\n\n▶️ В Ульяновске отремонтировали ещё шесть территорий по программе «Мой двор»\n\n▶️ Ульяновский хирург изобрел устройство для улавливания тромбов\n\n▶️ Капремонт Радищевского группового водовода выполнен почти на 50%\n\n🇷🇺 Ульяновская область в MAX",
-      "source_name": "Правительство Ульяновской области",
-      "url": "https://t.me/ulgovru/24081",
-      "source_kind": "telegram",
-      "lat": 54.3142,
-      "lon": 48.4031,
-      "mentioned_places": [
-        {
-          "name": "Ulyanovsk",
-          "label": "Ульяновск",
-          "type": "city",
-          "lat": 54.3142,
-          "lon": 48.4031
-        },
-        {
-          "name": "Gorodskoy Okrug Ul'yanovsk",
-          "label": "Gorodskoy Okrug Ul’yanovsk",
-          "type": "municipality",
-          "lat": 54.30642,
-          "lon": 48.33661
-        },
-        {
-          "name": "Ulyanovskiy Rayon",
-          "label": "Ulyanovskiy Rayon",
-          "type": "municipality",
-          "lat": 54.33528,
-          "lon": 48.01694
-        }
-      ],
-      "source_id": "ulgovru",
       "transport": "telegram_mtproto",
       "transport_quality": 30,
       "transport_window_complete": true,
