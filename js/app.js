@@ -1817,7 +1817,7 @@ function routeRevealProgress(feature, atMs) {
   if (!Number.isFinite(first) || !Number.isFinite(last)) return 1;
   const windowLength = Math.max(1, selectionEndMs() - selectionStartMs());
   const leadMs = Math.min(60 * 60 * 1000, windowLength / 6);
-  const beginning = last - first >= 15 * 60 * 1000 ? first : Math.max(selectionStartMs(), last - leadMs);
+  const beginning = last > first ? first : Math.max(selectionStartMs(), last - leadMs);
   if (last <= beginning) return atMs >= last ? 1 : 0;
   return Math.max(0, Math.min(1, (atMs - beginning) / (last - beginning)));
 }
@@ -1836,6 +1836,7 @@ function clippedIllustrativeLine(feature, progress) {
     if (remaining >= length) {
       visible.push(b);
       remaining -= length;
+      if (remaining <= 1e-9) break;
     } else {
       const t = Math.max(0, remaining / length);
       visible.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
