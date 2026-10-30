@@ -2,7 +2,7 @@ import json
 import unittest
 import tempfile
 from argparse import Namespace
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from collector.collect import (
@@ -25,6 +25,9 @@ from collector.collect import (
     reenrich_archive_places,
     merge_existing_archive,
     revalidate_archive_reports,
+    is_historical_aggregate,
+    is_aggregate_archive_record,
+    purge_archive_aggregate_summaries,
     fetch_posts_mtproto_for_window,
     source_post_applies,
     source_collection_sort_key,
@@ -861,6 +864,94 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(len(out['reports']), 1)
         self.assertEqual(out['reports'][0]['activity_kind'], 'uav_attack_activity')
         self.assertEqual(out['coverage']['reports_revalidated_removed'], 0)
+
+    def test_v27_aggregate_recap_recognition_does_not_confuse_live_detection(self):
+        historical = (
+            'За прошедшую ночь силами ПВО уничтожены 645 БПЛА '
+            'над территориями Брянской, Курской и Белгородской областей.'
+        )
+        self.assertTrue(is_historical_aggregate(historical))
+        self.assertTrue(is_historical_aggregate(
+            'Уничтожены 159 БПЛА над территориями Брянской, Курской '
+            'и Белгородской областей.'
+        ))
+        self.assertTrue(is_historical_aggregate(
+            'В период с 08.00 до 20.00 мск уничтожено 105 БПЛА.'
+        ))
+        self.assertFalse(is_historical_aggregate(
+            'Фиксация 249 БПЛА в районе города.'
+        ))
+        self.assertFalse(is_historical_aggregate(
+            'Объявлена опасность атаки БПЛА в Брянской области.'
+        ))
+        self.assertFalse(is_historical_aggregate(
+            'В Брянской области сейчас уничтожен один БПЛА.'
+        ))
+
+    def test_v27_aggregate_recap_ignored_before_splitting_numeric_sentences(self):
+        source = {
+            'region': 'Bryansk Oblast', 'source_name': 'Regional Updates',
+            'channel': 'example_bryansk', 'kind': 'telegram', 'places': [],
+        }
+        when = datetime(2026, 10, 10, 9, tzinfo=timezone.utc)
+        summaries = [
+            Post('example_bryansk', 1, when,
+                 'За прошедшую ночь силы ПВО уничтожили 245 БПЛА. '
+                 'Брянская, Курская и Белгородская области.',
+                 'https://t.me/example_bryansk/1'),
+            Post('example_bryansk', 2, when,
+                 'Уничтожены 159 БПЛА над территориями Брянской, '
+                 'Курской и Белгородской областей.',
+                 'https://t.me/example_bryansk/2'),
+        ]
+        reports = extract_reports(
+            summaries, source, when - timedelta(hours=1), when + timedelta(hours=1)
+        )
+        self.assertEqual(reports, [],
+            'a whole retrospective post must not create momentary regional counts')
+        live = Post('example_bryansk', 3, when, 'Фиксация 249 БПЛА.',
+                    'https://t.me/example_bryansk/3')
+        live_reports = extract_reports(
+            [live], source, when - timedelta(hours=1), when + timedelta(hours=1)
+        )
+        self.assertTrue(any(r.get('count') == 249 for r in live_reports),
+                        'large confirmed live detections must not be deleted only for size')
+
+    def test_v27_archive_purge_removes_old_summaries_without_resurrecting_them(self):
+        archive = {
+            'coverage': {},
+            'reports': [
+                {'id': 'recap', 'activity_kind': 'air_defense_action',
+                 'count': 645, 'count_type': 'destroyed_or_suppressed',
+                 'text': 'За ночь уничтожено 645 БПЛА.'},
+                {'id': 'already-retrospective',
+                 'activity_kind': 'historical_summary',
+                 'count': None, 'count_type': 'historical_summary',
+                 'text': 'За прошедшую ночь сбиты беспилотники.'},
+                {'id': 'real-detection', 'activity_kind': 'uav_detected',
+                 'region': 'Bryansk Oblast',
+                 'count': 249, 'count_type': 'detected_reported',
+                 'text': 'Фиксация 249 БПЛА.'},
+            ],
+            'events': [
+                {'id': 'false-interval',
+                 'start_text': 'За ночь уничтожены 159 БПЛА над '
+                               'территориями Брянской и Курской областей.'},
+                {'id': 'real-alert', 'region': 'Bryansk Oblast',
+                 'start_text': 'Объявлена опасность атаки БПЛА.'},
+            ],
+        }
+        cleaned = purge_archive_aggregate_summaries(archive)
+        self.assertEqual([r['id'] for r in cleaned['reports']], ['real-detection'])
+        self.assertEqual([e['id'] for e in cleaned['events']], ['real-alert'])
+        self.assertEqual(cleaned['coverage']['aggregate_reports_purged'], 2)
+        self.assertEqual(cleaned['coverage']['aggregate_events_purged'], 1)
+        self.assertEqual(cleaned['coverage']['archive_reports_total'], 1)
+        self.assertEqual(cleaned['coverage']['archive_events_total'], 1)
+        again = purge_archive_aggregate_summaries(cleaned)
+        self.assertEqual(again['coverage']['aggregate_reports_purged'], 0)
+        self.assertEqual(again['coverage']['aggregate_events_purged'], 0)
+        self.assertFalse(is_aggregate_archive_record(again['reports'][0]))
 
     def test_v24_retrospective_night_summary_is_historical(self):
         self.assertEqual(
