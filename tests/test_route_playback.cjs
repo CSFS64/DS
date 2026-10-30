@@ -79,11 +79,12 @@ test("one missile report must not imply an invented flight path", () => {
   let observations = [start];
   const api = new Function("routePlaceCatalog", "routeObservationNodes",
     "haversineKm", "smoothInterpolatingRoute", "routeTimingForNodes",
-    "bearingDeg", "buildIllustrativeUavRoutes",
+    "bearingDeg", "buildIllustrativeUavRoutes", "groupWaveTerminals",
     missiles + "\nreturn {buildIllustrativeMissileRoutes};"
   )(() => ({}), () => observations, (a, b) => flatDistance(a, b) * 50,
     points => points.map(p => [p.lon, p.lat]), geo.routeTimingForNodes,
-    () => 90, () => ({ lines: { features: [] }, arrows: { features: [] } }));
+    () => 90, () => ({ lines: { features: [] }, arrows: { features: [] } }),
+    geo.groupWaveTerminals);
   assert.equal(api.buildIllustrativeMissileRoutes(0, 10000000).lines.features.length, 0);
   observations = [start, end];
   const result = api.buildIllustrativeMissileRoutes(0, 10000000);
