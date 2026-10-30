@@ -72,6 +72,7 @@ const els = {
   handleStart: $("handleStart"), handleEnd: $("handleEnd"), handleCumulative: $("handleCumulative"),
   playButton: $("playButton"), scrubber: $("scrubber"), currentTimeLabel: $("currentTimeLabel"), speedSelect: $("speedSelect"),
   clockMoscow: $("clockMoscow"), clockKyiv: $("clockKyiv"), clockBeijing: $("clockBeijing"),
+  brandKyivTime: $("brandKyivTime"), brandBeijingTime: $("brandBeijingTime"),
   routeToggle: $("routeToggle"), cleanViewButton: $("cleanViewButton"),
   exportVideoButton: $("exportVideoButton"),
   videoExportStatus: $("videoExportStatus"),
@@ -2517,6 +2518,9 @@ async function exportTimelineVideo() {
       durationSeconds,
       routesVisible: state.routesVisible,
       formatTime: ms => formatTime(ms, "Europe/Moscow"),
+      formatKyiv: ms => formatTime(ms, "Europe/Kyiv"),
+      formatBeijing: ms => formatTime(ms, "Asia/Shanghai"),
+      brandLogoSrc: "assets/kalyna-osint-logo.avif",
       renderAt: ms => {
         state.viewMode = "realtime";
         state.currentMs = ms;
@@ -3058,8 +3062,13 @@ function renderMap(active, reports = []) {
 
 function renderClocks(active, reports = []) {
   els.clockMoscow.textContent = formatTime(state.currentMs, "Europe/Moscow");
-  els.clockKyiv.textContent = formatTime(state.currentMs, "Europe/Kyiv");
-  els.clockBeijing.textContent = formatTime(state.currentMs, "Asia/Shanghai");
+  const kyivTime = formatTime(state.currentMs, "Europe/Kyiv");
+  const beijingTime = formatTime(state.currentMs, "Asia/Shanghai");
+  els.clockKyiv.textContent = kyivTime;
+  els.clockBeijing.textContent = beijingTime;
+  // These are the historical playback instants, not wall-clock Date.now().
+  if (els.brandKyivTime) els.brandKyivTime.textContent = kyivTime;
+  if (els.brandBeijingTime) els.brandBeijingTime.textContent = beijingTime;
   if (state.viewMode === "cumulative") {
     const regionCount = new Set(active.map(e => e.region)).size;
     const placeCount = new Set(active.filter(e => e.scope !== "region").map(e => `${e.region}::${e.place}`)).size;
