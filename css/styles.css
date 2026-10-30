@@ -471,8 +471,10 @@ body.clean-map-view .route-loading { background: rgba(3,9,16,.5); }
   display: table;
   padding: .25em .45em .20em;
   margin-bottom: .38em;
-  background: rgba(239, 137, 195, .96);
-  color: #130c17;
+  /* Exact background sampled from the Fire Point reference: #FF7ECE. */
+  background: #ff7ece;
+  color: #161019;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, .27);
   font: 800 clamp(16px, 2.05vw, 39px)/1.14 "Courier New", ui-monospace, monospace;
   letter-spacing: -.035em;
   border-radius: 2px;
@@ -483,7 +485,7 @@ body.clean-map-view .route-loading { background: rgba(3,9,16,.5); }
   font: 700 clamp(13px, 1.35vw, 27px)/1.27 "Courier New", ui-monospace, monospace;
   letter-spacing: .01em;
   color: #f5f8ff;
-  text-shadow: 0 2px 5px #05070b, 0 0 12px #000, 1px 1px #03060c;
+  text-shadow: 0 2px 7px rgba(0, 0, 0, .92), 0 0 15px rgba(0, 0, 0, .58);
   white-space: nowrap;
 }
 .brand-corner-logo {
