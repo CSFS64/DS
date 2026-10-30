@@ -4,7 +4,7 @@ on:
   push:
     branches: ["main"]
   workflow_run:
-    workflows: ["Update delayed archive data"]
+    workflows: ["Update delayed archive data", "Purge archive aggregate summaries"]
     types: [completed]
   workflow_dispatch:
 
