@@ -40,6 +40,7 @@ const state = {
   routeSelectionKey: "",
   routeFeatureCount: 0,
   routeFullData: null,
+  routeStaticData: null,
   routeDisplayedPhase: "",
   routeGeneration: 0,
   routeDrawAt: 0,
@@ -1643,11 +1644,15 @@ function groupWaveTerminals(candidates) {
       haversineKm(node, group) <= (node.regionProxy || group.regionProxy ? 150 : 90)
     );
     if (match) {
+      const combinedWindows = [...(match.windows || []), ...(node.windows || [])];
       const preference = p => (p.regionProxy ? -3 : 3) +
         (isStrongObservationKind(p.kind) ? 2 : 0) +
         Math.log2(1 + (p.observations || 0)) + (p.weight || 0) * .1;
       if (preference(node) > preference(match)) {
+        node.windows = combinedWindows;
         neighbors[neighbors.indexOf(match)] = node;
+      } else {
+        match.windows = combinedWindows;
       }
     } else {
       neighbors.push(node);
@@ -1940,7 +1945,7 @@ async function buildIllustrativeUavRoutes(startMs, endMs, isCancelled = () => fa
 // These tentative links are NOT confirmed individual missile flight tracks.
 function buildIllustrativeMissileRoutes(startMs, endMs) {
   const catalog = routePlaceCatalog();
-  const nodes = routeObservationNodes(startMs, endMs, "missile", catalog)
+  const nodes = groupWaveTerminals(routeObservationNodes(startMs, endMs, "missile", catalog))
     .sort((a, b) => a.at - b.at);
   const lines = [], arrows = [];
   for (let i = 0; i < nodes.length; i++) {
@@ -2094,7 +2099,9 @@ function clipRouteWave(feature, tail, head) {
   if (head <= tail) return null;
   const coords = feature.geometry.coordinates;
   if (coords.length < 2) return null;
-  if (tail <= 0 && head >= 1) return feature;
+  if (tail <= 0 && head >= 1) return {
+    type: "Feature", properties: feature.properties, geometry: feature.geometry,
+  };
   const { lengths, total } = routeLengthIndex(feature);
   if (total <= 0) return null;
   const a = Math.max(0, tail) * total, b = Math.min(1, head) * total;
@@ -2119,7 +2126,7 @@ function clipRouteWave(feature, tail, head) {
     if (lengths[i] > a && lengths[i] < b) visible.push(coords[i]);
   }
   visible.push(pointAt(b));
-  return { ...feature, geometry: { type: "LineString", coordinates: visible } };
+  return { type: "Feature", properties: feature.properties, geometry: { type: "LineString", coordinates: visible } };
 }
 
 function illustratedRoutesAtTime(fullData, ms) {
@@ -2171,6 +2178,17 @@ async function buildRoutesCooperatively(start, end, key, generation) {
     const data = await buildIllustrativeRoutes(start, end, cancelled);
     if (cancelled() || !data || key !== currentRouteKey()) return;
     state.routeFullData = data;
+    // MapLibre receives only GeoJSON standard fields, never the internal timing,
+    // animation wave or distance caches kept on the CPU-side route objects.
+    state.routeStaticData = {
+      lines: {
+        type: "FeatureCollection",
+        features: data.lines.features.map(f => ({
+          type: "Feature", properties: f.properties, geometry: f.geometry,
+        })),
+      },
+      arrows: data.arrows,
+    };
     state.routeFeatureCount = data.lines.features.length;
     state.routeDisplayedPhase = "";
     state.routeBuildPending = false;
@@ -2181,6 +2199,7 @@ async function buildRoutesCooperatively(start, end, key, generation) {
     console.error("Route generation failed", error);
     state.routeBuildPending = false;
     state.routeFullData = { lines: EMPTY_FEATURE_COLLECTION, arrows: EMPTY_FEATURE_COLLECTION };
+    state.routeStaticData = state.routeFullData;
     state.routeFeatureCount = 0;
     hideRouteLoading();
     updateRouteOverlay();
@@ -2225,6 +2244,7 @@ function updateRouteOverlay(force = false) {
     const generation = ++state.routeGeneration;
     state.routeSelectionKey = key;
     state.routeFullData = null;
+    state.routeStaticData = null;
     state.routeFeatureCount = 0;
     state.routeDisplayedPhase = "";
     state.routeBuildPending = true;
@@ -2254,7 +2274,7 @@ function updateRouteOverlay(force = false) {
   if (!force && animating && now - state.routeDrawAt < 140) return;
   const displayed = animating
     ? illustratedRoutesAtTime(state.routeFullData, state.currentMs)
-    : state.routeFullData;
+    : state.routeStaticData;
   lineSource.setData(displayed.lines);
   arrowSource.setData(displayed.arrows);
   state.routeDisplayedPhase = phase;
@@ -2504,6 +2524,7 @@ function installArchiveLayers() {
 
   state.routeSelectionKey = "";
   state.routeFullData = null;
+  state.routeStaticData = null;
   state.routeDisplayedPhase = "";
 
   state.map.addSource("archive-places", { type: "geojson", data: preparePlacesGeoJson() });
@@ -3289,9 +3310,13 @@ function togglePlayback() {
   const start = selectionStartMs(), end = selectionEndMs();
   if (state.currentMs >= end) state.currentMs = start;
   els.playButton.classList.add("is-playing"); els.playButton.textContent = "Ⅱ PAUSE";
+  let lastFrameAt = performance.now();
   state.timer = setInterval(() => {
+    const now = performance.now();
+    const elapsedSeconds = Math.min(0.4, Math.max(0, now - lastFrameAt) / 1000);
+    lastFrameAt = now;
     const minutesPerSecond = +els.speedSelect.value;
-    state.currentMs += minutesPerSecond * 60 * 1000 * 0.1;
+    state.currentMs += minutesPerSecond * 60 * 1000 * elapsedSeconds;
     if (state.currentMs >= end) { state.currentMs = end; stopPlayback(); }
     render();
   }, 100);
