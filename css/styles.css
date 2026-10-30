@@ -406,3 +406,44 @@ body.clean-map-view .maplibregl-control-container {
   .clock span { font-size: 7px; }
   .clock strong { font-size: 8px; }
 }
+
+
+/* Non-blocking map loading notice. Browser stays interactive while
+   expensive inferred routes are calculated in small cooperative batches. */
+.route-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 850;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(3, 9, 16, .75);
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity .25s ease;
+}
+.route-loading[hidden] { display: none !important; }
+.route-loading-content {
+  min-width: min(340px, 85vw);
+  padding: 22px 26px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  background: rgba(5, 16, 27, .95);
+  border: 1px solid rgba(57,216,255,.45);
+  box-shadow: 0 14px 40px rgba(0,0,0,.45);
+  color: #d7eef7;
+}
+.route-loading-content small { color: #83a2b2; font-size: 11px; }
+.route-loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(57,216,255,.2);
+  border-top-color: #39d8ff;
+  border-radius: 50%;
+  animation: route-load-spin .85s linear infinite;
+}
+@keyframes route-load-spin { to { transform: rotate(360deg); } }
+body.clean-map-view .route-loading { background: rgba(3,9,16,.5); }

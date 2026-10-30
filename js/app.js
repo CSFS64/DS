@@ -40,13 +40,22 @@ const state = {
   routeSelectionKey: "",
   routeFeatureCount: 0,
   routeFullData: null,
+  routeStaticData: null,
+  routeCache: new Map(),
   routeDisplayedPhase: "",
+  routeGeneration: 0,
+  routeDrawAt: 0,
+  appliedRouteVisibility: "",
+  routeBuildPending: false,
   exportRecording: false,
   exportCancelled: false,
   interactiveRenderFrame: 0,
   routeUpdateTimer: null,
   observedCountSignature: "",
   routeCatalogCache: null,
+  activeEventHours: new Map(),
+  activeReportHours: new Map(),
+  longEvents: [],
   regionVisualStates: new Map(),
   placeVisualStates: new Map(),
   cleanView: false,
@@ -66,6 +75,7 @@ const els = {
   routeToggle: $("routeToggle"), cleanViewButton: $("cleanViewButton"),
   exportVideoButton: $("exportVideoButton"),
   videoExportStatus: $("videoExportStatus"),
+  routeLoading: $("routeLoading"), routeLoadingText: $("routeLoadingText"),
 };
 
 function parseMoscowDate(dateStr, endOfDay = false) {
@@ -79,10 +89,50 @@ function isoDateInZone(ms, zone = "Europe/Moscow") {
   return `${by.year}-${by.month}-${by.day}`;
 }
 
+const clockFormatters = new Map();
+function clockFormatter(zone, includeDate) {
+  const key = zone + "|" + (includeDate ? "date" : "time");
+  if (!clockFormatters.has(key)) {
+    const options = { timeZone: zone, hour: "2-digit", minute: "2-digit", hour12: false };
+    if (includeDate) Object.assign(options, { month: "2-digit", day: "2-digit" });
+    clockFormatters.set(key, new Intl.DateTimeFormat("zh-CN", options));
+  }
+  return clockFormatters.get(key);
+}
+
+function archiveHour(ms) { return Math.floor(ms / 3600000); }
+
+function prepareActiveArchiveIndex() {
+  const eventHours = new Map(), reportHours = new Map(), longEvents = [];
+  const add = (index, hour, item) => {
+    let bucket = index.get(hour);
+    if (!bucket) { bucket = []; index.set(hour, bucket); }
+    bucket.push(item);
+  };
+  for (const event of state.archive.events || []) {
+    const start = Date.parse(event.start), end = Date.parse(event.end);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) continue;
+    event._startMs = start;
+    event._endMs = end;
+    const h0 = archiveHour(start), h1 = archiveHour(end);
+    if (h1 - h0 > 168) { longEvents.push(event); continue; }
+    for (let h = h0; h <= h1; h++) add(eventHours, h, event);
+  }
+  for (const report of state.archive.reports || []) {
+    const at = Date.parse(report.at);
+    if (!Number.isFinite(at) || !reportRepresentsLiveThreat(report)) continue;
+    report._atMs = at;
+    for (let h = archiveHour(at - 45 * 60000); h <= archiveHour(at + 45 * 60000); h++) {
+      add(reportHours, h, report);
+    }
+  }
+  state.activeEventHours = eventHours;
+  state.activeReportHours = reportHours;
+  state.longEvents = longEvents;
+}
+
 function formatTime(ms, zone, includeDate = true) {
-  const opts = { timeZone: zone, hour: "2-digit", minute: "2-digit", hour12: false };
-  if (includeDate) Object.assign(opts, { month: "2-digit", day: "2-digit" });
-  return new Intl.DateTimeFormat("zh-CN", opts).format(new Date(ms));
+  return clockFormatter(zone, includeDate).format(new Date(ms));
 }
 
 function formatDuration(start, end) {
@@ -183,9 +233,11 @@ async function init() {
   } catch (err) {
     console.error(err);
     els.dataStatus.textContent = "DATA LOAD FAILED";
+    showRouteLoading("历史数据加载失败，请刷新页面。");
     return;
   }
 
+  prepareActiveArchiveIndex();
   initializeDates();
   wireControls();
   rebuildTimeline();
@@ -304,6 +356,7 @@ function initMap() {
   const MapLibre = window.maplibregl;
   if (!MapLibre) {
     els.dataStatus.textContent += " · MAPLIBRE LOAD FAILED";
+    showRouteLoading("地图组件加载失败，请刷新页面。");
     return;
   }
 
@@ -1579,7 +1632,38 @@ function routeObservationNodes(startMs, endMs, threat, catalog) {
   return dedupeRouteObservations(raw);
 }
 
-function buildIllustrativeUavRoutes(startMs, endMs) {
+// Merge redundant terminal observations within an active regional wave.
+ // A separate city/wave remains eligible when it is geographically or
+ // temporally distinct; this is evidence de-duplication, never a route limit.
+function groupWaveTerminals(candidates) {
+  const groups = new Map();
+  const ordered = [...candidates].sort((a, b) => a.at - b.at);
+  for (const node of ordered) {
+    const neighbors = groups.get(node.region) || [];
+    const match = neighbors.find(group =>
+      Math.abs(node.at - group.at) <= 3 * 3600 * 1000 &&
+      haversineKm(node, group) <= (node.regionProxy || group.regionProxy ? 150 : 90)
+    );
+    if (match) {
+      const combinedWindows = [...(match.windows || []), ...(node.windows || [])];
+      const preference = p => (p.regionProxy ? -3 : 3) +
+        (isStrongObservationKind(p.kind) ? 2 : 0) +
+        Math.log2(1 + (p.observations || 0)) + (p.weight || 0) * .1;
+      if (preference(node) > preference(match)) {
+        node.windows = combinedWindows;
+        neighbors[neighbors.indexOf(match)] = node;
+      } else {
+        match.windows = combinedWindows;
+      }
+    } else {
+      neighbors.push(node);
+      groups.set(node.region, neighbors);
+    }
+  }
+  return [...groups.values()].flat();
+}
+
+async function buildIllustrativeUavRoutes(startMs, endMs, isCancelled = () => false) {
   const catalog = routePlaceCatalog();
   const litRegions = selectedWindowUavRegions(startMs, endMs);
   const nodes = routeObservationNodes(startMs, endMs, "uav", catalog);
@@ -1594,19 +1678,34 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
     );
   });
 
-  // No global cap on number of routes: inspect every supported terminal.
-  terminals = terminals.sort((a, b) => b.at - a.at || b.lat - a.lat || a.lon - b.lon);
+  // Restore the original north-to-south terminal ordering and all existing
+  // candidate scoring / border routing. Only repeated observations are grouped.
+  terminals = groupWaveTerminals(terminals).sort((a, b) => {
+    if (Math.abs(a.lat - b.lat) > 0.15) return b.lat - a.lat;
+    return a.lon - b.lon || a.at - b.at;
+  });
 
+  let nextUiYield = performance.now() + 12;
+  const yieldIfNeeded = async () => {
+    if (performance.now() < nextUiYield) return;
+    await new Promise(resolve => setTimeout(resolve, 0));
+    nextUiYield = performance.now() + 12;
+  };
   const lineFeatures = [];
   const arrowFeatures = [];
   const linkedNodeKeys = new Set();
   const usedVisibleStarts = [];
   const consumedTerminalNodeKeys = new Set();
 
-  terminals.forEach((terminal, index) => {
+  for (let index = 0; index < terminals.length; index++) {
+    if (isCancelled()) return null;
+    // Yield even when routes fail, keeping clicks and map gestures responsive.
+    if (index % 2 === 0) await new Promise(resolve => setTimeout(resolve, 0));
+    if (isCancelled()) return null;
+    const terminal = terminals[index];
     // If this observation is already an upstream support for a longer
     // downstream route, do not draw a second independent border-origin route.
-    if (consumedTerminalNodeKeys.has(terminal.nodeKey)) return;
+    if (consumedTerminalNodeKeys.has(terminal.nodeKey)) continue;
 
     const seed = [terminal.region, terminal.placeName, terminal.at, index].join("|");
     const startOptions = rankBorderStarts(terminal, seed, usedVisibleStarts).slice(0, 18);
@@ -1616,6 +1715,8 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
     let chosen = null;
 
     for (const option of startOptions) {
+      if (isCancelled()) return null;
+      await yieldIfNeeded();
       const mode = option.mode;
       const entry = firstRussiaEntry(option.point, terminal);
       if (!validRussiaEntryForMode(entry, mode)) continue;
@@ -1687,6 +1788,8 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
       ];
 
       for (const variant of variants) {
+        if (isCancelled()) return null;
+        await yieldIfNeeded();
         const expanded = expandRouteWithNaturalSupports(
           evidenceWaypoints,
           seed,
@@ -1742,7 +1845,7 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
       }
     }
 
-    if (!chosen) return;
+    if (!chosen) continue;
     usedVisibleStarts.push(chosen.visibleStart);
     chosen.chain.forEach(node => linkedNodeKeys.add(node.nodeKey));
 
@@ -1830,7 +1933,7 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
       },
       geometry: { type: "Point", coordinates: b },
     });
-  });
+  }
 
   return {
     lines: { type: "FeatureCollection", features: lineFeatures },
@@ -1843,7 +1946,7 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
 // These tentative links are NOT confirmed individual missile flight tracks.
 function buildIllustrativeMissileRoutes(startMs, endMs) {
   const catalog = routePlaceCatalog();
-  const nodes = routeObservationNodes(startMs, endMs, "missile", catalog)
+  const nodes = groupWaveTerminals(routeObservationNodes(startMs, endMs, "missile", catalog))
     .sort((a, b) => a.at - b.at);
   const lines = [], arrows = [];
   for (let i = 0; i < nodes.length; i++) {
@@ -1895,8 +1998,9 @@ function buildIllustrativeMissileRoutes(startMs, endMs) {
   };
 }
 
-function buildIllustrativeRoutes(startMs, endMs) {
-  const uav = buildIllustrativeUavRoutes(startMs, endMs);
+async function buildIllustrativeRoutes(startMs, endMs, isCancelled = () => false) {
+  const uav = await buildIllustrativeUavRoutes(startMs, endMs, isCancelled);
+  if (!uav || isCancelled()) return null;
   const missile = buildIllustrativeMissileRoutes(startMs, endMs);
   return {
     lines: { type: "FeatureCollection", features: [...uav.lines.features, ...missile.lines.features] },
@@ -1904,49 +2008,137 @@ function buildIllustrativeRoutes(startMs, endMs) {
   };
 }
 
-// The geometry remains an inference, not an observed flight track. During
-// playback reveal each existing illustrative line according to its evidence
-// timestamps; paused/scrubbed views always show its complete geometry.
-function routeRevealProgress(feature, atMs) {
-  // Match the existing activeEvents / activeReports windows exactly.
-  // Never predict a future checkpoint or preserve routes after all alerts clear.
-  return (feature._timing || []).reduce((max, anchor) =>
-    atMs >= anchor.from && atMs <= anchor.to ? Math.max(max, anchor.progress) : max, 0);
+// Animated routes are *illustrations* of activity waves, not measured speed.
+// Static mode always uses the original complete candidate geometries.
+function routeWavePeriods(feature) {
+  if (feature._waves) return feature._waves;
+  const anchors = (feature._timing || []).filter(w =>
+    Number.isFinite(w.from) && Number.isFinite(w.to) && w.to > w.from
+  ).sort((a, b) => a.from - b.from);
+  const waves = [];
+  // Only merge contiguous alert/report activity. Disconnected periods are
+  // separate pulses, not a permanently visible line.
+  for (const anchor of anchors) {
+    let wave = waves[waves.length - 1];
+    if (!wave || anchor.from > wave.end + 5 * 60000) {
+      wave = { start: anchor.from, end: anchor.to, anchors: [] };
+      waves.push(wave);
+    }
+    wave.end = Math.max(wave.end, anchor.to);
+    wave.anchors.push(anchor);
+  }
+  for (const wave of waves) {
+    const duration = Math.max(1, wave.end - wave.start);
+    // The tail is a delayed version of the head. By the clear time the
+    // trailing edge reaches the end and the full pulse vanishes.
+    wave.tailLagMs = duration * .28;
+    const travelEnd = wave.end - wave.tailLagMs;
+    const points = [{ at: wave.start, progress: 0 }];
+    for (const a of wave.anchors) {
+      // Final arrival is paced to the period of observed activity, instead of
+      // making a pulse vanish while the supporting alert remains active.
+      const finalCheckpoint = a.progress >= 1 - 1e-8;
+      const at = finalCheckpoint ? travelEnd :
+        Math.min(travelEnd, Math.max(wave.start, a.from + (a.to - a.from) * .25));
+      points.push({ at, progress: a.progress });
+    }
+    points.push({ at: travelEnd, progress: 1 });
+    points.sort((a, b) => a.at - b.at || a.progress - b.progress);
+    // A later observation may occur at an earlier spatial checkpoint; never
+    // animate backwards. Keep time continuous even at identical timestamps.
+    let progress = 0;
+    for (const p of points) { progress = Math.max(progress, p.progress); p.progress = progress; }
+    wave.points = points;
+  }
+  feature._waves = waves;
+  return waves;
 }
 
-function clippedIllustrativeLine(feature, progress) {
-  if (progress <= 0) return null;
-  if (progress >= 1) return feature;
-  const points = feature.geometry.coordinates;
-  if (points.length < 2) return null;
-  let remaining = routeLengthKm(points) * progress;
-  const visible = [points[0]];
+function smoothWavePosition(points, ms) {
+  if (ms <= points[0].at) return 0;
   for (let i = 1; i < points.length; i++) {
     const a = points[i - 1], b = points[i];
-    const length = haversineKm({ lon: a[0], lat: a[1] }, { lon: b[0], lat: b[1] });
-    if (length <= 0) continue;
-    if (remaining >= length) {
-      visible.push(b);
-      remaining -= length;
-      if (remaining <= 1e-9) break;
-    } else {
-      const t = Math.max(0, remaining / length);
-      visible.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
-      break;
-    }
+    if (ms > b.at) continue;
+    if (b.at <= a.at) return b.progress;
+    const fraction = Math.max(0, Math.min(1, (ms - a.at) / (b.at - a.at)));
+    // Smootherstep transitions have continuous position and velocity at each
+    // reported waypoint, avoiding instantaneous growth between alerts.
+    const t = fraction * fraction * fraction * (fraction * (fraction * 6 - 15) + 10);
+    return a.progress + (b.progress - a.progress) * t;
   }
-  if (visible.length < 2) return null;
-  return { ...feature, geometry: { type: "LineString", coordinates: visible } };
+  return points[points.length - 1].progress;
+}
+
+function activeRouteWave(feature, ms) {
+  for (const wave of routeWavePeriods(feature)) {
+    if (ms < wave.start || ms >= wave.end) continue;
+    const head = smoothWavePosition(wave.points, ms);
+    const tail = smoothWavePosition(wave.points, ms - wave.tailLagMs);
+    if (head > tail + .00001) return { tail, head };
+  }
+  return null;
+}
+
+function routeRevealProgress(feature, ms) {
+  return activeRouteWave(feature, ms)?.head || 0;
+}
+
+function routeLengthIndex(feature) {
+  if (feature._lengthIndex) return feature._lengthIndex;
+  const coords = feature.geometry.coordinates;
+  const lengths = [0];
+  for (let i = 1; i < coords.length; i++) {
+    const a = { lon: coords[i - 1][0], lat: coords[i - 1][1] };
+    const b = { lon: coords[i][0], lat: coords[i][1] };
+    lengths.push(lengths[i - 1] + haversineKm(a, b));
+  }
+  feature._lengthIndex = { lengths, total: lengths[lengths.length - 1] };
+  return feature._lengthIndex;
+}
+
+function clipRouteWave(feature, tail, head) {
+  if (head <= tail) return null;
+  const coords = feature.geometry.coordinates;
+  if (coords.length < 2) return null;
+  if (tail <= 0 && head >= 1) return {
+    type: "Feature", properties: feature.properties, geometry: feature.geometry,
+  };
+  const { lengths, total } = routeLengthIndex(feature);
+  if (total <= 0) return null;
+  const a = Math.max(0, tail) * total, b = Math.min(1, head) * total;
+  if (b <= a) return null;
+  const pointAt = distance => {
+    let low = 1, high = lengths.length - 1;
+    while (low < high) {
+      const mid = (low + high) >> 1;
+      if (lengths[mid] < distance) low = mid + 1;
+      else high = mid;
+    }
+    const index = low;
+    const size = lengths[index] - lengths[index - 1];
+    const t = size > 0 ? Math.max(0, Math.min(1, (distance - lengths[index - 1]) / size)) : 0;
+    return [
+      coords[index - 1][0] + (coords[index][0] - coords[index - 1][0]) * t,
+      coords[index - 1][1] + (coords[index][1] - coords[index - 1][1]) * t,
+    ];
+  };
+  const visible = [pointAt(a)];
+  for (let i = 1; i < lengths.length - 1; i++) {
+    if (lengths[i] > a && lengths[i] < b) visible.push(coords[i]);
+  }
+  visible.push(pointAt(b));
+  return { type: "Feature", properties: feature.properties, geometry: { type: "LineString", coordinates: visible } };
 }
 
 function illustratedRoutesAtTime(fullData, ms) {
   const lines = [], arrows = [];
   for (const feature of fullData.lines.features) {
-    const line = clippedIllustrativeLine(feature, routeRevealProgress(feature, ms));
+    const wave = activeRouteWave(feature, ms);
+    if (!wave) continue;
+    const line = clipRouteWave(feature, wave.tail, wave.head);
     if (!line) continue;
     lines.push(line);
     const coords = line.geometry.coordinates;
-    if (coords.length < 2) continue;
     const a = coords[coords.length - 2], b = coords[coords.length - 1];
     arrows.push({
       type: "Feature",
@@ -1963,17 +2155,79 @@ function illustratedRoutesAtTime(fullData, ms) {
   };
 }
 
+function showRouteLoading(message) {
+  if (!els.routeLoading) return;
+  if (els.routeLoadingText) els.routeLoadingText.textContent = message;
+  els.routeLoading.hidden = false;
+}
+
+function hideRouteLoading() {
+  if (els.routeLoading) els.routeLoading.hidden = true;
+}
+
+function currentRouteKey() {
+  return [Math.round(selectionStartMs()), Math.round(selectionEndMs()),
+    state.archive?.reports?.length || 0, state.archive?.events?.length || 0].join(":");
+}
+
+async function buildRoutesCooperatively(start, end, key, generation) {
+  const cancelled = () => generation !== state.routeGeneration || !state.routesVisible;
+  try {
+    // Allow the dimming indicator to paint before route generation begins.
+    await new Promise(resolve => setTimeout(resolve, 30));
+    if (cancelled()) return;
+    const data = await buildIllustrativeRoutes(start, end, cancelled);
+    if (cancelled() || !data || key !== currentRouteKey()) return;
+    state.routeFullData = data;
+    // MapLibre receives only GeoJSON standard fields, never the internal timing,
+    // animation wave or distance caches kept on the CPU-side route objects.
+    state.routeStaticData = {
+      lines: {
+        type: "FeatureCollection",
+        features: data.lines.features.map(f => ({
+          type: "Feature", properties: f.properties, geometry: f.geometry,
+        })),
+      },
+      arrows: data.arrows,
+    };
+    state.routeFeatureCount = data.lines.features.length;
+    state.routeCache.delete(key);
+    state.routeCache.set(key, {
+      data: state.routeFullData,
+      staticData: state.routeStaticData,
+      count: state.routeFeatureCount,
+    });
+    while (state.routeCache.size > 4) {
+      state.routeCache.delete(state.routeCache.keys().next().value);
+    }
+    state.routeDisplayedPhase = "";
+    state.routeBuildPending = false;
+    hideRouteLoading();
+    updateRouteOverlay();
+  } catch (error) {
+    if (cancelled()) return;
+    console.error("Route generation failed", error);
+    state.routeBuildPending = false;
+    state.routeFullData = { lines: EMPTY_FEATURE_COLLECTION, arrows: EMPTY_FEATURE_COLLECTION };
+    state.routeStaticData = state.routeFullData;
+    state.routeFeatureCount = 0;
+    hideRouteLoading();
+    updateRouteOverlay();
+  }
+}
+
 function setRouteLayerVisibility() {
   if (!state.mapReady) return;
   const visibility = state.routesVisible ? "visible" : "none";
-  for (const id of [
-    "archive-uav-route-glow",
-    "archive-uav-route-casing",
-    "archive-uav-route-line",
-    "archive-uav-route-highlight",
-    "archive-uav-route-arrows",
-  ]) {
-    if (state.map.getLayer(id)) state.map.setLayoutProperty(id, "visibility", visibility);
+  if (state.appliedRouteVisibility !== visibility) {
+    for (const id of [
+      "archive-uav-route-glow", "archive-uav-route-casing",
+      "archive-uav-route-line", "archive-uav-route-highlight",
+      "archive-uav-route-arrows",
+    ]) {
+      if (state.map.getLayer(id)) state.map.setLayoutProperty(id, "visibility", visibility);
+    }
+    state.appliedRouteVisibility = visibility;
   }
   if (els.routeToggle) {
     els.routeToggle.classList.toggle("is-on", state.routesVisible);
@@ -1990,35 +2244,72 @@ function updateRouteOverlay(force = false) {
   const lineSource = state.map.getSource("archive-uav-routes");
   const arrowSource = state.map.getSource("archive-uav-route-arrows");
   if (!lineSource || !arrowSource) return;
-  const start = selectionStartMs();
-  const end = selectionEndMs();
-  const key = [
-    Math.round(start),
-    Math.round(end),
-    state.archive.reports?.length || 0,
-    state.archive.events?.length || 0,
-  ].join(":");
-  if (force || key !== state.routeSelectionKey || !state.routeFullData) {
+  setRouteLayerVisibility();
+  if (!state.routesVisible) return;
+
+  const key = currentRouteKey();
+  const changed = key !== state.routeSelectionKey;
+  if (changed) {
+    // Invalidate old jobs on selection change; never block the input callback.
+    const generation = ++state.routeGeneration;
     state.routeSelectionKey = key;
-    state.routeFullData = buildIllustrativeRoutes(start, end);
-    state.routeFeatureCount = state.routeFullData.lines.features.length;
+    state.routeFullData = null;
+    state.routeStaticData = null;
+    state.routeFeatureCount = 0;
     state.routeDisplayedPhase = "";
+    // Switching back to a previously selected time window is instantaneous.
+    const cached = state.routeCache.get(key);
+    if (cached) {
+      state.routeFullData = cached.data;
+      state.routeStaticData = cached.staticData;
+      state.routeFeatureCount = cached.count;
+      state.routeCache.delete(key);
+      state.routeCache.set(key, cached);
+      state.routeBuildPending = false;
+      hideRouteLoading();
+      updateRouteOverlay();
+      return;
+    }
+    state.routeBuildPending = true;
+    lineSource.setData(EMPTY_FEATURE_COLLECTION);
+    arrowSource.setData(EMPTY_FEATURE_COLLECTION);
+    showRouteLoading("正在计算当前时间范围内的示意路线…");
+    setRouteLayerVisibility();
+    buildRoutesCooperatively(selectionStartMs(), selectionEndMs(), key, generation);
+    return;
+  }
+  if (!state.routeFullData) {
+    if (state.exportRecording) return; // Never regenerate the route geometry during export.
+    // If a job was cancelled when the routes were hidden, restart only when
+    // visible again. Repeated animation frames never start duplicate jobs.
+    if (!state.routeBuildPending) {
+      const generation = ++state.routeGeneration;
+      state.routeBuildPending = true;
+      showRouteLoading("正在准备示意路线…");
+      buildRoutesCooperatively(selectionStartMs(), selectionEndMs(), key, generation);
+    }
+    return;
   }
   const animating = Boolean(state.timer || state.exportRecording);
-  const phase = animating ? "playing:" + Math.round(state.currentMs / 1000) : "complete";
-  if (state.routeDisplayedPhase !== phase) {
-    const displayed = animating
-      ? illustratedRoutesAtTime(state.routeFullData, state.currentMs)
-      : state.routeFullData;
-    lineSource.setData(displayed.lines);
-    arrowSource.setData(displayed.arrows);
-    state.routeDisplayedPhase = phase;
-  }
-  setRouteLayerVisibility();
+  const phase = animating ? "playing:" + Math.floor(state.currentMs / 1000) : "complete";
+  if (phase === state.routeDisplayedPhase) return;
+  const now = performance.now();
+  if (!force && animating && now - state.routeDrawAt < 140) return;
+  const displayed = animating
+    ? illustratedRoutesAtTime(state.routeFullData, state.currentMs)
+    : state.routeStaticData;
+  lineSource.setData(displayed.lines);
+  arrowSource.setData(displayed.arrows);
+  state.routeDisplayedPhase = phase;
+  state.routeDrawAt = now;
 }
 
 function installArchiveLayers() {
   if (!state.map?.isStyleLoaded()) return;
+  ++state.routeGeneration;
+  state.routeBuildPending = false;
+  state.appliedRouteVisibility = "";
+  state.routeDrawAt = 0;
   state.regionVisualStates.clear();
   state.placeVisualStates.clear();
   state.observedCountSignature = "";
@@ -2256,6 +2547,7 @@ function installArchiveLayers() {
 
   state.routeSelectionKey = "";
   state.routeFullData = null;
+  state.routeStaticData = null;
   state.routeDisplayedPhase = "";
 
   state.map.addSource("archive-places", { type: "geojson", data: preparePlacesGeoJson() });
@@ -2541,11 +2833,16 @@ function scheduleInteractiveRender() {
   });
 }
 
-function scheduleRouteRefresh(delayMs = 180, force = true) {
+function scheduleRouteRefresh(delayMs = 250) {
   if (state.routeUpdateTimer) clearTimeout(state.routeUpdateTimer);
+  // Cancel an obsolete route build immediately while the user is dragging.
+  if (state.routeBuildPending && currentRouteKey() !== state.routeSelectionKey) {
+    ++state.routeGeneration;
+    state.routeBuildPending = false;
+  }
   state.routeUpdateTimer = setTimeout(() => {
     state.routeUpdateTimer = null;
-    if (state.routesVisible) updateRouteOverlay(force);
+    if (state.routesVisible && !state.exportRecording) updateRouteOverlay();
   }, Math.max(0, delayMs));
 }
 
@@ -2574,8 +2871,13 @@ function wireControls() {
   if (els.routeToggle) {
     els.routeToggle.addEventListener("click", () => {
       state.routesVisible = !state.routesVisible;
+      if (!state.routesVisible) {
+        ++state.routeGeneration;
+        state.routeBuildPending = false;
+        hideRouteLoading();
+      }
       setRouteLayerVisibility();
-      if (state.routesVisible) updateRouteOverlay(true);
+      if (state.routesVisible) updateRouteOverlay();
     });
   }
   if (els.cleanViewButton) els.cleanViewButton.addEventListener("click", toggleCleanView);
@@ -2715,14 +3017,17 @@ function buildReportDots() {
 }
 
 function activeEvents() {
-  return (state.archive.events || []).filter(e => state.currentMs >= Date.parse(e.start) && state.currentMs <= Date.parse(e.end));
+  const ms = state.currentMs;
+  return [
+    ...(state.activeEventHours.get(archiveHour(ms)) || []),
+    ...state.longEvents,
+  ].filter(e => ms >= e._startMs && ms <= e._endMs);
 }
 
 function activeReports() {
-  const span = 45 * 60 * 1000;
-  return (state.archive.reports || []).filter(r =>
-    reportRepresentsLiveThreat(r) &&
-    Math.abs(state.currentMs - Date.parse(r.at)) <= span
+  const ms = state.currentMs;
+  return (state.activeReportHours.get(archiveHour(ms)) || []).filter(
+    r => Math.abs(ms - r._atMs) <= 45 * 60 * 1000
   );
 }
 
@@ -3028,9 +3333,13 @@ function togglePlayback() {
   const start = selectionStartMs(), end = selectionEndMs();
   if (state.currentMs >= end) state.currentMs = start;
   els.playButton.classList.add("is-playing"); els.playButton.textContent = "Ⅱ PAUSE";
+  let lastFrameAt = performance.now();
   state.timer = setInterval(() => {
+    const now = performance.now();
+    const elapsedSeconds = Math.min(0.4, Math.max(0, now - lastFrameAt) / 1000);
+    lastFrameAt = now;
     const minutesPerSecond = +els.speedSelect.value;
-    state.currentMs += minutesPerSecond * 60 * 1000 * 0.1;
+    state.currentMs += minutesPerSecond * 60 * 1000 * elapsedSeconds;
     if (state.currentMs >= end) { state.currentMs = end; stopPlayback(); }
     render();
   }, 100);
