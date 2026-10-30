@@ -1579,7 +1579,34 @@ function routeObservationNodes(startMs, endMs, threat, catalog) {
   return dedupeRouteObservations(raw);
 }
 
-function buildIllustrativeUavRoutes(startMs, endMs) {
+// Merge redundant terminal observations within an active regional wave.
+ // A separate city/wave remains eligible when it is geographically or
+ // temporally distinct; this is evidence de-duplication, never a route limit.
+function groupWaveTerminals(candidates) {
+  const groups = new Map();
+  const ordered = [...candidates].sort((a, b) => a.at - b.at);
+  for (const node of ordered) {
+    const neighbors = groups.get(node.region) || [];
+    const match = neighbors.find(group =>
+      Math.abs(node.at - group.at) <= 3 * 3600 * 1000 &&
+      haversineKm(node, group) <= (node.regionProxy || group.regionProxy ? 150 : 90)
+    );
+    if (match) {
+      const preference = p => (p.regionProxy ? -3 : 3) +
+        (isStrongObservationKind(p.kind) ? 2 : 0) +
+        Math.log2(1 + (p.observations || 0)) + (p.weight || 0) * .1;
+      if (preference(node) > preference(match)) {
+        neighbors[neighbors.indexOf(match)] = node;
+      }
+    } else {
+      neighbors.push(node);
+      groups.set(node.region, neighbors);
+    }
+  }
+  return [...groups.values()].flat();
+}
+
+async function buildIllustrativeUavRoutes(startMs, endMs, isCancelled = () => false) {
   const catalog = routePlaceCatalog();
   const litRegions = selectedWindowUavRegions(startMs, endMs);
   const nodes = routeObservationNodes(startMs, endMs, "uav", catalog);
@@ -1594,8 +1621,12 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
     );
   });
 
-  // No global cap on number of routes: inspect every supported terminal.
-  terminals = terminals.sort((a, b) => b.at - a.at || b.lat - a.lat || a.lon - b.lon);
+  // Restore the original north-to-south terminal ordering and all existing
+  // candidate scoring / border routing. Only repeated observations are grouped.
+  terminals = groupWaveTerminals(terminals).sort((a, b) => {
+    if (Math.abs(a.lat - b.lat) > 0.15) return b.lat - a.lat;
+    return a.lon - b.lon || a.at - b.at;
+  });
 
   const lineFeatures = [];
   const arrowFeatures = [];
@@ -1603,7 +1634,12 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
   const usedVisibleStarts = [];
   const consumedTerminalNodeKeys = new Set();
 
-  terminals.forEach((terminal, index) => {
+  for (let index = 0; index < terminals.length; index++) {
+    if (isCancelled()) return null;
+    // Yield even when routes fail, keeping clicks and map gestures responsive.
+    if (index % 2 === 0) await new Promise(resolve => setTimeout(resolve, 0));
+    if (isCancelled()) return null;
+    const terminal = terminals[index];
     // If this observation is already an upstream support for a longer
     // downstream route, do not draw a second independent border-origin route.
     if (consumedTerminalNodeKeys.has(terminal.nodeKey)) return;
@@ -1830,7 +1866,7 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
       },
       geometry: { type: "Point", coordinates: b },
     });
-  });
+  }
 
   return {
     lines: { type: "FeatureCollection", features: lineFeatures },
@@ -1895,8 +1931,9 @@ function buildIllustrativeMissileRoutes(startMs, endMs) {
   };
 }
 
-function buildIllustrativeRoutes(startMs, endMs) {
-  const uav = buildIllustrativeUavRoutes(startMs, endMs);
+async function buildIllustrativeRoutes(startMs, endMs, isCancelled = () => false) {
+  const uav = await buildIllustrativeUavRoutes(startMs, endMs, isCancelled);
+  if (!uav || isCancelled()) return null;
   const missile = buildIllustrativeMissileRoutes(startMs, endMs);
   return {
     lines: { type: "FeatureCollection", features: [...uav.lines.features, ...missile.lines.features] },
