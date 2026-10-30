@@ -1941,49 +1941,132 @@ async function buildIllustrativeRoutes(startMs, endMs, isCancelled = () => false
   };
 }
 
-// The geometry remains an inference, not an observed flight track. During
-// playback reveal each existing illustrative line according to its evidence
-// timestamps; paused/scrubbed views always show its complete geometry.
-function routeRevealProgress(feature, atMs) {
-  // Match the existing activeEvents / activeReports windows exactly.
-  // Never predict a future checkpoint or preserve routes after all alerts clear.
-  return (feature._timing || []).reduce((max, anchor) =>
-    atMs >= anchor.from && atMs <= anchor.to ? Math.max(max, anchor.progress) : max, 0);
+// Animated routes are *illustrations* of activity waves, not measured speed.
+// Static mode always uses the original complete candidate geometries.
+function routeWavePeriods(feature) {
+  if (feature._waves) return feature._waves;
+  const anchors = (feature._timing || []).filter(w =>
+    Number.isFinite(w.from) && Number.isFinite(w.to) && w.to > w.from
+  ).sort((a, b) => a.from - b.from);
+  const waves = [];
+  // Only merge contiguous alert/report activity. Disconnected periods are
+  // separate pulses, not a permanently visible line.
+  for (const anchor of anchors) {
+    let wave = waves[waves.length - 1];
+    if (!wave || anchor.from > wave.end + 5 * 60000) {
+      wave = { start: anchor.from, end: anchor.to, anchors: [] };
+      waves.push(wave);
+    }
+    wave.end = Math.max(wave.end, anchor.to);
+    wave.anchors.push(anchor);
+  }
+  for (const wave of waves) {
+    const duration = Math.max(1, wave.end - wave.start);
+    // The tail is a delayed version of the head. By the clear time the
+    // trailing edge reaches the end and the full pulse vanishes.
+    wave.tailLagMs = duration * .28;
+    const travelEnd = wave.end - wave.tailLagMs;
+    const points = [{ at: wave.start, progress: 0 }];
+    for (const a of wave.anchors) {
+      const at = Math.min(travelEnd, Math.max(wave.start,
+        a.from + (a.to - a.from) * .25));
+      points.push({ at, progress: a.progress });
+    }
+    points.push({ at: travelEnd, progress: 1 });
+    points.sort((a, b) => a.at - b.at || a.progress - b.progress);
+    // A later observation may occur at an earlier spatial checkpoint; never
+    // animate backwards. Keep time continuous even at identical timestamps.
+    let progress = 0;
+    for (const p of points) { progress = Math.max(progress, p.progress); p.progress = progress; }
+    wave.points = points;
+  }
+  feature._waves = waves;
+  return waves;
 }
 
-function clippedIllustrativeLine(feature, progress) {
-  if (progress <= 0) return null;
-  if (progress >= 1) return feature;
-  const points = feature.geometry.coordinates;
-  if (points.length < 2) return null;
-  let remaining = routeLengthKm(points) * progress;
-  const visible = [points[0]];
+function smoothWavePosition(points, ms) {
+  if (ms <= points[0].at) return 0;
   for (let i = 1; i < points.length; i++) {
     const a = points[i - 1], b = points[i];
-    const length = haversineKm({ lon: a[0], lat: a[1] }, { lon: b[0], lat: b[1] });
-    if (length <= 0) continue;
-    if (remaining >= length) {
-      visible.push(b);
-      remaining -= length;
-      if (remaining <= 1e-9) break;
-    } else {
-      const t = Math.max(0, remaining / length);
-      visible.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
-      break;
-    }
+    if (ms > b.at) continue;
+    if (b.at <= a.at) return b.progress;
+    const fraction = Math.max(0, Math.min(1, (ms - a.at) / (b.at - a.at)));
+    // Smootherstep transitions have continuous position and velocity at each
+    // reported waypoint, avoiding instantaneous growth between alerts.
+    const t = fraction * fraction * fraction * (fraction * (fraction * 6 - 15) + 10);
+    return a.progress + (b.progress - a.progress) * t;
   }
-  if (visible.length < 2) return null;
+  return points[points.length - 1].progress;
+}
+
+function activeRouteWave(feature, ms) {
+  for (const wave of routeWavePeriods(feature)) {
+    if (ms < wave.start || ms >= wave.end) continue;
+    const head = smoothWavePosition(wave.points, ms);
+    const tail = smoothWavePosition(wave.points, ms - wave.tailLagMs);
+    if (head > tail + .00001) return { tail, head };
+  }
+  return null;
+}
+
+function routeRevealProgress(feature, ms) {
+  return activeRouteWave(feature, ms)?.head || 0;
+}
+
+function routeLengthIndex(feature) {
+  if (feature._lengthIndex) return feature._lengthIndex;
+  const coords = feature.geometry.coordinates;
+  const lengths = [0];
+  for (let i = 1; i < coords.length; i++) {
+    const a = { lon: coords[i - 1][0], lat: coords[i - 1][1] };
+    const b = { lon: coords[i][0], lat: coords[i][1] };
+    lengths.push(lengths[i - 1] + haversineKm(a, b));
+  }
+  feature._lengthIndex = { lengths, total: lengths[lengths.length - 1] };
+  return feature._lengthIndex;
+}
+
+function clipRouteWave(feature, tail, head) {
+  if (head <= tail) return null;
+  const coords = feature.geometry.coordinates;
+  if (coords.length < 2) return null;
+  if (tail <= 0 && head >= 1) return feature;
+  const { lengths, total } = routeLengthIndex(feature);
+  if (total <= 0) return null;
+  const a = Math.max(0, tail) * total, b = Math.min(1, head) * total;
+  if (b <= a) return null;
+  const pointAt = distance => {
+    let low = 1, high = lengths.length - 1;
+    while (low < high) {
+      const mid = (low + high) >> 1;
+      if (lengths[mid] < distance) low = mid + 1;
+      else high = mid;
+    }
+    const index = low;
+    const size = lengths[index] - lengths[index - 1];
+    const t = size > 0 ? Math.max(0, Math.min(1, (distance - lengths[index - 1]) / size)) : 0;
+    return [
+      coords[index - 1][0] + (coords[index][0] - coords[index - 1][0]) * t,
+      coords[index - 1][1] + (coords[index][1] - coords[index - 1][1]) * t,
+    ];
+  };
+  const visible = [pointAt(a)];
+  for (let i = 1; i < lengths.length - 1; i++) {
+    if (lengths[i] > a && lengths[i] < b) visible.push(coords[i]);
+  }
+  visible.push(pointAt(b));
   return { ...feature, geometry: { type: "LineString", coordinates: visible } };
 }
 
 function illustratedRoutesAtTime(fullData, ms) {
   const lines = [], arrows = [];
   for (const feature of fullData.lines.features) {
-    const line = clippedIllustrativeLine(feature, routeRevealProgress(feature, ms));
+    const wave = activeRouteWave(feature, ms);
+    if (!wave) continue;
+    const line = clipRouteWave(feature, wave.tail, wave.head);
     if (!line) continue;
     lines.push(line);
     const coords = line.geometry.coordinates;
-    if (coords.length < 2) continue;
     const a = coords[coords.length - 2], b = coords[coords.length - 1];
     arrows.push({
       type: "Feature",
