@@ -29,7 +29,6 @@ const state = {
   previousActivePlaceIds: new Set(),
   previousReportRegionIds: new Set(),
   previousReportPlaceIds: new Set(),
-  previousRoutePlaceIds: new Set(),
   ukraineBorderCandidates: null,
   currentMs: 0,
   cumulativeMs: 0,
@@ -65,7 +64,7 @@ const els = {
   playButton: $("playButton"), scrubber: $("scrubber"), currentTimeLabel: $("currentTimeLabel"), speedSelect: $("speedSelect"),
   clockMoscow: $("clockMoscow"), clockKyiv: $("clockKyiv"), clockBeijing: $("clockBeijing"),
   routeToggle: $("routeToggle"), cleanViewButton: $("cleanViewButton"),
-  exportVideoButton: $("exportVideoButton"), videoDurationSelect: $("videoDurationSelect"),
+  exportVideoButton: $("exportVideoButton"),
   videoExportStatus: $("videoExportStatus"),
 };
 
@@ -315,13 +314,14 @@ function initMap() {
     zoom: 3.35,
     minZoom: 2,
     maxZoom: 13,
-    attributionControl: true,
+    attributionControl: false,
     cooperativeGestures: false,
     renderWorldCopies: false,
     preserveDrawingBuffer: true,
   });
 
   state.map.addControl(new MapLibre.NavigationControl({ showCompass: false }), "bottom-right");
+  state.map.addControl(new MapLibre.AttributionControl({ compact: true }), "bottom-left");
 
   const styleTimeout = window.setTimeout(() => {
     if (!state.mapReady && !state.baseStyleFallbackUsed) {
@@ -781,15 +781,15 @@ function routePreludeFromOrigin(origin, entry, mode) {
   return routeStaysInAllowedTerritory(coords, mode === "eastSouth") ? coords : [];
 }
 
-function selectedWindowUavRegions(startMs, endMs) {
+function selectedWindowUavRegions(startMs, endMs, threat = "uav") {
   const lit = new Set();
   for (const report of state.archive.reports || []) {
     const at = Date.parse(report.at);
-    if (at < startMs || at > endMs || !reportRepresentsLiveThreat(report)) continue;
+    if (threatClass(report) !== threat || at < startMs - 45 * 60 * 1000 || at > endMs + 45 * 60 * 1000 || !reportRepresentsLiveThreat(report)) continue;
     if (report.region) lit.add(report.region);
   }
   for (const event of state.archive.events || []) {
-    if (threatClass(event) !== "uav") continue;
+    if (threatClass(event) !== threat) continue;
     const start = Date.parse(event.start), end = Date.parse(event.end);
     if (end < startMs || start > endMs) continue;
     if (event.region) lit.add(event.region);
@@ -907,8 +907,8 @@ function routeCountWeight(record) {
   return 1 + Math.min(1.8, Math.log2(count + 1) * 0.42);
 }
 
-function routeObservationPoints(record, atMs, sourceType, catalog) {
-  if (threatClass(record) !== "uav" || !reportRepresentsLiveThreat(record)) return [];
+function routeObservationPoints(record, atMs, sourceType, catalog, threat = "uav") {
+  if (threatClass(record) !== threat || (sourceType !== "alert" && !reportRepresentsLiveThreat(record))) return [];
   const points = [];
   const seen = new Set();
   const recordKey = String(record.id || record.url || [record.region, record.at || record.start, record.place].join("|"));
@@ -916,6 +916,10 @@ function routeObservationPoints(record, atMs, sourceType, catalog) {
   const formal = record.signal_class === "formal_alert_signal" || sourceType === "alert";
   const observedCount = routeEvidenceCount(record);
   const countWeight = routeCountWeight(record);
+  const activeFrom = sourceType === "alert" ? Date.parse(record.start) : atMs - 45 * 60 * 1000;
+  const activeTo = sourceType === "alert" ? Date.parse(record.end) : atMs + 45 * 60 * 1000;
+  if (!Number.isFinite(activeFrom) || !Number.isFinite(activeTo) || activeTo < activeFrom) return [];
+  const windows = [{ from: activeFrom, to: activeTo }];
 
   const add = (candidate, fallbackName, precision, weight = 1) => {
     const resolved = candidate && Number.isFinite(+candidate.lon) && Number.isFinite(+candidate.lat)
@@ -958,13 +962,14 @@ function routeObservationPoints(record, atMs, sourceType, catalog) {
       recordKey,
       observedCount,
       weight: weight * countWeight,
+      windows: windows.map(w => ({ ...w })),
     });
   };
 
   // The route engine now resolves locations through the same city/municipality
   // catalog used to render the visible map dots. This removes the old state
   // where the map knew a point's coordinates but the route engine did not.
-  for (const p of (record.mentioned_places || []).slice(0, 8)) {
+  for (const p of (record.mentioned_places || [])) {
     add(p, p.label || p.name, p.type || "local", 1.0);
   }
   if (record.scope !== "region") {
@@ -998,6 +1003,7 @@ function routeObservationPoints(record, atMs, sourceType, catalog) {
         observedCount,
         weight: 0.42 * countWeight,
         regionProxy: true,
+        windows: windows.map(w => ({ ...w })),
       });
     }
   }
@@ -1244,6 +1250,7 @@ function dedupeRouteObservations(observations) {
       last.observedCount = Math.max(last.observedCount || 0, node.observedCount || 0) || null;
       last.at = Math.min(last.at, node.at);
       last.formal = last.formal || node.formal;
+      last.windows.push(...(node.windows || []));
       continue;
     }
     out.push({ ...node, observations: 1 });
@@ -1524,25 +1531,58 @@ function routeLengthKm(coords) {
   return total;
 }
 
+// An observation's position along a smoothed path; only records decide when
+// the visual line appears, never the assumed flight speed.
+function routePointProgress(coords, node) {
+  const total = routeLengthKm(coords);
+  if (!total || coords.length < 2) return 1;
+  let closest = Infinity, along = 0, travelled = 0;
+  for (let i = 1; i < coords.length; i++) {
+    const a = { lon: coords[i - 1][0], lat: coords[i - 1][1] };
+    const b = { lon: coords[i][0], lat: coords[i][1] };
+    const v = localVectorKm(a, b, node.lat), p = localVectorKm(a, node, node.lat);
+    const squared = v.x * v.x + v.y * v.y;
+    const t = squared ? Math.max(0, Math.min(1, (p.x * v.x + p.y * v.y) / squared)) : 0;
+    const d = (p.x - t * v.x) ** 2 + (p.y - t * v.y) ** 2;
+    const segmentKm = haversineKm(a, b);
+    if (d < closest) { closest = d; along = travelled + segmentKm * t; }
+    travelled += segmentKm;
+  }
+  return Math.max(0, Math.min(1, along / total));
+}
+
+function routeTimingForNodes(coords, nodes) {
+  const anchors = [];
+  let previous = 0;
+  for (let i = 0; i < nodes.length; i++) {
+    const point = nodes[i];
+    const progress = i === nodes.length - 1 ? 1 :
+      Math.max(previous, routePointProgress(coords, point));
+    previous = progress;
+    for (const w of point.windows || []) anchors.push({ from: w.from, to: w.to, progress });
+  }
+  return anchors;
+}
+
+function routeObservationNodes(startMs, endMs, threat, catalog) {
+  const raw = [], margin = 45 * 60 * 1000;
+  for (const r of state.archive.reports || []) {
+    const at = Date.parse(r.at);
+    if (at >= startMs - margin && at <= endMs + margin)
+      raw.push(...routeObservationPoints(r, at, "report", catalog, threat));
+  }
+  for (const e of state.archive.events || []) {
+    const start = Date.parse(e.start), end = Date.parse(e.end);
+    if (start <= endMs && end >= startMs)
+      raw.push(...routeObservationPoints(e, start, "alert", catalog, threat));
+  }
+  return dedupeRouteObservations(raw);
+}
+
 function buildIllustrativeUavRoutes(startMs, endMs) {
   const catalog = routePlaceCatalog();
   const litRegions = selectedWindowUavRegions(startMs, endMs);
-  const raw = [];
-
-  for (const report of state.archive.reports || []) {
-    const at = Date.parse(report.at);
-    if (at >= startMs && at <= endMs) {
-      raw.push(...routeObservationPoints(report, at, "report", catalog));
-    }
-  }
-  for (const event of state.archive.events || []) {
-    const start = Date.parse(event.start);
-    const end = Date.parse(event.end);
-    if (end < startMs || start > endMs) continue;
-    raw.push(...routeObservationPoints(event, Math.max(start, startMs), "alert", catalog));
-  }
-
-  const nodes = dedupeRouteObservations(raw);
+  const nodes = routeObservationNodes(startMs, endMs, "uav", catalog);
   let terminals = nodes.filter((node, idx) => {
     if (isStrongObservationKind(node.kind) || node.precision === "region-proxy") return true;
     return !nodes.some((other, j) =>
@@ -1554,12 +1594,8 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
     );
   });
 
-  terminals = terminals
-    .sort((a, b) => {
-      if (Math.abs(a.lat - b.lat) > 0.15) return b.lat - a.lat;
-      return a.lon - b.lon || a.at - b.at;
-    })
-    .slice(0, 140);
+  // No global cap on number of routes: inspect every supported terminal.
+  terminals = terminals.sort((a, b) => b.at - a.at || b.lat - a.lat || a.lon - b.lon);
 
   const lineFeatures = [];
   const arrowFeatures = [];
@@ -1759,6 +1795,7 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
       earliest_at: new Date(chosen.chain[0].at).toISOString(),
       latest_at: new Date(terminal.at).toISOString(),
       illustrative: true,
+      threat: "uav",
     };
 
     // Northern routes start exactly at the international border crossing.
@@ -1780,6 +1817,7 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
       properties: props,
       geometry: { type: "LineString", coordinates: displayCoords },
     };
+    feature._timing = routeTimingForNodes(displayCoords, chosen.chain);
     lineFeatures.push(feature);
 
     const a = displayCoords[displayCoords.length - 2];
@@ -1794,17 +1832,75 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
     });
   });
 
-  const evidenceStates = nodes.map(node => ({
-    placeKey: node.placeKey,
-    nodeKey: node.nodeKey,
-    linked: linkedNodeKeys.has(node.nodeKey),
-    formal: node.formal,
-  }));
-
   return {
     lines: { type: "FeatureCollection", features: lineFeatures },
     arrows: { type: "FeatureCollection", features: arrowFeatures },
-    evidenceStates,
+  };
+}
+
+// Unlike the UAV border-entry hypothesis, missiles are linked only between
+// two independently reported checkpoints; no unobserved launch site is added.
+// These tentative links are NOT confirmed individual missile flight tracks.
+function buildIllustrativeMissileRoutes(startMs, endMs) {
+  const catalog = routePlaceCatalog();
+  const nodes = routeObservationNodes(startMs, endMs, "missile", catalog)
+    .sort((a, b) => a.at - b.at);
+  const lines = [], arrows = [];
+  for (let i = 0; i < nodes.length; i++) {
+    const terminal = nodes[i];
+    let preceding = null, bestScore = Infinity;
+    for (let j = i - 1; j >= 0; j--) {
+      const source = nodes[j];
+      const minutes = (terminal.at - source.at) / 60000;
+      if (minutes > 180) break;
+      if (minutes < 2 || source.recordKey === terminal.recordKey) continue;
+      const km = haversineKm(source, terminal);
+      if (km < 20 || km > 1100 || km / (minutes / 60) > 2600) continue;
+      const score = minutes * 1.3 + km * 0.24 + (source.regionProxy ? 80 : 0);
+      if (score < bestScore) { bestScore = score; preceding = source; }
+    }
+    if (!preceding) continue; // A single warning cannot establish a route.
+    const coords = smoothInterpolatingRoute([preceding, terminal], 10);
+    if (coords.length < 2) continue;
+    const props = {
+      route_id: "missile-observation-" + i,
+      threat: "missile",
+      region: terminal.region,
+      target: terminal.place,
+      confidence: (preceding.regionProxy || terminal.regionProxy) ? 0.25 : 0.4,
+      route_weight: 1,
+      illustrative: true,
+      earliest_at: new Date(preceding.at).toISOString(),
+      latest_at: new Date(terminal.at).toISOString(),
+    };
+    const line = {
+      type: "Feature", properties: props,
+      geometry: { type: "LineString", coordinates: coords },
+    };
+    line._timing = routeTimingForNodes(coords, [preceding, terminal]);
+    lines.push(line);
+    const a = coords[coords.length - 2], b = coords[coords.length - 1];
+    arrows.push({
+      type: "Feature",
+      properties: {
+        ...props,
+        bearing: bearingDeg({ lon: a[0], lat: a[1] }, { lon: b[0], lat: b[1] }),
+      },
+      geometry: { type: "Point", coordinates: b },
+    });
+  }
+  return {
+    lines: { type: "FeatureCollection", features: lines },
+    arrows: { type: "FeatureCollection", features: arrows },
+  };
+}
+
+function buildIllustrativeRoutes(startMs, endMs) {
+  const uav = buildIllustrativeUavRoutes(startMs, endMs);
+  const missile = buildIllustrativeMissileRoutes(startMs, endMs);
+  return {
+    lines: { type: "FeatureCollection", features: [...uav.lines.features, ...missile.lines.features] },
+    arrows: { type: "FeatureCollection", features: [...uav.arrows.features, ...missile.arrows.features] },
   };
 }
 
@@ -1812,14 +1908,10 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
 // playback reveal each existing illustrative line according to its evidence
 // timestamps; paused/scrubbed views always show its complete geometry.
 function routeRevealProgress(feature, atMs) {
-  const first = Date.parse(feature.properties.earliest_at);
-  const last = Date.parse(feature.properties.latest_at);
-  if (!Number.isFinite(first) || !Number.isFinite(last)) return 1;
-  const windowLength = Math.max(1, selectionEndMs() - selectionStartMs());
-  const leadMs = Math.min(60 * 60 * 1000, windowLength / 6);
-  const beginning = last > first ? first : Math.max(selectionStartMs(), last - leadMs);
-  if (last <= beginning) return atMs >= last ? 1 : 0;
-  return Math.max(0, Math.min(1, (atMs - beginning) / (last - beginning)));
+  // Match the existing activeEvents / activeReports windows exactly.
+  // Never predict a future checkpoint or preserve routes after all alerts clear.
+  return (feature._timing || []).reduce((max, anchor) =>
+    atMs >= anchor.from && atMs <= anchor.to ? Math.max(max, anchor.progress) : max, 0);
 }
 
 function clippedIllustrativeLine(feature, progress) {
@@ -1880,7 +1972,6 @@ function setRouteLayerVisibility() {
     "archive-uav-route-line",
     "archive-uav-route-highlight",
     "archive-uav-route-arrows",
-    "archive-place-route-unlinked",
   ]) {
     if (state.map.getLayer(id)) state.map.setLayoutProperty(id, "visibility", visibility);
   }
@@ -1889,41 +1980,8 @@ function setRouteLayerVisibility() {
     els.routeToggle.setAttribute("aria-pressed", String(state.routesVisible));
     const label = els.routeToggle.querySelector(".route-toggle-label");
     if (label) {
-      label.textContent = "示意无人机路线 " + (state.routesVisible ? "ON" : "OFF") + " · " + state.routeFeatureCount;
+      label.textContent = "示意无人机 / 导弹路线 " + (state.routesVisible ? "ON" : "OFF") + " · " + state.routeFeatureCount;
     }
-  }
-}
-
-function applyRouteEvidenceStates(evidenceStates) {
-  if (!state.mapReady || !state.map.getSource("archive-places")) return;
-  for (const id of state.previousRoutePlaceIds) {
-    try {
-      state.map.setFeatureState(
-        { source: "archive-places", id },
-        { routeLinked: false, routeUnlinked: false },
-      );
-    } catch (_) {}
-  }
-  state.previousRoutePlaceIds.clear();
-
-  const byPlace = new Map();
-  for (const evidence of evidenceStates || []) {
-    if (!evidence.placeKey) continue;
-    const current = byPlace.get(evidence.placeKey) || { linked: false };
-    current.linked = current.linked || Boolean(evidence.linked);
-    byPlace.set(evidence.placeKey, current);
-  }
-
-  for (const [placeKey, status] of byPlace) {
-    const id = state.placeFeatureIds.get(placeKey);
-    if (id == null) continue;
-    try {
-      state.map.setFeatureState(
-        { source: "archive-places", id },
-        status.linked ? { routeLinked: true, routeUnlinked: false } : { routeLinked: false, routeUnlinked: true },
-      );
-      state.previousRoutePlaceIds.add(id);
-    } catch (_) {}
   }
 }
 
@@ -1942,10 +2000,9 @@ function updateRouteOverlay(force = false) {
   ].join(":");
   if (force || key !== state.routeSelectionKey || !state.routeFullData) {
     state.routeSelectionKey = key;
-    state.routeFullData = buildIllustrativeUavRoutes(start, end);
+    state.routeFullData = buildIllustrativeRoutes(start, end);
     state.routeFeatureCount = state.routeFullData.lines.features.length;
     state.routeDisplayedPhase = "";
-    applyRouteEvidenceStates(state.routeFullData.evidenceStates);
   }
   const animating = Boolean(state.timer || state.exportRecording);
   const phase = animating ? "playing:" + Math.round(state.currentMs / 1000) : "complete";
@@ -1967,7 +2024,7 @@ function installArchiveLayers() {
   state.observedCountSignature = "";
 
   for (const id of [
-    "archive-observed-count-label", "archive-place-label", "archive-place-dot", "archive-place-route-unlinked", "archive-place-glow",
+    "archive-observed-count-label", "archive-place-label", "archive-place-dot", "archive-place-glow",
     "archive-uav-route-arrows", "archive-uav-route-highlight", "archive-uav-route-line",
     "archive-uav-route-casing", "archive-uav-route-glow",
     "archive-russia-border-main", "archive-russia-border-casing", "archive-russia-border-glow",
@@ -2102,7 +2159,7 @@ function installArchiveLayers() {
       "visibility": state.routesVisible ? "visible" : "none",
     },
     paint: {
-      "line-color": "#ff7218",
+      "line-color": ["case", ["==", ["get", "threat"], "missile"], "#ff355d", "#ff7218"],
       "line-width": ["interpolate", ["linear"], ["zoom"],
         3, ["*", 6.8, ["coalesce", ["get", "route_weight"], 1]],
         7, ["*", 9.5, ["coalesce", ["get", "route_weight"], 1]],
@@ -2123,7 +2180,7 @@ function installArchiveLayers() {
       "visibility": state.routesVisible ? "visible" : "none",
     },
     paint: {
-      "line-color": "#6f2c08",
+      "line-color": ["case", ["==", ["get", "threat"], "missile"], "#581b39", "#6f2c08"],
       "line-width": ["interpolate", ["linear"], ["zoom"],
         3, ["*", 3.5, ["coalesce", ["get", "route_weight"], 1]],
         7, ["*", 4.5, ["coalesce", ["get", "route_weight"], 1]],
@@ -2143,7 +2200,7 @@ function installArchiveLayers() {
       "visibility": state.routesVisible ? "visible" : "none",
     },
     paint: {
-      "line-color": "#ff8b1f",
+      "line-color": ["case", ["==", ["get", "threat"], "missile"], "#ff4a73", "#ff8b1f"],
       "line-width": ["interpolate", ["linear"], ["zoom"],
         3, ["*", 1.35, ["coalesce", ["get", "route_weight"], 1]],
         7, ["*", 1.85, ["coalesce", ["get", "route_weight"], 1]],
@@ -2164,7 +2221,7 @@ function installArchiveLayers() {
       "visibility": state.routesVisible ? "visible" : "none",
     },
     paint: {
-      "line-color": "#ffc263",
+      "line-color": ["case", ["==", ["get", "threat"], "missile"], "#ffb3c9", "#ffc263"],
       "line-width": ["interpolate", ["linear"], ["zoom"],
         3, ["*", 0.35, ["coalesce", ["get", "route_weight"], 1]],
         7, ["*", 0.55, ["coalesce", ["get", "route_weight"], 1]],
@@ -2190,8 +2247,8 @@ function installArchiveLayers() {
       "text-ignore-placement": true,
     },
     paint: {
-      "text-color": "#ff9a2f",
-      "text-halo-color": "#5e2608",
+      "text-color": ["case", ["==", ["get", "threat"], "missile"], "#ff537c", "#ff9a2f"],
+      "text-halo-color": ["case", ["==", ["get", "threat"], "missile"], "#541a32", "#5e2608"],
       "text-halo-width": 1.1,
       "text-opacity": ["interpolate", ["linear"], ["get", "confidence"], 0.3, 0.55, 1, 1],
     },
@@ -2200,7 +2257,6 @@ function installArchiveLayers() {
   state.routeSelectionKey = "";
   state.routeFullData = null;
   state.routeDisplayedPhase = "";
-  state.previousRoutePlaceIds.clear();
 
   state.map.addSource("archive-places", { type: "geojson", data: preparePlacesGeoJson() });
   state.map.addLayer({
@@ -2225,49 +2281,6 @@ function installArchiveLayers() {
       "circle-blur": 0.7,
     },
   });
-  state.map.addLayer({
-    id: "archive-place-route-unlinked",
-    type: "circle",
-    source: "archive-places",
-    layout: {
-      "visibility": state.routesVisible ? "visible" : "none",
-    },
-    paint: {
-      "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 5.6, 7, 8.4, 11, 11.5],
-      "circle-color": ["case",
-        ["boolean", ["feature-state", "active"], false], "#39d8ff",
-        ["boolean", ["feature-state", "report"], false], "#ffb347",
-        "#7893a1"
-      ],
-      "circle-opacity": ["case",
-        ["all",
-          ["boolean", ["feature-state", "routeUnlinked"], false],
-          ["any",
-            ["boolean", ["feature-state", "active"], false],
-            ["boolean", ["feature-state", "report"], false]
-          ]
-        ], 0.055,
-        0
-      ],
-      "circle-stroke-color": ["case",
-        ["boolean", ["feature-state", "active"], false], "#8ceaff",
-        ["boolean", ["feature-state", "report"], false], "#ffd17c",
-        "#91a9b6"
-      ],
-      "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 3, 1.0, 7, 1.35, 11, 1.7],
-      "circle-stroke-opacity": ["case",
-        ["all",
-          ["boolean", ["feature-state", "routeUnlinked"], false],
-          ["any",
-            ["boolean", ["feature-state", "active"], false],
-            ["boolean", ["feature-state", "report"], false]
-          ]
-        ], 0.88,
-        0
-      ],
-    },
-  });
-
   state.map.addLayer({
     id: "archive-place-dot",
     type: "circle",
@@ -2463,7 +2476,8 @@ async function exportTimelineVideo() {
   try {
     if (!previous.clean) applyCleanView(true);
     await waitForMapRender();
-    const durationSeconds = Number(els.videoDurationSelect?.value || 60);
+    const minutesPerSecond = Number(els.speedSelect.value);
+    const durationSeconds = (end - start) / (minutesPerSecond * 60 * 1000);
     const result = await window.DeepstrikeVideoExporter.record({
       map: state.map,
       start,

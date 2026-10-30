@@ -65,7 +65,7 @@
     ctx.font = "15px system-ui, sans-serif";
     ctx.fillStyle = "#90acba";
     ctx.fillText(
-      routesVisible ? "Illustrative UAV routes; not verified flight tracks" : "Historical public alert records",
+      routesVisible ? "Illustrative UAV / missile routes; not verified flight tracks" : "Historical public alert records",
       30, h - 25
     );
     ctx.textAlign = "right";
@@ -86,7 +86,7 @@
     if (!map?.getCanvas || typeof HTMLCanvasElement.prototype.captureStream !== "function") {
       throw new Error("当前浏览器无法录制 Canvas 视频，请使用新版 Chrome 或 Edge。");
     }
-    if (![30, 60, 120].includes(durationSeconds)) throw new Error("不支持的视频时长。");
+    if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) throw new Error("时间范围或播放速度无效。");
     const mimeType = chooseMimeType();
     const output = document.createElement("canvas");
     output.width = WIDTH;
