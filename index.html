@@ -23,6 +23,17 @@
       </div>
       <div id="videoExportStatus" class="video-export-status" role="status" aria-live="polite" hidden></div>
       <div class="map-grid" aria-hidden="true"></div>
+      <!-- Visual branding is part of the clean map; video-export.js draws
+           the same layout directly onto each encoded frame. -->
+      <div class="map-branding" aria-hidden="true">
+        <img class="brand-watermark" src="assets/kalyna-osint-logo.avif" alt="">
+        <div class="brand-meta">
+          <div class="brand-title">Deep Strike Activity Map</div>
+          <div class="brand-time">Kyiv time: <span id="brandKyivTime">—</span></div>
+          <div class="brand-time">Beijing time: <span id="brandBeijingTime">—</span></div>
+        </div>
+        <img class="brand-corner-logo" src="assets/kalyna-osint-logo.avif" alt="">
+      </div>
 
       <header class="hud-header">
         <div>
@@ -99,6 +110,7 @@
           <option value="30" selected>30 min/s</option>
           <option value="60">60 min/s</option>
           <option value="180">180 min/s</option>
+          <option value="288">288 min/s</option>
         </select>
       </div>
 

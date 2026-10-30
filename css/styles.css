@@ -447,3 +447,117 @@ body.clean-map-view .maplibregl-control-container {
 }
 @keyframes route-load-spin { to { transform: rotate(360deg); } }
 body.clean-map-view .route-loading { background: rgba(3,9,16,.5); }
+
+
+/* Shared presentation composition: the canvas video recorder uses the same
+   title, date format, logo placement and watermark proportions. */
+.map-branding {
+  display: none;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 620;
+  isolation: isolate;
+  font-family: "Courier New", ui-monospace, SFMono-Regular, monospace;
+}
+.brand-meta {
+  position: absolute;
+  top: max(3.1vh, 22px);
+  left: max(2vw, 18px);
+  max-width: calc(100% - 195px);
+  color: #fff;
+}
+.brand-title {
+  display: table;
+  padding: .25em .45em .20em;
+  margin-bottom: .38em;
+  background: rgba(239, 137, 195, .96);
+  color: #130c17;
+  font: 800 clamp(16px, 2.05vw, 39px)/1.14 "Courier New", ui-monospace, monospace;
+  letter-spacing: -.035em;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+.brand-time {
+  margin-top: .2em;
+  font: 700 clamp(13px, 1.35vw, 27px)/1.27 "Courier New", ui-monospace, monospace;
+  letter-spacing: .01em;
+  color: #f5f8ff;
+  text-shadow: 0 2px 5px #05070b, 0 0 12px #000, 1px 1px #03060c;
+  white-space: nowrap;
+}
+.brand-corner-logo {
+  position: absolute;
+  top: max(2.8vh, 18px);
+  right: max(1.9vw, 16px);
+  width: clamp(78px, 8.2vw, 158px);
+  height: auto;
+  filter: drop-shadow(0 2px 7px rgba(0, 0, 0, .7));
+}
+.brand-watermark {
+  position: absolute;
+  width: min(36vw, 560px);
+  height: auto;
+  max-height: 60%;
+  object-fit: contain;
+  left: 50%;
+  top: 52%;
+  transform: translate(-50%, -50%);
+  opacity: .065;
+  user-select: none;
+}
+body.clean-map-view .map-branding { display: block; }
+@media (max-width: 740px) {
+  .brand-meta {
+    top: max(18px, env(safe-area-inset-top));
+    left: 14px;
+    max-width: calc(100% - 124px);
+  }
+  .brand-title { font-size: clamp(12px, 3vw, 19px); white-space: normal; }
+  .brand-time { font-size: clamp(11px, 2.3vw, 15px); }
+  .brand-corner-logo { width: clamp(70px, 15vw, 100px); right: 12px; top: 16px; }
+  .brand-watermark { width: min(54vw, 340px); }
+}
+@media (max-width: 390px) {
+  .brand-meta { max-width: calc(100% - 100px); }
+  .brand-title { font-size: 12px; }
+  .brand-time { font-size: 10px; }
+  .brand-corner-logo { width: 70px; }
+}
+
+
+/* Subtle identifying mark in the ordinary map, while all text/controls stay
+   in their existing positions. The presentation mode enlarges the same mark. */
+.map-branding { display: block; }
+.brand-meta { display: none; }
+.brand-corner-logo {
+  top: max(12px, env(safe-area-inset-top));
+  width: clamp(64px, 6vw, 104px);
+}
+.brand-watermark {
+  width: min(27vw, 420px);
+  opacity: .045;
+}
+body:not(.clean-map-view) .hud-header {
+  right: calc(25px + clamp(64px, 6vw, 104px));
+}
+body.clean-map-view .brand-meta { display: block; }
+body.clean-map-view .brand-corner-logo {
+  top: max(2.8vh, 18px);
+  width: clamp(78px, 8.2vw, 158px);
+}
+body.clean-map-view .brand-watermark {
+  width: min(36vw, 560px);
+  opacity: .065;
+}
+@media (max-width: 740px) {
+  body:not(.clean-map-view) .hud-header { right: 86px; }
+  .brand-corner-logo { width: 62px; right: 10px; top: 12px; }
+  .brand-watermark { width: min(45vw, 260px); }
+  body.clean-map-view .brand-corner-logo {
+    width: clamp(70px, 15vw, 100px);
+    right: 12px;
+    top: 16px;
+  }
+  body.clean-map-view .brand-watermark { width: min(54vw, 340px); }
+}
