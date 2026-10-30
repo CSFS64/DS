@@ -14,12 +14,13 @@
   <main class="app-shell">
     <section class="map-panel">
       <div id="map" aria-label="历史无人机与导弹活动地图"></div>
+      <div id="videoExportStatus" class="video-export-status" role="status" aria-live="polite" hidden></div>
       <div class="map-grid" aria-hidden="true"></div>
 
       <header class="hud-header">
         <div>
           <h1>DEEPSTRIKE / ALERT ARCHIVE</h1>
-          <div id="dataStatus" class="hud-sub">LOADING ARCHIVE…</div>
+          <div id="dataStatus" class="hud-sub" hidden aria-hidden="true">LOADING ARCHIVE…</div>
         </div>
         <div id="archiveLamp" class="archive-lamp" title="当前回放时刻存在活动或警报"></div>
       </header>
@@ -35,11 +36,17 @@
         <button id="routeToggle" class="route-toggle is-on" type="button" aria-pressed="true">
           <i class="legend-route"></i><span class="route-toggle-label">示意无人机路线 ON · 0</span>
         </button>
-        <div class="export-controls" aria-label="地图纯画面与图片导出">
+        <div class="export-controls" aria-label="地图纯画面与视频导出">
           <button id="cleanViewButton" class="export-button" type="button" aria-pressed="false">CLEAN VIEW</button>
-          <button id="exportPngButton" class="export-button export-primary" type="button">EXPORT PNG</button>
+          <select id="videoDurationSelect" class="export-duration" aria-label="导出视频长度" title="完整时间窗压缩到选定的视频长度">
+            <option value="30">30 SEC</option>
+            <option value="60" selected>60 SEC</option>
+            <option value="120">120 SEC</option>
+          </select>
+          <button id="exportVideoButton" class="export-button export-primary" type="button">EXPORT VIDEO</button>
         </div>
-        <small class="legend-note">可视化路线从进入俄罗斯区域几何的边界点开始，此后只在俄罗斯区域内绘制；候选线路优先穿过所选时间窗内有无人机活动的州，并尽量减少夹在相邻亮州之间的未亮州，同时奖励在亮州内较长的穿越距离。只有州级信息时仍使用低置信度州内代理点。路线和起点均为示意推断，不代表真实发射点或单机连续航迹。</small>
+
+
       </div>
 
       <aside id="detailPanel" class="detail-panel" hidden>
@@ -103,6 +110,7 @@
   </main>
 
   <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
+  <script src="js/video-export.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
