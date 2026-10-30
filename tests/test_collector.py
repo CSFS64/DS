@@ -1039,12 +1039,9 @@ class CollectorTests(unittest.TestCase):
             }],
         }
         out = revalidate_archive_reports(data)
-        self.assertEqual(len(out['reports']), 1)
-        report = out['reports'][0]
-        self.assertEqual(report['activity_kind'], 'historical_summary')
-        self.assertEqual(report['signal_class'], 'uav_activity_signal')
-        self.assertEqual(report['count_type'], 'historical_summary')
-        self.assertEqual(out['coverage']['reports_revalidated_reclassified'], 1)
+        self.assertEqual(out['reports'], [])
+        self.assertEqual(out['coverage']['reports_revalidated_removed'], 1)
+        self.assertEqual(out['coverage']['reports_revalidated_reclassified'], 0)
 
     def test_v26_ulyanovsk_aftermath_followups_are_historical(self):
         self.assertEqual(
@@ -1099,9 +1096,9 @@ class CollectorTests(unittest.TestCase):
             }],
         }
         out = revalidate_archive_reports(data)
-        self.assertEqual(out['reports'][0]['activity_kind'], 'historical_summary')
-        self.assertEqual(out['reports'][0]['count_type'], 'historical_summary')
-        self.assertEqual(out['coverage']['reports_revalidated_reclassified'], 1)
+        self.assertEqual(out['reports'], [])
+        self.assertEqual(out['coverage']['reports_revalidated_removed'], 1)
+        self.assertEqual(out['coverage']['reports_revalidated_reclassified'], 0)
 
     def test_v16_cached_mtproto_peer_still_works_during_resolve_floodwait(self):
         class FakeClient:
