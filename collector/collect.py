@@ -294,6 +294,9 @@ def is_historical_aggregate(text: str) -> bool:
     finished intervals, or multi-region totals; keep live regional warnings.
     """
     n = normalize(text)
+    # normalize() removes punctuation, including ':' and '.', so use the
+    # unmodified lower-cased text for explicit time-range recognition.
+    raw = str(text).lower().replace("ё", "е")
     if not re.search(r"\b(?:бпла|беспилотн\w*|дрон\w*|ракет\w*)\b", n):
         return False
     completed = bool(re.search(
@@ -306,12 +309,15 @@ def is_historical_aggregate(text: str) -> bool:
         or re.search(r"\b(?:за|в\s+течение)\s+(?:(?:последн\w*|прошедш\w*|минувш\w*)\s+)?"
                      r"(?:ноч\w*|сут\w*|дн\w*|вечер\w*|час\w*)\b", n)
         or re.search(r"\bпо\s+итогам\b", n)
-        or re.search(r"\b(?:в\s+период\s+с|за\s+период\s+с)\s*\d{1,2}[.:]\d{2}\b", n)
+        or re.search(r"\b(?:в\s+период\s+с|за\s+период\s+с)\s*\d{1,2}[.:]\d{2}\b", raw)
         or re.search(r"\bс\s+\d{1,2}[.:]\d{2}(?:\s*мск)?\b.{0,105}"
-                     r"\bдо\s+\d{1,2}[.:]\d{2}\b", n)
+                     r"\bдо\s+\d{1,2}[.:]\d{2}\b", raw)
         or re.search(r"\b(?:с\s+начала|по\s+состоянию\s+на)\b.{0,90}"
                      r"\b(?:сут\w*|дн\w*|ноч\w*|час\w*)\b", n)
     )
+    # Explicit day/night totals are historical even when a sentence
+    # contains an operational word such as "обнаружены". Do not infer
+    # moment-by-moment activity from the publication timestamp.
     if retrospective_period and completed:
         return True
 
