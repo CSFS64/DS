@@ -227,6 +227,8 @@ def has_missile_reference(text: str) -> bool:
 
 
 def missile_activity_kind(text: str) -> str | None:
+    if is_historical_aggregate(text):
+        return "historical_summary"
     formal = missile_text_kind(text)
     if formal == "start":
         return "alert_start_signal"
@@ -283,11 +285,121 @@ def has_uav_reference(text: str) -> bool:
     return any(p.search(n) for p in UAV_REFERENCE_PATTERNS) or "опасное небо" in n
 
 
+def is_historical_aggregate(text: str) -> bool:
+    """Retrospective air-defense tallies are NOT observations at publication time.
+
+    Whole-post screening must happen before splitting messages into numeric
+    sentences: otherwise a morning MoD digest becomes simultaneous live alerts
+    in every named oblast. Restrict this to completed operations, explicit
+    finished intervals, or multi-region totals; keep live regional warnings.
+    """
+    n = normalize(text)
+    # normalize() removes punctuation, including ':' and '.', so use the
+    # unmodified lower-cased text for explicit time-range recognition.
+    raw = str(text).lower().replace("ё", "е")
+    if not re.search(r"\b(?:бпла|беспилотн\w*|дрон\w*|ракет\w*)\b", n):
+        return False
+    completed = bool(re.search(
+        r"\b(?:уничтож\w*|сбит\w*|сбил\w*|подав\w*|перехва\w*|"
+        r"нейтрализ\w*|обезвреж\w*|отраж\w*|обнаруж\w*|"
+        r"зафиксир\w*|атаков\w*|поражен\w*)\b", n
+    ))
+    retrospective_period = bool(
+        re.search(r"\b(?:минувш\w*|прошедш\w*|вчерашн\w*)\b", n)
+        or re.search(r"\b(?:за|в\s+течение)\s+(?:(?:последн\w*|прошедш\w*|минувш\w*)\s+)?"
+                     r"(?:ноч\w*|сут\w*|дн\w*|вечер\w*|час\w*)\b", n)
+        or re.search(r"\bпо\s+итогам\b", n)
+        or re.search(r"\b(?:в\s+период\s+с|за\s+период\s+с)\s*\d{1,2}[.:]\d{2}\b", raw)
+        or re.search(r"\bс\s+\d{1,2}[.:]\d{2}(?:\s*мск)?\b.{0,105}"
+                     r"\bдо\s+\d{1,2}[.:]\d{2}\b", raw)
+        or re.search(r"\b(?:с\s+начала|по\s+состоянию\s+на)\b.{0,90}"
+                     r"\b(?:сут\w*|дн\w*|ноч\w*|час\w*)\b", n)
+    )
+    # Explicit day/night totals are historical even when a sentence
+    # contains an operational word such as "обнаружены". Do not infer
+    # moment-by-moment activity from the publication timestamp.
+    if retrospective_period and completed:
+        return True
+
+    # Ministry reports can say "уничтожены 159 БПЛА над территориями
+    # Брянской, Курской ... областей" without saying "за ночь" in the text.
+    # That is a consolidated air-defense tally, not a fresh location report.
+    multi_region = bool(
+        re.search(r"\b(?:над\s+территориями|над\s+регионами|"
+                  r"в\s+нескольких\s+регионах|в\s+различных\s+регионах)\b", n)
+        and (re.search(r",[^.!?\n]{0,140}\b(?:област\w*|кра\w*|республик\w*)\b", n)
+             or re.search(r"\b(?:област\w*|кра\w*|республик\w*)\b", n))
+    )
+    count_in_post = bool(re.search(
+        r"\b\d{2,5}\s*(?:бпла|беспилотн\w*|дрон\w*|ракет\w*)\b", n
+    ))
+    return bool(completed and multi_region and count_in_post)
+
+
+def is_aggregate_archive_record(record: dict[str, Any]) -> bool:
+    """Reject stale summaries, including old wrongly labelled live counts."""
+    if record.get("activity_kind") == "historical_summary" or \
+            record.get("count_type") == "historical_summary":
+        return True
+    text = str(record.get("text") or "")
+    if is_historical_aggregate(text):
+        return True
+    # Legacy number-extraction rows preserved only one sentence of a much
+    # longer digest. These counts are completed interceptions, not the count
+    # of objects currently moving over a city. Never apply this rule to
+    # detected_reported / incoming_reported live observations.
+    try:
+        count = int(record.get("count") or 0)
+    except (TypeError, ValueError):
+        count = 0
+    completed_tally = record.get("count_type") in {
+        "destroyed_or_suppressed", "detected_and_destroyed", "shot_down",
+        "destroyed", "intercepted",
+    }
+    return count >= 100 and completed_tally
+
+
+def purge_archive_aggregate_summaries(data: dict[str, Any]) -> dict[str, Any]:
+    """Physically remove recap contamination from the published archive JSON.
+
+    This runs after every archive merge so previous bad rows cannot be
+    resurrected by the high-quality-transport preservation logic.
+    """
+    old_reports = data.get("reports", []) or []
+    old_events = data.get("events", []) or []
+    data["reports"] = [r for r in old_reports if not is_aggregate_archive_record(r)]
+    data["events"] = [
+        event for event in old_events
+        if not is_historical_aggregate(str(event.get("start_text") or ""))
+    ]
+    coverage = data.setdefault("coverage", {})
+    coverage["aggregate_reports_purged"] = len(old_reports) - len(data["reports"])
+    coverage["aggregate_events_purged"] = len(old_events) - len(data["events"])
+    coverage["archive_reports_total"] = len(data["reports"])
+    coverage["archive_events_total"] = len(data["events"])
+    archive_regions = (
+        {e.get("region") for e in data["events"] if e.get("region")}
+        | {r.get("region") for r in data["reports"] if r.get("region")}
+    )
+    coverage["archive_regions_with_records"] = len(archive_regions)
+    coverage["archive_regions_with_local_records"] = len({
+        record.get("region")
+        for record in [*data["events"], *data["reports"]]
+        if record.get("region") and (
+            record.get("scope") in ("city", "municipality")
+            or record.get("mentioned_places")
+        )
+    })
+    return data
+
+
 def uav_activity_kind(text: str) -> str | None:
     """Classify operational UAV wording without cross-sentence false matches."""
     whole = normalize(text)
     if any(p.search(whole) for p in UAV_ARTICLE_REJECTION_PATTERNS):
         return None
+    if is_historical_aggregate(text):
+        return "historical_summary"
 
     formal = text_kind(text)
     if formal == "start":
@@ -1526,6 +1638,8 @@ def pair_alerts(posts: list[Post], source: dict[str, Any], window_start: datetim
         })
 
     for post in posts:
+        if is_historical_aggregate(post.text):
+            continue
         threat_kinds = alert_threat_kinds(post.text)
         if not threat_kinds:
             continue
@@ -1706,6 +1820,8 @@ def extract_reports(posts: list[Post], source: dict[str, Any], window_start: dat
     for post in posts:
         if post.published_at < window_start or post.published_at > window_end:
             continue
+        if is_historical_aggregate(post.text):
+            continue
         if mod_derived(post, source):
             continue
 
@@ -1719,6 +1835,8 @@ def extract_reports(posts: list[Post], source: dict[str, Any], window_start: dat
         # Preserve explicit UAV/missile quantities when the source states them.
         # Multi-region aggregate totals are not assigned to one local region.
         for sentence in sentence_split(post.text):
+            if is_historical_aggregate(sentence):
+                continue
             numeric_sets = [
                 ("uav", classify_count_sentence(sentence)),
                 ("missile", classify_missile_count_sentence(sentence)),
@@ -1726,10 +1844,7 @@ def extract_reports(posts: list[Post], source: dict[str, Any], window_start: dat
             for threat_class, counts in numeric_sets:
                 if not counts:
                     continue
-                if (
-                    str(source.get("source_layer") or "").startswith("monitoring_")
-                    and cross_region_aggregate_count_text(sentence)
-                ):
+                if cross_region_aggregate_count_text(sentence):
                     continue
 
                 activity_kind = (
@@ -2314,6 +2429,9 @@ def revalidate_archive_reports(data: dict[str, Any]) -> dict[str, Any]:
     reclassified = 0
 
     for report in data.get("reports", []) or []:
+        if is_aggregate_archive_record(report):
+            removed += 1
+            continue
         signal_class = report.get("signal_class")
         threat = report.get("threat_class")
         text = str(report.get("text") or "").strip()
@@ -2343,6 +2461,10 @@ def revalidate_archive_reports(data: dict[str, Any]) -> dict[str, Any]:
                 kept.append(report)
             else:
                 removed += 1
+            continue
+
+        if kind == "historical_summary":
+            removed += 1
             continue
 
         if kind == "alert_start_signal":
@@ -2542,6 +2664,7 @@ def main():
 
     data = collect(args)
     data = merge_existing_archive(data, Path(args.output))
+    data = purge_archive_aggregate_summaries(data)
     data = revalidate_archive_reports(data)
     source_cfg = json.loads(Path(args.sources).read_text(encoding="utf-8"))
     city_path = Path(args.cities)
