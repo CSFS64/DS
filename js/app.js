@@ -781,15 +781,15 @@ function routePreludeFromOrigin(origin, entry, mode) {
   return routeStaysInAllowedTerritory(coords, mode === "eastSouth") ? coords : [];
 }
 
-function selectedWindowUavRegions(startMs, endMs) {
+function selectedWindowUavRegions(startMs, endMs, threat = "uav") {
   const lit = new Set();
   for (const report of state.archive.reports || []) {
     const at = Date.parse(report.at);
-    if (at < startMs || at > endMs || !reportRepresentsLiveThreat(report)) continue;
+    if (threatClass(report) !== threat || at < startMs - 45 * 60 * 1000 || at > endMs + 45 * 60 * 1000 || !reportRepresentsLiveThreat(report)) continue;
     if (report.region) lit.add(report.region);
   }
   for (const event of state.archive.events || []) {
-    if (threatClass(event) !== "uav") continue;
+    if (threatClass(event) !== threat) continue;
     const start = Date.parse(event.start), end = Date.parse(event.end);
     if (end < startMs || start > endMs) continue;
     if (event.region) lit.add(event.region);
@@ -907,8 +907,8 @@ function routeCountWeight(record) {
   return 1 + Math.min(1.8, Math.log2(count + 1) * 0.42);
 }
 
-function routeObservationPoints(record, atMs, sourceType, catalog) {
-  if (threatClass(record) !== "uav" || !reportRepresentsLiveThreat(record)) return [];
+function routeObservationPoints(record, atMs, sourceType, catalog, threat = "uav") {
+  if (threatClass(record) !== threat || (sourceType !== "alert" && !reportRepresentsLiveThreat(record))) return [];
   const points = [];
   const seen = new Set();
   const recordKey = String(record.id || record.url || [record.region, record.at || record.start, record.place].join("|"));
@@ -916,6 +916,10 @@ function routeObservationPoints(record, atMs, sourceType, catalog) {
   const formal = record.signal_class === "formal_alert_signal" || sourceType === "alert";
   const observedCount = routeEvidenceCount(record);
   const countWeight = routeCountWeight(record);
+  const activeFrom = sourceType === "alert" ? Date.parse(record.start) : atMs - 45 * 60 * 1000;
+  const activeTo = sourceType === "alert" ? Date.parse(record.end) : atMs + 45 * 60 * 1000;
+  if (!Number.isFinite(activeFrom) || !Number.isFinite(activeTo) || activeTo < activeFrom) return [];
+  const windows = [{ from: activeFrom, to: activeTo }];
 
   const add = (candidate, fallbackName, precision, weight = 1) => {
     const resolved = candidate && Number.isFinite(+candidate.lon) && Number.isFinite(+candidate.lat)
@@ -958,13 +962,14 @@ function routeObservationPoints(record, atMs, sourceType, catalog) {
       recordKey,
       observedCount,
       weight: weight * countWeight,
+      windows: windows.map(w => ({ ...w })),
     });
   };
 
   // The route engine now resolves locations through the same city/municipality
   // catalog used to render the visible map dots. This removes the old state
   // where the map knew a point's coordinates but the route engine did not.
-  for (const p of (record.mentioned_places || []).slice(0, 8)) {
+  for (const p of (record.mentioned_places || [])) {
     add(p, p.label || p.name, p.type || "local", 1.0);
   }
   if (record.scope !== "region") {
@@ -998,6 +1003,7 @@ function routeObservationPoints(record, atMs, sourceType, catalog) {
         observedCount,
         weight: 0.42 * countWeight,
         regionProxy: true,
+        windows: windows.map(w => ({ ...w })),
       });
     }
   }
@@ -1244,6 +1250,7 @@ function dedupeRouteObservations(observations) {
       last.observedCount = Math.max(last.observedCount || 0, node.observedCount || 0) || null;
       last.at = Math.min(last.at, node.at);
       last.formal = last.formal || node.formal;
+      last.windows.push(...(node.windows || []));
       continue;
     }
     out.push({ ...node, observations: 1 });
@@ -1524,25 +1531,58 @@ function routeLengthKm(coords) {
   return total;
 }
 
+// An observation's position along a smoothed path; only records decide when
+// the visual line appears, never the assumed flight speed.
+function routePointProgress(coords, node) {
+  const total = routeLengthKm(coords);
+  if (!total || coords.length < 2) return 1;
+  let closest = Infinity, along = 0, travelled = 0;
+  for (let i = 1; i < coords.length; i++) {
+    const a = { lon: coords[i - 1][0], lat: coords[i - 1][1] };
+    const b = { lon: coords[i][0], lat: coords[i][1] };
+    const v = localVectorKm(a, b, node.lat), p = localVectorKm(a, node, node.lat);
+    const squared = v.x * v.x + v.y * v.y;
+    const t = squared ? Math.max(0, Math.min(1, (p.x * v.x + p.y * v.y) / squared)) : 0;
+    const d = (p.x - t * v.x) ** 2 + (p.y - t * v.y) ** 2;
+    const segmentKm = haversineKm(a, b);
+    if (d < closest) { closest = d; along = travelled + segmentKm * t; }
+    travelled += segmentKm;
+  }
+  return Math.max(0, Math.min(1, along / total));
+}
+
+function routeTimingForNodes(coords, nodes) {
+  const anchors = [];
+  let previous = 0;
+  for (let i = 0; i < nodes.length; i++) {
+    const point = nodes[i];
+    const progress = i === nodes.length - 1 ? 1 :
+      Math.max(previous, routePointProgress(coords, point));
+    previous = progress;
+    for (const w of point.windows || []) anchors.push({ from: w.from, to: w.to, progress });
+  }
+  return anchors;
+}
+
+function routeObservationNodes(startMs, endMs, threat, catalog) {
+  const raw = [], margin = 45 * 60 * 1000;
+  for (const r of state.archive.reports || []) {
+    const at = Date.parse(r.at);
+    if (at >= startMs - margin && at <= endMs + margin)
+      raw.push(...routeObservationPoints(r, at, "report", catalog, threat));
+  }
+  for (const e of state.archive.events || []) {
+    const start = Date.parse(e.start), end = Date.parse(e.end);
+    if (start <= endMs && end >= startMs)
+      raw.push(...routeObservationPoints(e, start, "alert", catalog, threat));
+  }
+  return dedupeRouteObservations(raw);
+}
+
 function buildIllustrativeUavRoutes(startMs, endMs) {
   const catalog = routePlaceCatalog();
   const litRegions = selectedWindowUavRegions(startMs, endMs);
-  const raw = [];
-
-  for (const report of state.archive.reports || []) {
-    const at = Date.parse(report.at);
-    if (at >= startMs && at <= endMs) {
-      raw.push(...routeObservationPoints(report, at, "report", catalog));
-    }
-  }
-  for (const event of state.archive.events || []) {
-    const start = Date.parse(event.start);
-    const end = Date.parse(event.end);
-    if (end < startMs || start > endMs) continue;
-    raw.push(...routeObservationPoints(event, Math.max(start, startMs), "alert", catalog));
-  }
-
-  const nodes = dedupeRouteObservations(raw);
+  const nodes = routeObservationNodes(startMs, endMs, "uav", catalog);
   let terminals = nodes.filter((node, idx) => {
     if (isStrongObservationKind(node.kind) || node.precision === "region-proxy") return true;
     return !nodes.some((other, j) =>
@@ -1554,12 +1594,8 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
     );
   });
 
-  terminals = terminals
-    .sort((a, b) => {
-      if (Math.abs(a.lat - b.lat) > 0.15) return b.lat - a.lat;
-      return a.lon - b.lon || a.at - b.at;
-    })
-    .slice(0, 140);
+  // No global cap on number of routes: inspect every supported terminal.
+  terminals = terminals.sort((a, b) => b.at - a.at || b.lat - a.lat || a.lon - b.lon);
 
   const lineFeatures = [];
   const arrowFeatures = [];
@@ -1759,6 +1795,7 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
       earliest_at: new Date(chosen.chain[0].at).toISOString(),
       latest_at: new Date(terminal.at).toISOString(),
       illustrative: true,
+      threat: "uav",
     };
 
     // Northern routes start exactly at the international border crossing.
@@ -1780,6 +1817,7 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
       properties: props,
       geometry: { type: "LineString", coordinates: displayCoords },
     };
+    feature._timing = routeTimingForNodes(displayCoords, chosen.chain);
     lineFeatures.push(feature);
 
     const a = displayCoords[displayCoords.length - 2];
@@ -1794,17 +1832,9 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
     });
   });
 
-  const evidenceStates = nodes.map(node => ({
-    placeKey: node.placeKey,
-    nodeKey: node.nodeKey,
-    linked: linkedNodeKeys.has(node.nodeKey),
-    formal: node.formal,
-  }));
-
   return {
     lines: { type: "FeatureCollection", features: lineFeatures },
     arrows: { type: "FeatureCollection", features: arrowFeatures },
-    evidenceStates,
   };
 }
 
