@@ -50,7 +50,9 @@ button, input, select { font: inherit; }
   font-size: 9px !important;
 }
 .maplibregl-ctrl-attrib a { color: #7aa3b7 !important; }
-.maplibregl-ctrl-bottom-right { bottom: 188px; right: 8px; }
+.maplibregl-ctrl-bottom-right { bottom: 14px; right: 8px; }
+.maplibregl-ctrl-bottom-left { bottom: 8px; left: 10px; }
+.maplibregl-ctrl-attrib.maplibregl-compact { max-width: min(480px, 75vw); }
 
 .map-grid {
   position: absolute;
@@ -199,7 +201,7 @@ button, input, select { font: inherit; }
 .route-toggle:not(.is-on) .legend-route { opacity: .28; box-shadow: none; }
 .export-controls {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 66px minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 5px;
   margin-top: 2px;
 }
@@ -213,14 +215,6 @@ button, input, select { font: inherit; }
   font: 750 8px ui-monospace, SFMono-Regular, Menlo, monospace;
   letter-spacing: .04em;
   cursor: pointer;
-}
-.export-duration {
-  min-width: 0;
-  border: 1px solid rgba(57,216,255,.28);
-  background: rgba(7,24,34,.9);
-  color: #b9d9e7;
-  font: 700 8px ui-monospace, SFMono-Regular, Menlo, monospace;
-  padding: 0 3px;
 }
 .video-export-status {
   position: absolute;
@@ -389,7 +383,8 @@ body.clean-map-view .maplibregl-control-container {
   .hud-header h1 { font-size: 11px; }
   .map-legend { right: 8px; bottom: 8px; font-size: 8px; }
   .route-toggle { font-size: 8px; }
-  .maplibregl-ctrl-bottom-right { bottom: 174px; }
+  .maplibregl-ctrl-bottom-right { bottom: 8px; }
+  .maplibregl-ctrl-bottom-left { bottom: 8px; left: 5px; }
   .detail-panel { left: 8px; bottom: 8px; width: calc(100% - 16px); }
   .control-panel { padding: 10px 9px max(10px, env(safe-area-inset-bottom)); }
   .timeline-layout { grid-template-columns: 1fr 1fr; gap: 7px 10px; }
