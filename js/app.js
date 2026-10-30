@@ -1876,6 +1876,69 @@ async function buildIllustrativeUavRoutes(startMs, endMs, cancelled = () => fals
   };
 }
 
+// Only the yellow cumulative cursor drives static route inference.
+// Normal timeline playback and the white scrubber never trigger route drawing.
+function staticRouteWindow() {
+  if (state.viewMode !== "cumulative") return null;
+  const start = selectionStartMs();
+  const end = Math.min(Math.max(state.cumulativeMs, start), selectionEndMs());
+  return end > start ? { start, end } : null;
+}
+
+function showRouteLoading(message) {
+  if (!els.routeLoading) return;
+  if (els.routeLoadingText) els.routeLoadingText.textContent = message;
+  els.routeLoading.hidden = false;
+}
+
+function hideRouteLoading() {
+  if (els.routeLoading) els.routeLoading.hidden = true;
+}
+
+function currentRouteKey() {
+  const window = staticRouteWindow();
+  return window ? [
+    Math.round(window.start), Math.round(window.end),
+    state.archive?.reports?.length || 0, state.archive?.events?.length || 0,
+  ].join(":") : "";
+}
+
+async function buildRoutesCooperatively(start, end, key, generation) {
+  const cancelled = () => generation !== state.routeGeneration ||
+    !state.routesVisible || state.viewMode !== "cumulative";
+  try {
+    // Paint the loading indicator and yield repeatedly while scoring routes.
+    await new Promise(resolve => setTimeout(resolve, 30));
+    if (cancelled()) return;
+    const data = await buildIllustrativeUavRoutes(start, end, cancelled);
+    if (cancelled() || !data || key !== currentRouteKey()) return;
+    state.routeFullData = data;
+    state.routeStaticData = {
+      lines: data.lines,
+      arrows: data.arrows,
+    };
+    state.routeFeatureCount = data.lines.features.length;
+    state.routeCache.delete(key);
+    state.routeCache.set(key, { staticData: state.routeStaticData, count: state.routeFeatureCount });
+    while (state.routeCache.size > 4) {
+      state.routeCache.delete(state.routeCache.keys().next().value);
+    }
+    state.routeDisplayedPhase = "";
+    state.routeBuildPending = false;
+    hideRouteLoading();
+    updateRouteOverlay();
+  } catch (error) {
+    if (cancelled()) return;
+    console.error("Static route generation failed", error);
+    state.routeBuildPending = false;
+    state.routeFullData = { lines: EMPTY_FEATURE_COLLECTION, arrows: EMPTY_FEATURE_COLLECTION };
+    state.routeStaticData = state.routeFullData;
+    state.routeFeatureCount = 0;
+    hideRouteLoading();
+    updateRouteOverlay();
+  }
+}
+
 function setRouteLayerVisibility() {
   if (!state.mapReady) return;
   const visibility = state.routesVisible ? "visible" : "none";
@@ -1894,33 +1957,54 @@ function setRouteLayerVisibility() {
     els.routeToggle.setAttribute("aria-pressed", String(state.routesVisible));
     const label = els.routeToggle.querySelector(".route-toggle-label");
     if (label) {
-      label.textContent = "示意无人机 / 导弹路线 " + (state.routesVisible ? "ON" : "OFF") + " · " + state.routeFeatureCount;
+      label.textContent = "示意无人机路线 " + (state.routesVisible ? "ON" : "OFF") + " · " + state.routeFeatureCount;
     }
   }
 }
 
-function updateRouteOverlay(force = false) {
+function updateRouteOverlay() {
   if (!state.mapReady) return;
   const lineSource = state.map.getSource("archive-uav-routes");
   const arrowSource = state.map.getSource("archive-uav-route-arrows");
   if (!lineSource || !arrowSource) return;
   setRouteLayerVisibility();
-  if (!state.routesVisible) return;
+
+  const window = state.routesVisible ? staticRouteWindow() : null;
+  if (!window) {
+    // Realtime playback and initial page load have NO route geometry.
+    if (state.routeUpdateTimer) {
+      clearTimeout(state.routeUpdateTimer);
+      state.routeUpdateTimer = null;
+    }
+    if (state.routeBuildPending) ++state.routeGeneration;
+    state.routeBuildPending = false;
+    if (state.routeDisplayedPhase !== "empty") {
+      lineSource.setData(EMPTY_FEATURE_COLLECTION);
+      arrowSource.setData(EMPTY_FEATURE_COLLECTION);
+      state.routeDisplayedPhase = "empty";
+    }
+    state.routeSelectionKey = "";
+    state.routeFullData = null;
+    state.routeStaticData = null;
+    state.routeFeatureCount = 0;
+    hideRouteLoading();
+    setRouteLayerVisibility();
+    return;
+  }
 
   const key = currentRouteKey();
-  const changed = key !== state.routeSelectionKey;
-  if (changed) {
-    // Invalidate old jobs on selection change; never block the input callback.
+  if (key !== state.routeSelectionKey) {
     const generation = ++state.routeGeneration;
     state.routeSelectionKey = key;
     state.routeFullData = null;
     state.routeStaticData = null;
     state.routeFeatureCount = 0;
-    state.routeDisplayedPhase = "";
-    // Switching back to a previously selected time window is instantaneous.
+    state.routeDisplayedPhase = "empty";
+    lineSource.setData(EMPTY_FEATURE_COLLECTION);
+    arrowSource.setData(EMPTY_FEATURE_COLLECTION);
+
     const cached = state.routeCache.get(key);
     if (cached) {
-      state.routeFullData = cached.data;
       state.routeStaticData = cached.staticData;
       state.routeFeatureCount = cached.count;
       state.routeCache.delete(key);
@@ -1930,38 +2014,34 @@ function updateRouteOverlay(force = false) {
       updateRouteOverlay();
       return;
     }
+    if (state.exportRecording) {
+      // Export captures realtime; never compute routes during recording.
+      state.routeBuildPending = false;
+      hideRouteLoading();
+      return;
+    }
     state.routeBuildPending = true;
-    lineSource.setData(EMPTY_FEATURE_COLLECTION);
-    arrowSource.setData(EMPTY_FEATURE_COLLECTION);
-    showRouteLoading("正在计算当前时间范围内的示意路线…");
-    setRouteLayerVisibility();
-    buildRoutesCooperatively(selectionStartMs(), selectionEndMs(), key, generation);
+    showRouteLoading("正在根据黄色汇总指针计算静态路线…");
+    buildRoutesCooperatively(window.start, window.end, key, generation);
     return;
   }
-  if (!state.routeFullData) {
-    if (state.exportRecording) return; // Never regenerate the route geometry during export.
-    // If a job was cancelled when the routes were hidden, restart only when
-    // visible again. Repeated animation frames never start duplicate jobs.
-    if (!state.routeBuildPending) {
+
+  if (!state.routeStaticData) {
+    if (!state.routeBuildPending && !state.exportRecording) {
       const generation = ++state.routeGeneration;
       state.routeBuildPending = true;
-      showRouteLoading("正在准备示意路线…");
-      buildRoutesCooperatively(selectionStartMs(), selectionEndMs(), key, generation);
+      showRouteLoading("正在准备静态路线…");
+      buildRoutesCooperatively(window.start, window.end, key, generation);
     }
     return;
   }
-  const animating = Boolean(state.timer || state.exportRecording);
-  const phase = animating ? "playing:" + Math.floor(state.currentMs / 1000) : "complete";
-  if (phase === state.routeDisplayedPhase) return;
-  const now = performance.now();
-  if (!force && animating && now - state.routeDrawAt < 140) return;
-  const displayed = animating
-    ? illustratedRoutesAtTime(state.routeFullData, state.currentMs)
-    : state.routeStaticData;
-  lineSource.setData(displayed.lines);
-  arrowSource.setData(displayed.arrows);
-  state.routeDisplayedPhase = phase;
-  state.routeDrawAt = now;
+  if (state.routeDisplayedPhase !== key) {
+    // Exactly one GeoJSON update per cumulative-cursor value; no animated clipping.
+    lineSource.setData(state.routeStaticData.lines);
+    arrowSource.setData(state.routeStaticData.arrows);
+    state.routeDisplayedPhase = key;
+  }
+  setRouteLayerVisibility();
 }
 
 function installArchiveLayers() {
