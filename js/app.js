@@ -29,7 +29,6 @@ const state = {
   previousActivePlaceIds: new Set(),
   previousReportRegionIds: new Set(),
   previousReportPlaceIds: new Set(),
-  previousRoutePlaceIds: new Set(),
   ukraineBorderCandidates: null,
   currentMs: 0,
   cumulativeMs: 0,
@@ -65,7 +64,7 @@ const els = {
   playButton: $("playButton"), scrubber: $("scrubber"), currentTimeLabel: $("currentTimeLabel"), speedSelect: $("speedSelect"),
   clockMoscow: $("clockMoscow"), clockKyiv: $("clockKyiv"), clockBeijing: $("clockBeijing"),
   routeToggle: $("routeToggle"), cleanViewButton: $("cleanViewButton"),
-  exportVideoButton: $("exportVideoButton"), videoDurationSelect: $("videoDurationSelect"),
+  exportVideoButton: $("exportVideoButton"),
   videoExportStatus: $("videoExportStatus"),
 };
 
@@ -315,13 +314,14 @@ function initMap() {
     zoom: 3.35,
     minZoom: 2,
     maxZoom: 13,
-    attributionControl: true,
+    attributionControl: false,
     cooperativeGestures: false,
     renderWorldCopies: false,
     preserveDrawingBuffer: true,
   });
 
   state.map.addControl(new MapLibre.NavigationControl({ showCompass: false }), "bottom-right");
+  state.map.addControl(new MapLibre.AttributionControl({ compact: true }), "bottom-left");
 
   const styleTimeout = window.setTimeout(() => {
     if (!state.mapReady && !state.baseStyleFallbackUsed) {
@@ -1972,7 +1972,6 @@ function setRouteLayerVisibility() {
     "archive-uav-route-line",
     "archive-uav-route-highlight",
     "archive-uav-route-arrows",
-    "archive-place-route-unlinked",
   ]) {
     if (state.map.getLayer(id)) state.map.setLayoutProperty(id, "visibility", visibility);
   }
@@ -1983,39 +1982,6 @@ function setRouteLayerVisibility() {
     if (label) {
       label.textContent = "示意无人机 / 导弹路线 " + (state.routesVisible ? "ON" : "OFF") + " · " + state.routeFeatureCount;
     }
-  }
-}
-
-function applyRouteEvidenceStates(evidenceStates) {
-  if (!state.mapReady || !state.map.getSource("archive-places")) return;
-  for (const id of state.previousRoutePlaceIds) {
-    try {
-      state.map.setFeatureState(
-        { source: "archive-places", id },
-        { routeLinked: false, routeUnlinked: false },
-      );
-    } catch (_) {}
-  }
-  state.previousRoutePlaceIds.clear();
-
-  const byPlace = new Map();
-  for (const evidence of evidenceStates || []) {
-    if (!evidence.placeKey) continue;
-    const current = byPlace.get(evidence.placeKey) || { linked: false };
-    current.linked = current.linked || Boolean(evidence.linked);
-    byPlace.set(evidence.placeKey, current);
-  }
-
-  for (const [placeKey, status] of byPlace) {
-    const id = state.placeFeatureIds.get(placeKey);
-    if (id == null) continue;
-    try {
-      state.map.setFeatureState(
-        { source: "archive-places", id },
-        status.linked ? { routeLinked: true, routeUnlinked: false } : { routeLinked: false, routeUnlinked: true },
-      );
-      state.previousRoutePlaceIds.add(id);
-    } catch (_) {}
   }
 }
 
@@ -2058,7 +2024,7 @@ function installArchiveLayers() {
   state.observedCountSignature = "";
 
   for (const id of [
-    "archive-observed-count-label", "archive-place-label", "archive-place-dot", "archive-place-route-unlinked", "archive-place-glow",
+    "archive-observed-count-label", "archive-place-label", "archive-place-dot", "archive-place-glow",
     "archive-uav-route-arrows", "archive-uav-route-highlight", "archive-uav-route-line",
     "archive-uav-route-casing", "archive-uav-route-glow",
     "archive-russia-border-main", "archive-russia-border-casing", "archive-russia-border-glow",
@@ -2193,7 +2159,7 @@ function installArchiveLayers() {
       "visibility": state.routesVisible ? "visible" : "none",
     },
     paint: {
-      "line-color": "#ff7218",
+      "line-color": ["case", ["==", ["get", "threat"], "missile"], "#ff355d", "#ff7218"],
       "line-width": ["interpolate", ["linear"], ["zoom"],
         3, ["*", 6.8, ["coalesce", ["get", "route_weight"], 1]],
         7, ["*", 9.5, ["coalesce", ["get", "route_weight"], 1]],
@@ -2214,7 +2180,7 @@ function installArchiveLayers() {
       "visibility": state.routesVisible ? "visible" : "none",
     },
     paint: {
-      "line-color": "#6f2c08",
+      "line-color": ["case", ["==", ["get", "threat"], "missile"], "#581b39", "#6f2c08"],
       "line-width": ["interpolate", ["linear"], ["zoom"],
         3, ["*", 3.5, ["coalesce", ["get", "route_weight"], 1]],
         7, ["*", 4.5, ["coalesce", ["get", "route_weight"], 1]],
@@ -2234,7 +2200,7 @@ function installArchiveLayers() {
       "visibility": state.routesVisible ? "visible" : "none",
     },
     paint: {
-      "line-color": "#ff8b1f",
+      "line-color": ["case", ["==", ["get", "threat"], "missile"], "#ff4a73", "#ff8b1f"],
       "line-width": ["interpolate", ["linear"], ["zoom"],
         3, ["*", 1.35, ["coalesce", ["get", "route_weight"], 1]],
         7, ["*", 1.85, ["coalesce", ["get", "route_weight"], 1]],
@@ -2255,7 +2221,7 @@ function installArchiveLayers() {
       "visibility": state.routesVisible ? "visible" : "none",
     },
     paint: {
-      "line-color": "#ffc263",
+      "line-color": ["case", ["==", ["get", "threat"], "missile"], "#ffb3c9", "#ffc263"],
       "line-width": ["interpolate", ["linear"], ["zoom"],
         3, ["*", 0.35, ["coalesce", ["get", "route_weight"], 1]],
         7, ["*", 0.55, ["coalesce", ["get", "route_weight"], 1]],
@@ -2281,8 +2247,8 @@ function installArchiveLayers() {
       "text-ignore-placement": true,
     },
     paint: {
-      "text-color": "#ff9a2f",
-      "text-halo-color": "#5e2608",
+      "text-color": ["case", ["==", ["get", "threat"], "missile"], "#ff537c", "#ff9a2f"],
+      "text-halo-color": ["case", ["==", ["get", "threat"], "missile"], "#541a32", "#5e2608"],
       "text-halo-width": 1.1,
       "text-opacity": ["interpolate", ["linear"], ["get", "confidence"], 0.3, 0.55, 1, 1],
     },
@@ -2291,7 +2257,6 @@ function installArchiveLayers() {
   state.routeSelectionKey = "";
   state.routeFullData = null;
   state.routeDisplayedPhase = "";
-  state.previousRoutePlaceIds.clear();
 
   state.map.addSource("archive-places", { type: "geojson", data: preparePlacesGeoJson() });
   state.map.addLayer({
@@ -2316,49 +2281,6 @@ function installArchiveLayers() {
       "circle-blur": 0.7,
     },
   });
-  state.map.addLayer({
-    id: "archive-place-route-unlinked",
-    type: "circle",
-    source: "archive-places",
-    layout: {
-      "visibility": state.routesVisible ? "visible" : "none",
-    },
-    paint: {
-      "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 5.6, 7, 8.4, 11, 11.5],
-      "circle-color": ["case",
-        ["boolean", ["feature-state", "active"], false], "#39d8ff",
-        ["boolean", ["feature-state", "report"], false], "#ffb347",
-        "#7893a1"
-      ],
-      "circle-opacity": ["case",
-        ["all",
-          ["boolean", ["feature-state", "routeUnlinked"], false],
-          ["any",
-            ["boolean", ["feature-state", "active"], false],
-            ["boolean", ["feature-state", "report"], false]
-          ]
-        ], 0.055,
-        0
-      ],
-      "circle-stroke-color": ["case",
-        ["boolean", ["feature-state", "active"], false], "#8ceaff",
-        ["boolean", ["feature-state", "report"], false], "#ffd17c",
-        "#91a9b6"
-      ],
-      "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 3, 1.0, 7, 1.35, 11, 1.7],
-      "circle-stroke-opacity": ["case",
-        ["all",
-          ["boolean", ["feature-state", "routeUnlinked"], false],
-          ["any",
-            ["boolean", ["feature-state", "active"], false],
-            ["boolean", ["feature-state", "report"], false]
-          ]
-        ], 0.88,
-        0
-      ],
-    },
-  });
-
   state.map.addLayer({
     id: "archive-place-dot",
     type: "circle",
@@ -2554,7 +2476,8 @@ async function exportTimelineVideo() {
   try {
     if (!previous.clean) applyCleanView(true);
     await waitForMapRender();
-    const durationSeconds = Number(els.videoDurationSelect?.value || 60);
+    const minutesPerSecond = Number(els.speedSelect.value);
+    const durationSeconds = (end - start) / (minutesPerSecond * 60 * 1000);
     const result = await window.DeepstrikeVideoExporter.record({
       map: state.map,
       start,
