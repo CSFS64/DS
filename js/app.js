@@ -1679,6 +1679,12 @@ async function buildIllustrativeUavRoutes(startMs, endMs, isCancelled = () => fa
     return a.lon - b.lon || a.at - b.at;
   });
 
+  let nextUiYield = performance.now() + 12;
+  const yieldIfNeeded = async () => {
+    if (performance.now() < nextUiYield) return;
+    await new Promise(resolve => setTimeout(resolve, 0));
+    nextUiYield = performance.now() + 12;
+  };
   const lineFeatures = [];
   const arrowFeatures = [];
   const linkedNodeKeys = new Set();
@@ -1703,6 +1709,8 @@ async function buildIllustrativeUavRoutes(startMs, endMs, isCancelled = () => fa
     let chosen = null;
 
     for (const option of startOptions) {
+      if (isCancelled()) return null;
+      await yieldIfNeeded();
       const mode = option.mode;
       const entry = firstRussiaEntry(option.point, terminal);
       if (!validRussiaEntryForMode(entry, mode)) continue;
@@ -1774,6 +1782,8 @@ async function buildIllustrativeUavRoutes(startMs, endMs, isCancelled = () => fa
       ];
 
       for (const variant of variants) {
+        if (isCancelled()) return null;
+        await yieldIfNeeded();
         const expanded = expandRouteWithNaturalSupports(
           evidenceWaypoints,
           seed,
