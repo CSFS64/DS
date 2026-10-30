@@ -1838,18 +1838,80 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
   };
 }
 
+// Unlike the UAV border-entry hypothesis, missiles are linked only between
+// two independently reported checkpoints; no unobserved launch site is added.
+// These tentative links are NOT confirmed individual missile flight tracks.
+function buildIllustrativeMissileRoutes(startMs, endMs) {
+  const catalog = routePlaceCatalog();
+  const nodes = routeObservationNodes(startMs, endMs, "missile", catalog)
+    .sort((a, b) => a.at - b.at);
+  const lines = [], arrows = [];
+  for (let i = 0; i < nodes.length; i++) {
+    const terminal = nodes[i];
+    let preceding = null, bestScore = Infinity;
+    for (let j = i - 1; j >= 0; j--) {
+      const source = nodes[j];
+      const minutes = (terminal.at - source.at) / 60000;
+      if (minutes > 180) break;
+      if (minutes < 2 || source.recordKey === terminal.recordKey) continue;
+      const km = haversineKm(source, terminal);
+      if (km < 20 || km > 1100 || km / (minutes / 60) > 2600) continue;
+      const score = minutes * 1.3 + km * 0.24 + (source.regionProxy ? 80 : 0);
+      if (score < bestScore) { bestScore = score; preceding = source; }
+    }
+    if (!preceding) continue; // A single warning cannot establish a route.
+    const coords = smoothInterpolatingRoute([preceding, terminal], 10);
+    if (coords.length < 2) continue;
+    const props = {
+      route_id: "missile-observation-" + i,
+      threat: "missile",
+      region: terminal.region,
+      target: terminal.place,
+      confidence: (preceding.regionProxy || terminal.regionProxy) ? 0.25 : 0.4,
+      route_weight: 1,
+      illustrative: true,
+      earliest_at: new Date(preceding.at).toISOString(),
+      latest_at: new Date(terminal.at).toISOString(),
+    };
+    const line = {
+      type: "Feature", properties: props,
+      geometry: { type: "LineString", coordinates: coords },
+    };
+    line._timing = routeTimingForNodes(coords, [preceding, terminal]);
+    lines.push(line);
+    const a = coords[coords.length - 2], b = coords[coords.length - 1];
+    arrows.push({
+      type: "Feature",
+      properties: {
+        ...props,
+        bearing: bearingDeg({ lon: a[0], lat: a[1] }, { lon: b[0], lat: b[1] }),
+      },
+      geometry: { type: "Point", coordinates: b },
+    });
+  }
+  return {
+    lines: { type: "FeatureCollection", features: lines },
+    arrows: { type: "FeatureCollection", features: arrows },
+  };
+}
+
+function buildIllustrativeRoutes(startMs, endMs) {
+  const uav = buildIllustrativeUavRoutes(startMs, endMs);
+  const missile = buildIllustrativeMissileRoutes(startMs, endMs);
+  return {
+    lines: { type: "FeatureCollection", features: [...uav.lines.features, ...missile.lines.features] },
+    arrows: { type: "FeatureCollection", features: [...uav.arrows.features, ...missile.arrows.features] },
+  };
+}
+
 // The geometry remains an inference, not an observed flight track. During
 // playback reveal each existing illustrative line according to its evidence
 // timestamps; paused/scrubbed views always show its complete geometry.
 function routeRevealProgress(feature, atMs) {
-  const first = Date.parse(feature.properties.earliest_at);
-  const last = Date.parse(feature.properties.latest_at);
-  if (!Number.isFinite(first) || !Number.isFinite(last)) return 1;
-  const windowLength = Math.max(1, selectionEndMs() - selectionStartMs());
-  const leadMs = Math.min(60 * 60 * 1000, windowLength / 6);
-  const beginning = last > first ? first : Math.max(selectionStartMs(), last - leadMs);
-  if (last <= beginning) return atMs >= last ? 1 : 0;
-  return Math.max(0, Math.min(1, (atMs - beginning) / (last - beginning)));
+  // Match the existing activeEvents / activeReports windows exactly.
+  // Never predict a future checkpoint or preserve routes after all alerts clear.
+  return (feature._timing || []).reduce((max, anchor) =>
+    atMs >= anchor.from && atMs <= anchor.to ? Math.max(max, anchor.progress) : max, 0);
 }
 
 function clippedIllustrativeLine(feature, progress) {
@@ -1919,7 +1981,7 @@ function setRouteLayerVisibility() {
     els.routeToggle.setAttribute("aria-pressed", String(state.routesVisible));
     const label = els.routeToggle.querySelector(".route-toggle-label");
     if (label) {
-      label.textContent = "示意无人机路线 " + (state.routesVisible ? "ON" : "OFF") + " · " + state.routeFeatureCount;
+      label.textContent = "示意无人机 / 导弹路线 " + (state.routesVisible ? "ON" : "OFF") + " · " + state.routeFeatureCount;
     }
   }
 }
@@ -1972,10 +2034,9 @@ function updateRouteOverlay(force = false) {
   ].join(":");
   if (force || key !== state.routeSelectionKey || !state.routeFullData) {
     state.routeSelectionKey = key;
-    state.routeFullData = buildIllustrativeUavRoutes(start, end);
+    state.routeFullData = buildIllustrativeRoutes(start, end);
     state.routeFeatureCount = state.routeFullData.lines.features.length;
     state.routeDisplayedPhase = "";
-    applyRouteEvidenceStates(state.routeFullData.evidenceStates);
   }
   const animating = Boolean(state.timer || state.exportRecording);
   const phase = animating ? "playing:" + Math.round(state.currentMs / 1000) : "complete";
