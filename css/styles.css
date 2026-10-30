@@ -524,3 +524,40 @@ body.clean-map-view .map-branding { display: block; }
   .brand-time { font-size: 10px; }
   .brand-corner-logo { width: 70px; }
 }
+
+
+/* Subtle identifying mark in the ordinary map, while all text/controls stay
+   in their existing positions. The presentation mode enlarges the same mark. */
+.map-branding { display: block; }
+.brand-meta { display: none; }
+.brand-corner-logo {
+  top: max(12px, env(safe-area-inset-top));
+  width: clamp(64px, 6vw, 104px);
+}
+.brand-watermark {
+  width: min(27vw, 420px);
+  opacity: .045;
+}
+body:not(.clean-map-view) .hud-header {
+  right: calc(25px + clamp(64px, 6vw, 104px));
+}
+body.clean-map-view .brand-meta { display: block; }
+body.clean-map-view .brand-corner-logo {
+  top: max(2.8vh, 18px);
+  width: clamp(78px, 8.2vw, 158px);
+}
+body.clean-map-view .brand-watermark {
+  width: min(36vw, 560px);
+  opacity: .065;
+}
+@media (max-width: 740px) {
+  body:not(.clean-map-view) .hud-header { right: 86px; }
+  .brand-corner-logo { width: 62px; right: 10px; top: 12px; }
+  .brand-watermark { width: min(45vw, 260px); }
+  body.clean-map-view .brand-corner-logo {
+    width: clamp(70px, 15vw, 100px);
+    right: 12px;
+    top: 16px;
+  }
+  body.clean-map-view .brand-watermark { width: min(54vw, 340px); }
+}
