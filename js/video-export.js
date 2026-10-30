@@ -40,6 +40,7 @@
   }
 
   const BRAND_TITLE = "Deep Strike Activity Map";
+  const BRAND_PINK = "#ff7ece"; // Match the Fire Point reference and .brand-title CSS.
 
   function loadBrandLogo(src) {
     return new Promise((resolve, reject) => {
@@ -87,17 +88,23 @@
     ctx.textBaseline = "middle";
     ctx.font = '800 39px "Courier New", monospace';
     const ribbonWidth = Math.ceil(ctx.measureText(BRAND_TITLE).width) + 38;
-    ctx.fillStyle = "rgba(239, 137, 195, 0.96)";
+    ctx.shadowColor = "rgba(0, 0, 0, .27)";
+    ctx.shadowBlur = 15;
+    ctx.shadowOffsetY = 4;
+    ctx.fillStyle = BRAND_PINK;
     ctx.fillRect(36, 36, ribbonWidth, 63);
-    ctx.fillStyle = "#130c17";
+    ctx.shadowColor = "transparent";
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+    ctx.fillStyle = "#161019";
     ctx.fillText(BRAND_TITLE, 55, 69);
 
     // Render the exact historical playback instant in both time zones.
     // This deliberately does not use the viewer's current wall-clock time.
     ctx.font = '700 27px "Courier New", monospace';
     ctx.fillStyle = "#f5f8ff";
-    ctx.shadowColor = "rgba(0,0,0,.95)";
-    ctx.shadowBlur = 8;
+    ctx.shadowColor = "rgba(0,0,0,.92)";
+    ctx.shadowBlur = 10;
     ctx.shadowOffsetY = 2;
     ctx.fillText("Kyiv time: " + formatKyiv(ms), 38, 149);
     ctx.fillText("Beijing time: " + formatBeijing(ms), 38, 190);
