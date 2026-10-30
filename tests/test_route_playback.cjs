@@ -14,7 +14,7 @@ function section(first, last) {
 }
 const geometry = section("function routePointProgress(", "async function buildIllustrativeUavRoutes(");
 const animation = section("function routeWavePeriods(", "function showRouteLoading(");
-const missiles = section("function buildIllustrativeMissileRoutes(", "function buildIllustrativeRoutes(");
+const missiles = section("function buildIllustrativeMissileRoutes(", "async function buildIllustrativeRoutes(");
 
 const flatDistance = (a, b) => Math.hypot(a.lon - b.lon, a.lat - b.lat);
 const lineLength = points => points.slice(1).reduce((total, p, i) =>
