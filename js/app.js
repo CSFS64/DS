@@ -51,6 +51,9 @@ const state = {
   routeUpdateTimer: null,
   observedCountSignature: "",
   routeCatalogCache: null,
+  activeEventHours: new Map(),
+  activeReportHours: new Map(),
+  longEvents: [],
   regionVisualStates: new Map(),
   placeVisualStates: new Map(),
   cleanView: false,
@@ -84,10 +87,50 @@ function isoDateInZone(ms, zone = "Europe/Moscow") {
   return `${by.year}-${by.month}-${by.day}`;
 }
 
+const clockFormatters = new Map();
+function clockFormatter(zone, includeDate) {
+  const key = zone + "|" + (includeDate ? "date" : "time");
+  if (!clockFormatters.has(key)) {
+    const options = { timeZone: zone, hour: "2-digit", minute: "2-digit", hour12: false };
+    if (includeDate) Object.assign(options, { month: "2-digit", day: "2-digit" });
+    clockFormatters.set(key, new Intl.DateTimeFormat("zh-CN", options));
+  }
+  return clockFormatters.get(key);
+}
+
+function archiveHour(ms) { return Math.floor(ms / 3600000); }
+
+function prepareActiveArchiveIndex() {
+  const eventHours = new Map(), reportHours = new Map(), longEvents = [];
+  const add = (index, hour, item) => {
+    let bucket = index.get(hour);
+    if (!bucket) { bucket = []; index.set(hour, bucket); }
+    bucket.push(item);
+  };
+  for (const event of state.archive.events || []) {
+    const start = Date.parse(event.start), end = Date.parse(event.end);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) continue;
+    event._startMs = start;
+    event._endMs = end;
+    const h0 = archiveHour(start), h1 = archiveHour(end);
+    if (h1 - h0 > 168) { longEvents.push(event); continue; }
+    for (let h = h0; h <= h1; h++) add(eventHours, h, event);
+  }
+  for (const report of state.archive.reports || []) {
+    const at = Date.parse(report.at);
+    if (!Number.isFinite(at) || !reportRepresentsLiveThreat(report)) continue;
+    report._atMs = at;
+    for (let h = archiveHour(at - 45 * 60000); h <= archiveHour(at + 45 * 60000); h++) {
+      add(reportHours, h, report);
+    }
+  }
+  state.activeEventHours = eventHours;
+  state.activeReportHours = reportHours;
+  state.longEvents = longEvents;
+}
+
 function formatTime(ms, zone, includeDate = true) {
-  const opts = { timeZone: zone, hour: "2-digit", minute: "2-digit", hour12: false };
-  if (includeDate) Object.assign(opts, { month: "2-digit", day: "2-digit" });
-  return new Intl.DateTimeFormat("zh-CN", opts).format(new Date(ms));
+  return clockFormatter(zone, includeDate).format(new Date(ms));
 }
 
 function formatDuration(start, end) {
@@ -192,6 +235,7 @@ async function init() {
     return;
   }
 
+  prepareActiveArchiveIndex();
   initializeDates();
   wireControls();
   rebuildTimeline();
@@ -2179,6 +2223,7 @@ function updateRouteOverlay(force = false) {
     return;
   }
   if (!state.routeFullData) {
+    if (state.exportRecording) return; // Never regenerate the route geometry during export.
     // If a job was cancelled when the routes were hidden, restart only when
     // visible again. Repeated animation frames never start duplicate jobs.
     if (!state.routeBuildPending) {
@@ -2915,14 +2960,17 @@ function buildReportDots() {
 }
 
 function activeEvents() {
-  return (state.archive.events || []).filter(e => state.currentMs >= Date.parse(e.start) && state.currentMs <= Date.parse(e.end));
+  const ms = state.currentMs;
+  return [
+    ...(state.activeEventHours.get(archiveHour(ms)) || []),
+    ...state.longEvents,
+  ].filter(e => ms >= e._startMs && ms <= e._endMs);
 }
 
 function activeReports() {
-  const span = 45 * 60 * 1000;
-  return (state.archive.reports || []).filter(r =>
-    reportRepresentsLiveThreat(r) &&
-    Math.abs(state.currentMs - Date.parse(r.at)) <= span
+  const ms = state.currentMs;
+  return (state.activeReportHours.get(archiveHour(ms)) || []).filter(
+    r => Math.abs(ms - r._atMs) <= 45 * 60 * 1000
   );
 }
 
