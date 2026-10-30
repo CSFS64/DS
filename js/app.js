@@ -41,6 +41,7 @@ const state = {
   routeFeatureCount: 0,
   routeFullData: null,
   routeStaticData: null,
+  routeCache: new Map(),
   routeDisplayedPhase: "",
   routeGeneration: 0,
   routeDrawAt: 0,
@@ -2190,6 +2191,15 @@ async function buildRoutesCooperatively(start, end, key, generation) {
       arrows: data.arrows,
     };
     state.routeFeatureCount = data.lines.features.length;
+    state.routeCache.delete(key);
+    state.routeCache.set(key, {
+      data: state.routeFullData,
+      staticData: state.routeStaticData,
+      count: state.routeFeatureCount,
+    });
+    while (state.routeCache.size > 4) {
+      state.routeCache.delete(state.routeCache.keys().next().value);
+    }
     state.routeDisplayedPhase = "";
     state.routeBuildPending = false;
     hideRouteLoading();
@@ -2247,6 +2257,19 @@ function updateRouteOverlay(force = false) {
     state.routeStaticData = null;
     state.routeFeatureCount = 0;
     state.routeDisplayedPhase = "";
+    // Switching back to a previously selected time window is instantaneous.
+    const cached = state.routeCache.get(key);
+    if (cached) {
+      state.routeFullData = cached.data;
+      state.routeStaticData = cached.staticData;
+      state.routeFeatureCount = cached.count;
+      state.routeCache.delete(key);
+      state.routeCache.set(key, cached);
+      state.routeBuildPending = false;
+      hideRouteLoading();
+      updateRouteOverlay();
+      return;
+    }
     state.routeBuildPending = true;
     lineSource.setData(EMPTY_FEATURE_COLLECTION);
     arrowSource.setData(EMPTY_FEATURE_COLLECTION);
