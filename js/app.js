@@ -2601,9 +2601,12 @@ function wireControls() {
     state.currentMs = state.cumulativeMs;
     updateCumulativeHandle();
     scheduleInteractiveRender();
+    scheduleRouteRefresh(160);
   });
   els.scrubber.addEventListener("input", () => {
+    const leavingCumulative = state.viewMode === "cumulative";
     state.viewMode = "realtime";
+    if (leavingCumulative) updateRouteOverlay();
     state.currentMs = selectionStartMs() + (selectionEndMs() - selectionStartMs()) * (+els.scrubber.value / 1000);
     scheduleInteractiveRender();
   });
@@ -2649,6 +2652,7 @@ function wireControls() {
 function rebuildTimeline() {
   if (!els.dateStart.value || !els.dateEnd.value) return;
   if (els.dateStart.value > els.dateEnd.value) els.dateEnd.value = els.dateStart.value;
+  stopPlayback();
   state.timelineStartMs = parseMoscowDate(els.dateStart.value, false);
   state.timelineEndMs = parseMoscowDate(els.dateEnd.value, true);
   els.rangeStart.value = 0;
@@ -3087,10 +3091,10 @@ function togglePlayback() {
 }
 
 function stopPlayback() {
-  const wasPlaying = Boolean(state.timer);
   clearInterval(state.timer); state.timer = null;
   els.playButton.classList.remove("is-playing"); els.playButton.textContent = "▶ PLAY";
-  if (wasPlaying) updateRouteOverlay(); // Restore the entire line when stopped.
+  // Playing/stopping never regenerates static routes. The user must move
+  // the yellow cumulative cursor to request a cumulative route snapshot.
 }
 
 function sourceStatusText(region) {
