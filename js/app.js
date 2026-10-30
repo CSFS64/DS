@@ -1642,7 +1642,7 @@ async function buildIllustrativeUavRoutes(startMs, endMs, isCancelled = () => fa
     const terminal = terminals[index];
     // If this observation is already an upstream support for a longer
     // downstream route, do not draw a second independent border-origin route.
-    if (consumedTerminalNodeKeys.has(terminal.nodeKey)) return;
+    if (consumedTerminalNodeKeys.has(terminal.nodeKey)) continue;
 
     const seed = [terminal.region, terminal.placeName, terminal.at, index].join("|");
     const startOptions = rankBorderStarts(terminal, seed, usedVisibleStarts).slice(0, 18);
@@ -1778,7 +1778,7 @@ async function buildIllustrativeUavRoutes(startMs, endMs, isCancelled = () => fa
       }
     }
 
-    if (!chosen) return;
+    if (!chosen) continue;
     usedVisibleStarts.push(chosen.visibleStart);
     chosen.chain.forEach(node => linkedNodeKeys.add(node.nodeKey));
 
