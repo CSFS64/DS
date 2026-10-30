@@ -14,6 +14,13 @@
   <main class="app-shell">
     <section class="map-panel">
       <div id="map" aria-label="历史无人机与导弹活动地图"></div>
+      <div id="routeLoading" class="route-loading" role="status" aria-live="polite">
+        <div class="route-loading-content">
+          <span class="route-loading-spinner" aria-hidden="true"></span>
+          <strong id="routeLoadingText">正在加载地图与历史数据…</strong>
+          <small>地图和时间轴正在准备，请稍候</small>
+        </div>
+      </div>
       <div id="videoExportStatus" class="video-export-status" role="status" aria-live="polite" hidden></div>
       <div class="map-grid" aria-hidden="true"></div>
 
