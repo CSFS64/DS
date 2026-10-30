@@ -2600,6 +2600,16 @@ function wireControls() {
     state.cumulativeMs = Math.min(Math.max(state.cumulativeMs, selectionStartMs()), selectionEndMs());
     state.currentMs = state.cumulativeMs;
     updateCumulativeHandle();
+    // The previous snapshot is no longer valid at the new yellow cutoff.
+    // Clear it once, without doing heavy route work inside the drag event.
+    if (state.mapReady && currentRouteKey() !== state.routeSelectionKey &&
+        state.routeDisplayedPhase !== "empty") {
+      state.map.getSource("archive-uav-routes")?.setData(EMPTY_FEATURE_COLLECTION);
+      state.map.getSource("archive-uav-route-arrows")?.setData(EMPTY_FEATURE_COLLECTION);
+      state.routeDisplayedPhase = "empty";
+      state.routeFeatureCount = 0;
+      setRouteLayerVisibility();
+    }
     scheduleInteractiveRender();
     scheduleRouteRefresh(160);
   });
