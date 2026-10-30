@@ -40,6 +40,10 @@ const state = {
   routesVisible: true,
   routeSelectionKey: "",
   routeFeatureCount: 0,
+  routeFullData: null,
+  routeDisplayedPhase: "",
+  exportRecording: false,
+  exportCancelled: false,
   interactiveRenderFrame: 0,
   routeUpdateTimer: null,
   observedCountSignature: "",
@@ -60,7 +64,9 @@ const els = {
   handleStart: $("handleStart"), handleEnd: $("handleEnd"), handleCumulative: $("handleCumulative"),
   playButton: $("playButton"), scrubber: $("scrubber"), currentTimeLabel: $("currentTimeLabel"), speedSelect: $("speedSelect"),
   clockMoscow: $("clockMoscow"), clockKyiv: $("clockKyiv"), clockBeijing: $("clockBeijing"),
-  routeToggle: $("routeToggle"), cleanViewButton: $("cleanViewButton"), exportPngButton: $("exportPngButton"),
+  routeToggle: $("routeToggle"), cleanViewButton: $("cleanViewButton"),
+  exportVideoButton: $("exportVideoButton"), videoDurationSelect: $("videoDurationSelect"),
+  videoExportStatus: $("videoExportStatus"),
 };
 
 function parseMoscowDate(dateStr, endOfDay = false) {
@@ -1802,6 +1808,68 @@ function buildIllustrativeUavRoutes(startMs, endMs) {
   };
 }
 
+// The geometry remains an inference, not an observed flight track. During
+// playback reveal each existing illustrative line according to its evidence
+// timestamps; paused/scrubbed views always show its complete geometry.
+function routeRevealProgress(feature, atMs) {
+  const first = Date.parse(feature.properties.earliest_at);
+  const last = Date.parse(feature.properties.latest_at);
+  if (!Number.isFinite(first) || !Number.isFinite(last)) return 1;
+  const windowLength = Math.max(1, selectionEndMs() - selectionStartMs());
+  const leadMs = Math.min(60 * 60 * 1000, windowLength / 6);
+  const beginning = last - first >= 15 * 60 * 1000 ? first : Math.max(selectionStartMs(), last - leadMs);
+  if (last <= beginning) return atMs >= last ? 1 : 0;
+  return Math.max(0, Math.min(1, (atMs - beginning) / (last - beginning)));
+}
+
+function clippedIllustrativeLine(feature, progress) {
+  if (progress <= 0) return null;
+  if (progress >= 1) return feature;
+  const points = feature.geometry.coordinates;
+  if (points.length < 2) return null;
+  let remaining = routeLengthKm(points) * progress;
+  const visible = [points[0]];
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1], b = points[i];
+    const length = haversineKm({ lon: a[0], lat: a[1] }, { lon: b[0], lat: b[1] });
+    if (length <= 0) continue;
+    if (remaining >= length) {
+      visible.push(b);
+      remaining -= length;
+    } else {
+      const t = Math.max(0, remaining / length);
+      visible.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+      break;
+    }
+  }
+  if (visible.length < 2) return null;
+  return { ...feature, geometry: { type: "LineString", coordinates: visible } };
+}
+
+function illustratedRoutesAtTime(fullData, ms) {
+  const lines = [], arrows = [];
+  for (const feature of fullData.lines.features) {
+    const line = clippedIllustrativeLine(feature, routeRevealProgress(feature, ms));
+    if (!line) continue;
+    lines.push(line);
+    const coords = line.geometry.coordinates;
+    if (coords.length < 2) continue;
+    const a = coords[coords.length - 2], b = coords[coords.length - 1];
+    arrows.push({
+      type: "Feature",
+      properties: {
+        ...line.properties,
+        bearing: bearingDeg({ lon: a[0], lat: a[1] }, { lon: b[0], lat: b[1] }),
+      },
+      geometry: { type: "Point", coordinates: b },
+    });
+  }
+  return {
+    lines: { type: "FeatureCollection", features: lines },
+    arrows: { type: "FeatureCollection", features: arrows },
+  };
+}
+
 function setRouteLayerVisibility() {
   if (!state.mapReady) return;
   const visibility = state.routesVisible ? "visible" : "none";
@@ -1871,16 +1939,23 @@ function updateRouteOverlay(force = false) {
     state.archive.reports?.length || 0,
     state.archive.events?.length || 0,
   ].join(":");
-  if (!force && key === state.routeSelectionKey) {
-    setRouteLayerVisibility();
-    return;
+  if (force || key !== state.routeSelectionKey || !state.routeFullData) {
+    state.routeSelectionKey = key;
+    state.routeFullData = buildIllustrativeUavRoutes(start, end);
+    state.routeFeatureCount = state.routeFullData.lines.features.length;
+    state.routeDisplayedPhase = "";
+    applyRouteEvidenceStates(state.routeFullData.evidenceStates);
   }
-  state.routeSelectionKey = key;
-  const data = buildIllustrativeUavRoutes(start, end);
-  state.routeFeatureCount = data.lines.features.length;
-  lineSource.setData(data.lines);
-  arrowSource.setData(data.arrows);
-  applyRouteEvidenceStates(data.evidenceStates);
+  const animating = Boolean(state.timer || state.exportRecording);
+  const phase = animating ? "playing:" + Math.round(state.currentMs / 1000) : "complete";
+  if (state.routeDisplayedPhase !== phase) {
+    const displayed = animating
+      ? illustratedRoutesAtTime(state.routeFullData, state.currentMs)
+      : state.routeFullData;
+    lineSource.setData(displayed.lines);
+    arrowSource.setData(displayed.arrows);
+    state.routeDisplayedPhase = phase;
+  }
   setRouteLayerVisibility();
 }
 
@@ -2122,6 +2197,8 @@ function installArchiveLayers() {
   });
 
   state.routeSelectionKey = "";
+  state.routeFullData = null;
+  state.routeDisplayedPhase = "";
   state.previousRoutePlaceIds.clear();
 
   state.map.addSource("archive-places", { type: "geojson", data: preparePlacesGeoJson() });
@@ -2307,6 +2384,7 @@ function applyCleanView(enabled) {
     els.cleanViewButton.textContent = state.cleanView ? "EXIT CLEAN VIEW" : "CLEAN VIEW";
   }
   if (state.cleanView && els.detailPanel) els.detailPanel.hidden = true;
+  if (state.cleanView && document.activeElement instanceof HTMLElement) document.activeElement.blur();
   scheduleMapResize();
 }
 
@@ -2347,50 +2425,6 @@ function waitForMapRender(timeoutMs = 5000) {
   });
 }
 
-function snapshotMapCanvas() {
-  const source = state.map?.getCanvas?.();
-  if (!source || !source.width || !source.height) return null;
-
-  // Copy the freshly rendered WebGL frame immediately into a normal 2D canvas.
-  // This freezes the image before any later WebGL redraw can affect export.
-  const frozen = document.createElement("canvas");
-  frozen.width = source.width;
-  frozen.height = source.height;
-  const ctx = frozen.getContext("2d", { alpha: false, willReadFrequently: true });
-  if (!ctx) return null;
-  ctx.fillStyle = "#050a0f";
-  ctx.fillRect(0, 0, frozen.width, frozen.height);
-  ctx.drawImage(source, 0, 0);
-  return frozen;
-}
-
-function snapshotLooksBlank(canvas) {
-  if (!canvas) return true;
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  if (!ctx) return false;
-
-  const sampleX = [0.12, 0.28, 0.44, 0.60, 0.76, 0.90];
-  const sampleY = [0.14, 0.31, 0.48, 0.65, 0.82];
-  const colors = [];
-  for (const fx of sampleX) {
-    for (const fy of sampleY) {
-      const x = Math.min(canvas.width - 1, Math.max(0, Math.floor(canvas.width * fx)));
-      const y = Math.min(canvas.height - 1, Math.max(0, Math.floor(canvas.height * fy)));
-      const p = ctx.getImageData(x, y, 1, 1).data;
-      colors.push([p[0], p[1], p[2]]);
-    }
-  }
-
-  let minR = 255, minG = 255, minB = 255, maxR = 0, maxG = 0, maxB = 0;
-  for (const [r, g, b] of colors) {
-    minR = Math.min(minR, r); maxR = Math.max(maxR, r);
-    minG = Math.min(minG, g); maxG = Math.max(maxG, g);
-    minB = Math.min(minB, b); maxB = Math.max(maxB, b);
-  }
-  const spread = (maxR - minR) + (maxG - minG) + (maxB - minB);
-  return spread < 9;
-}
-
 function exportFileStamp(ms) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/Kyiv", year: "numeric", month: "2-digit", day: "2-digit",
@@ -2400,61 +2434,86 @@ function exportFileStamp(ms) {
   return `${p.year}${p.month}${p.day}_${p.hour}${p.minute}`;
 }
 
-function currentExportEndMs() {
-  if (state.viewMode === "cumulative") return Math.min(state.cumulativeMs, selectionEndMs());
-  return Math.min(Math.max(state.currentMs, selectionStartMs()), selectionEndMs());
-}
-
-async function exportCleanPng() {
-  if (!state.mapReady || !state.map || state.exportBusy) return;
-  state.exportBusy = true;
-  const wasClean = state.cleanView;
-  const originalText = els.exportPngButton?.textContent || "EXPORT PNG";
-  if (els.exportPngButton) {
-    els.exportPngButton.disabled = true;
-    els.exportPngButton.textContent = "RENDERING…";
+async function exportTimelineVideo() {
+  if (!state.mapReady || state.exportBusy) return;
+  const start = selectionStartMs(), end = selectionEndMs();
+  if (!(end > start)) {
+    window.alert("请在时间轴上选择有效的起止范围。");
+    return;
   }
-
+  if (!window.DeepstrikeVideoExporter) {
+    window.alert("视频导出组件未加载。请刷新页面后重试。");
+    return;
+  }
+  stopPlayback();
+  const previous = { ms: state.currentMs, cumulativeMs: state.cumulativeMs, mode: state.viewMode, clean: state.cleanView };
+  const originalText = els.exportVideoButton?.textContent || "EXPORT VIDEO";
+  state.exportBusy = true;
+  state.exportRecording = true;
+  state.exportCancelled = false;
+  if (els.exportVideoButton) {
+    els.exportVideoButton.disabled = true;
+    els.exportVideoButton.textContent = "RECORDING…";
+  }
+  if (els.videoExportStatus) {
+    els.videoExportStatus.hidden = false;
+    els.videoExportStatus.textContent = "PREPARING VIDEO · ESC 取消 · 保持标签页在前台";
+  }
   try {
-    if (!wasClean) applyCleanView(true);
-    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    if (!previous.clean) applyCleanView(true);
     await waitForMapRender();
-
-    let frozen = snapshotMapCanvas();
-    if (snapshotLooksBlank(frozen)) {
-      // One retry handles browsers that dispatch the first render while the
-      // resized WebGL backing buffer is still settling.
-      await waitForMapRender();
-      frozen = snapshotMapCanvas();
-    }
-    if (!frozen || snapshotLooksBlank(frozen)) {
-      throw new Error("Map render was blank after retry");
-    }
-
-    const blob = await new Promise(resolve => frozen.toBlob(resolve, "image/png"));
-    if (!blob) throw new Error("PNG export returned an empty image");
-
-    const start = selectionStartMs();
-    const end = currentExportEndMs();
-    const filename = `deepstrike_${exportFileStamp(start)}-${exportFileStamp(end)}_KYIV.png`;
-    const url = URL.createObjectURL(blob);
+    const durationSeconds = Number(els.videoDurationSelect?.value || 60);
+    const result = await window.DeepstrikeVideoExporter.record({
+      map: state.map,
+      start,
+      end,
+      durationSeconds,
+      routesVisible: state.routesVisible,
+      formatTime: ms => formatTime(ms, "Europe/Moscow"),
+      renderAt: ms => {
+        state.viewMode = "realtime";
+        state.currentMs = ms;
+        render();
+      },
+      onProgress: progress => {
+        if (els.videoExportStatus) {
+          els.videoExportStatus.textContent = "RECORDING " + Math.round(progress * 100) +
+            "% · ESC 取消 · 保持标签页在前台";
+        }
+      },
+      isCancelled: () => state.exportCancelled,
+    });
+    const filename = "deepstrike_" + exportFileStamp(start) + "-" + exportFileStamp(end) +
+      "_KYIV." + result.extension;
+    const url = URL.createObjectURL(result.blob);
     const link = document.createElement("a");
     link.href = url;
     link.download = filename;
     document.body.appendChild(link);
     link.click();
     link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    if (els.videoExportStatus) els.videoExportStatus.textContent = "VIDEO READY · 下载已开始";
   } catch (err) {
-    console.error("PNG export failed", err);
-    if (els.exportPngButton) els.exportPngButton.textContent = "EXPORT FAILED";
-    await new Promise(resolve => setTimeout(resolve, 900));
+    console.error("Video export failed", err);
+    if (!state.exportCancelled) {
+      window.alert("视频导出失败：" + (err?.message || String(err)) +
+        "\n请在最新版 Chrome/Edge 中重试，并在录制时保持页面处于前台。");
+    }
   } finally {
-    if (!wasClean) applyCleanView(false);
+    state.exportRecording = false;
     state.exportBusy = false;
-    if (els.exportPngButton) {
-      els.exportPngButton.disabled = false;
-      els.exportPngButton.textContent = originalText;
+    state.exportCancelled = false;
+    state.currentMs = previous.ms;
+    state.cumulativeMs = previous.cumulativeMs;
+    state.viewMode = previous.mode;
+    state.routeDisplayedPhase = "";
+    if (!previous.clean) applyCleanView(false);
+    render();
+    if (els.videoExportStatus) els.videoExportStatus.hidden = true;
+    if (els.exportVideoButton) {
+      els.exportVideoButton.disabled = false;
+      els.exportVideoButton.textContent = originalText;
     }
   }
 }
@@ -2505,9 +2564,24 @@ function wireControls() {
     });
   }
   if (els.cleanViewButton) els.cleanViewButton.addEventListener("click", toggleCleanView);
-  if (els.exportPngButton) els.exportPngButton.addEventListener("click", exportCleanPng);
+  if (els.exportVideoButton) els.exportVideoButton.addEventListener("click", exportTimelineVideo);
   document.addEventListener("keydown", event => {
-    if (event.key === "Escape" && state.cleanView) applyCleanView(false);
+    if (event.key === "Escape") {
+      if (state.exportBusy) {
+        state.exportCancelled = true;
+        event.preventDefault();
+      } else if (state.cleanView) {
+        applyCleanView(false);
+      }
+      return;
+    }
+    if (event.code !== "Space" || event.repeat || event.isComposing ||
+        event.ctrlKey || event.metaKey || event.altKey) return;
+    const target = event.target;
+    if (target instanceof Element &&
+        (target.closest("input, select, textarea, button, [contenteditable]") || target.isContentEditable)) return;
+    event.preventDefault();
+    if (!state.exportBusy) togglePlayback();
   });
   document.addEventListener("fullscreenchange", () => {
     if (state.cleanView && !document.fullscreenElement) applyCleanView(false);
@@ -2933,6 +3007,7 @@ function renderScrubber() {
 }
 
 function togglePlayback() {
+  if (state.exportBusy) return;
   if (state.timer) { stopPlayback(); return; }
   state.viewMode = "realtime";
   const start = selectionStartMs(), end = selectionEndMs();
@@ -2944,11 +3019,14 @@ function togglePlayback() {
     if (state.currentMs >= end) { state.currentMs = end; stopPlayback(); }
     render();
   }, 100);
+  updateRouteOverlay();
 }
 
 function stopPlayback() {
+  const wasPlaying = Boolean(state.timer);
   clearInterval(state.timer); state.timer = null;
   els.playButton.classList.remove("is-playing"); els.playButton.textContent = "▶ PLAY";
+  if (wasPlaying) updateRouteOverlay(); // Restore the entire line when stopped.
 }
 
 function sourceStatusText(region) {
