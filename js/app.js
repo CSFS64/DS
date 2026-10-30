@@ -2029,8 +2029,11 @@ function routeWavePeriods(feature) {
     const travelEnd = wave.end - wave.tailLagMs;
     const points = [{ at: wave.start, progress: 0 }];
     for (const a of wave.anchors) {
-      const at = Math.min(travelEnd, Math.max(wave.start,
-        a.from + (a.to - a.from) * .25));
+      // Final arrival is paced to the period of observed activity, instead of
+      // making a pulse vanish while the supporting alert remains active.
+      const finalCheckpoint = a.progress >= 1 - 1e-8;
+      const at = finalCheckpoint ? travelEnd :
+        Math.min(travelEnd, Math.max(wave.start, a.from + (a.to - a.from) * .25));
       points.push({ at, progress: a.progress });
     }
     points.push({ at: travelEnd, progress: 1 });
