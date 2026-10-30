@@ -25,6 +25,8 @@ test("288 min/s choice and uploaded logo appear in clean and regular views", () 
   assert.match(html, /id="brandBeijingTime"/);
   assert.match(css, /\.map-branding \{ display: block; \}/);
   assert.match(css, /body\.clean-map-view \.brand-meta \{ display: block; \}/);
+  assert.match(css, /background: #ff7ece;/, "pink ribbon matches reference");
+  assert.match(css, /color: #161019;/, "dark text retains contrast on pink");
   assert.match(css, /\.brand-watermark \{[\s\S]*?opacity: \.065;/);
   assert.match(css, /body\.clean-map-view \.brand-watermark[\s\S]*?opacity: \.065;/);
 });
@@ -82,6 +84,8 @@ test("video canvas burns two changing time labels, corner logo and faint waterma
   assert.ok(labels.includes("Kyiv time: 10/16 08:38"));
   assert.ok(labels.includes("Beijing time: 10/16 13:38"));
   assert.match(video, /await loadBrandLogo\(brandLogoSrc\)/);
+  assert.match(video, /const BRAND_PINK = "#ff7ece"/);
+  assert.match(video, /ctx\.fillStyle = BRAND_PINK;/);
   assert.match(app, /formatKyiv: ms => formatTime\(ms, "Europe\/Kyiv"\)/);
   assert.match(app, /formatBeijing: ms => formatTime\(ms, "Asia\/Shanghai"\)/);
 });
