@@ -97,18 +97,21 @@
       ctx.drawImage(logo, width-right-logoWidth, logoTop, logoWidth,logoHeight);
       ctx.restore();
 
-      // Keep map-tile credit discreet but legible. No bottom credits bar.
-      ctx.save();
-      ctx.font = '11px "Courier New", monospace';
-      ctx.textAlign = "right";
-      ctx.textBaseline = "top";
-      ctx.fillStyle = "#dce8f0";
-      ctx.shadowColor = "#000";
-      ctx.shadowBlur = 6;
-      ctx.fillText("© OpenStreetMap contributors · OpenFreeMap",
-        width-right, logoTop+logoHeight+12);
-      ctx.restore();
     }
+
+    // Keep the required map attribution in the lower-right corner, safely
+    // above the five-pixel blue progress strip and away from the upper logo.
+    // The same HUD canvas is composited into the exported 1920×1080 video.
+    ctx.save();
+    ctx.font = '11px "Courier New", monospace';
+    ctx.textAlign = "right";
+    ctx.textBaseline = "bottom";
+    ctx.fillStyle = "#dce8f0";
+    ctx.shadowColor = "#000";
+    ctx.shadowBlur = 6;
+    ctx.fillText("© OpenStreetMap contributors · OpenFreeMap",
+      width - right, height - Math.max(18, 26 * factor));
+    ctx.restore();
 
     // Match the existing Fire Point pink title and the two historical clocks.
     ctx.save();
