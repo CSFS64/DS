@@ -43,8 +43,9 @@ jobs:
           node --check js/app.js
           node --check js/route-animation.js
           node --check js/route-canvas.js
+          node --check js/presentation-hud.js
           node --check js/video-export.js
       - name: Test static routes, animated waves and video branding
-        run: node --test tests/test_route_playback.cjs tests/test_route_waves.cjs tests/test_route_smooth.cjs tests/test_branding.cjs
+        run: node --test tests/test_route_playback.cjs tests/test_route_waves.cjs tests/test_route_smooth.cjs tests/test_branding.cjs tests/test_presentation_hud.cjs
       - name: Validate detailed Ukraine GeoJSON
         run: python -m json.tool data/ukraine-regions.geojson > /dev/null
