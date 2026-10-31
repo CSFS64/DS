@@ -1547,17 +1547,47 @@ function segmentsProperlyIntersect(a, b, c, d) {
          ((o3 > eps && o4 < -eps) || (o3 < -eps && o4 > eps));
 }
 
+// A geometry's bounding box never changes after its candidate route is built.
+// The WeakMap avoids re-scanning previously accepted polylines on every trial.
+const routeCrossingBoundsCache = new WeakMap();
+function routeCrossingBounds(coords) {
+  let bounds = routeCrossingBoundsCache.get(coords);
+  if (bounds) return bounds;
+  let minLon = Infinity, minLat = Infinity, maxLon = -Infinity, maxLat = -Infinity;
+  for (const [lon, lat] of coords) {
+    if (lon < minLon) minLon = lon;
+    if (lon > maxLon) maxLon = lon;
+    if (lat < minLat) minLat = lat;
+    if (lat > maxLat) maxLat = lat;
+  }
+  bounds = [minLon, minLat, maxLon, maxLat];
+  routeCrossingBoundsCache.set(coords, bounds);
+  return bounds;
+}
+
 function countRouteCrossings(coords, existingRoutes) {
   let crossings = 0;
+  const [minX, minY, maxX, maxY] = routeCrossingBounds(coords);
   for (const existing of existingRoutes) {
     const other = existing.geometry?.coordinates || existing;
+    // Safe broad-phase reject: disjoint coordinate boxes cannot intersect.
+    const [oMinX, oMinY, oMaxX, oMaxY] = routeCrossingBounds(other);
+    if (maxX < oMinX || oMaxX < minX || maxY < oMinY || oMaxY < minY) continue;
     for (let i = 1; i < coords.length; i++) {
       // Ignore the first/last tiny pieces: nearby routes may legitimately fan
       // out from the border or converge near a shared reported location.
       if (i < 3 || i > coords.length - 3) continue;
+      const a = coords[i - 1], b = coords[i];
+      const aMinX = Math.min(a[0], b[0]), aMaxX = Math.max(a[0], b[0]);
+      const aMinY = Math.min(a[1], b[1]), aMaxY = Math.max(a[1], b[1]);
       for (let j = 1; j < other.length; j++) {
         if (j < 3 || j > other.length - 3) continue;
-        if (segmentsProperlyIntersect(coords[i - 1], coords[i], other[j - 1], other[j])) {
+        const c = other[j - 1], d = other[j];
+        // Safe narrow-phase reject; actual crossing still uses the *same*
+        // orientation test and same 4-crossing threshold as before.
+        if (aMaxX < Math.min(c[0], d[0]) || Math.max(c[0], d[0]) < aMinX ||
+            aMaxY < Math.min(c[1], d[1]) || Math.max(c[1], d[1]) < aMinY) continue;
+        if (segmentsProperlyIntersect(a, b, c, d)) {
           crossings += 1;
           if (crossings >= 4) return crossings;
         }
@@ -1608,12 +1638,13 @@ async function buildIllustrativeUavRoutes(startMs, endMs, cancelled = () => fals
     );
   });
 
+  // Preserve the original sort and route scoring. Evaluate every terminal
+  // instead of truncating the candidate list at 140.
   terminals = terminals
     .sort((a, b) => {
       if (Math.abs(a.lat - b.lat) > 0.15) return b.lat - a.lat;
       return a.lon - b.lon || a.at - b.at;
-    })
-    .slice(0, 140);
+    });
 
   // Keep the original terminal selection and scoring exactly, but yield while
   // exploring candidates so a long historical range does not freeze the tab.
@@ -1626,6 +1657,7 @@ async function buildIllustrativeUavRoutes(startMs, endMs, cancelled = () => fals
   const lineFeatures = [];
   const arrowFeatures = [];
   const linkedNodeKeys = new Set();
+  const terminalNodeKeys = new Set(terminals.map(node => node.nodeKey));
   const usedVisibleStarts = [];
   const consumedTerminalNodeKeys = new Set();
 
@@ -1782,7 +1814,7 @@ async function buildIllustrativeUavRoutes(startMs, endMs, cancelled = () => fals
     // Upstream terminals that form part of this longer route should not later
     // spawn their own independent line from the border.
     for (const support of chosen.supports) {
-      if (terminals.some(node => node.nodeKey === support.nodeKey)) {
+      if (terminalNodeKeys.has(support.nodeKey)) {
         consumedTerminalNodeKeys.add(support.nodeKey);
       }
     }
