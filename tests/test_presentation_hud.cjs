@@ -112,3 +112,25 @@ test("video uses full-bleed layering and guards unexpected distorted source shap
   assert.deepEqual(events.slice(-2).map(e=>e.slice(1)),[[0,1075,1920,5],[0,1075,960,5]]);
   assert.throws(()=>draw(ctx,{width:1920,height:1200},50,0,100,()=>"",()=>"",null,routes,overlay),/16:9/);
 });
+
+
+test("map attribution sits in lower right above the blue strip, never below the logo",()=>{
+  const events=[];
+  const ctx={
+    font:"",textAlign:"",textBaseline:"",
+    save(){},restore(){},
+    fillText:(text,x,y)=>events.push({text,x,y,align:ctx.textAlign,baseline:ctx.textBaseline}),
+    fillRect(){},drawImage(){},measureText:()=>({width:420}),
+    beginPath(){},moveTo(){},lineTo(){},stroke(){},
+  };
+  hud.drawHud(ctx,1920,1080,{map:{
+    unproject:([x,y])=>({lng:x*.001,lat:50})
+  },ms:0,formatKyiv:()=>"",formatBeijing:()=>""});
+  const marks=events.filter(x=>x.text.startsWith("© OpenStreetMap"));
+  assert.equal(marks.length,1);
+  const mark=marks[0];
+  assert.equal(mark.align,"right");
+  assert.equal(mark.baseline,"bottom");
+  assert.ok(mark.x>1850 && mark.x<=1920,"right-aligned near right map edge");
+  assert.ok(mark.y>1000 && mark.y<1075,"lower right, above 5px blue progress");
+});
