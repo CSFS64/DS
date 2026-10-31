@@ -69,10 +69,11 @@ test("288 min/s runs at display rate, independent of 10Hz map updates", () => {
     speedSelect:{value:"288"}};
   let mapUpdates=0,waveUpdates=0;
   const obj = new Function("state","els","selectionStartMs","selectionEndMs",
-    "performance","render","updateRouteOverlay","requestAnimationFrame",
-    "cancelAnimationFrame",source+"return {togglePlayback,stopPlayback};")(
+    "performance","render","updateRouteOverlay","updatePresentationProgress",
+    "requestAnimationFrame","cancelAnimationFrame",
+    source+"return {togglePlayback,stopPlayback};")(
       state,els,()=>0,()=>10*3600000,{now:()=>0},
-      ()=>{mapUpdates++;},()=>{waveUpdates++;},rAF,cancel);
+      ()=>{mapUpdates++;},()=>{waveUpdates++;},()=>{},rAF,cancel);
   obj.togglePlayback();
   for(let i=1;i<=60;i++){
     const id=state.timer, frame=scheduled.get(id);
