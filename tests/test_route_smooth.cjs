@@ -118,20 +118,22 @@ test("playback canvas has no per-frame GeoJSON setData; static mode remains unto
 
 test("export composites the overlay between basemap and branding",()=>{
   assert.match(app,/routeOverlay: els\.playbackRouteCanvas/);
-  const source=fragment(video,"const BRAND_TITLE =","function sleep(");
+  const source=fragment(video,"function drawVideoFrame(","function sleep(");
   const draw=new Function(source+"return drawVideoFrame;")();
   const imgs=[];
   const ctx={
     canvas:{width:1920,height:1080},fillRect(){},fillText(){},save(){},restore(){},
     measureText:t=>({width:t.length*20}),drawImage:img=>imgs.push(img)
   };
-  const map={width:1920,height:1080}, overlay={width:1920,height:1080,hidden:false};
-  const logo={naturalWidth:220,naturalHeight:208};
-  draw(ctx,map,0,0,100,()=>"",()=>"",logo,overlay);
+  const map={width:1920,height:1080};
+  const overlay={width:1920,height:1080,hidden:false};
+  const hud={width:1920,height:1080,hidden:false};
+  draw(ctx,map,0,0,100,()=>"",()=>"",null,overlay,hud);
   assert.equal(imgs[0],map);
   assert.equal(imgs[1],overlay);
-  assert.equal(imgs.length,4,"map, dynamic canvas, watermark, logo");
+  assert.equal(imgs[2],hud,"same presentation HUD as fullscreen");
+  assert.equal(imgs.length,3,"map, dynamic canvas and shared HUD; no black footer");
   imgs.length=0;overlay.hidden=true;
-  draw(ctx,map,0,0,100,()=>"",()=>"",logo,overlay);
-  assert.equal(imgs.length,3,"no double drawing after wave disappears");
+  draw(ctx,map,0,0,100,()=>"",()=>"",null,overlay,hud);
+  assert.equal(imgs.length,2,"only map and shared HUD after a wave ends");
 });
