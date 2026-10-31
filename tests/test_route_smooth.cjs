@@ -95,8 +95,8 @@ test("head moves on every display frame between published observation anchors", 
     route_id:"x",latest_at:new Date(base+2*3600000).toISOString()
   },geometry:{type:"LineString",coordinates:[[0,0],[1,0],[2,0]]}};
   const prep=anim.prepare({lines:{features:[feature]}});
-  const a=anim.renderAt(prep,base+45*60000);
-  const b=anim.renderAt(prep,base+46*60000);
+  const a=anim.renderAt(prep,base+90*60000);
+  const b=anim.renderAt(prep,base+91*60000);
   assert.equal(a.count,1);
   assert.equal(b.count,1);
   const x1=a.lines.features[0].geometry.coordinates.at(-1)[0];
