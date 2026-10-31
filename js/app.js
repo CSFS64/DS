@@ -88,6 +88,7 @@ const els = {
   exportVideoButton: $("exportVideoButton"),
   videoExportStatus: $("videoExportStatus"),
   routeLoading: $("routeLoading"), routeLoadingText: $("routeLoadingText"),
+  playbackRouteCanvas: $("playbackRouteCanvas"),
 };
 
 function parseMoscowDate(dateStr, endOfDay = false) {
@@ -415,6 +416,21 @@ function initMap() {
   });
 
   state.map.on("click", (ev) => handleMapClick(ev));
+
+  // A paused wave must remain attached to its geographic path when the map
+  // is panned/zoomed. During playback the main rAF loop already repaints it.
+  let routeMapMoveFrame = 0;
+  const repaintPausedRoute = () => {
+    if (state.timer || routeMapMoveFrame || !state.mapReady ||
+        state.viewMode !== "realtime" || !state.playbackActivated ||
+        !state.routesVisible) return;
+    routeMapMoveFrame = requestAnimationFrame(() => {
+      routeMapMoveFrame = 0;
+      updateRouteOverlay();
+    });
+  };
+  state.map.on("move", repaintPausedRoute);
+  state.map.on("resize", repaintPausedRoute);
 }
 
 function firstSymbolLayerId() {
@@ -2075,15 +2091,12 @@ function ensurePlaybackRoutes() {
 }
 
 function updatePlaybackRouteOverlay(lineSource, arrowSource) {
+  const canvas = els.playbackRouteCanvas;
+  const painter = window.DeepstrikeRouteCanvas;
   if (!state.routesVisible || !state.playbackActivated) {
     if (state.playbackPending) ++state.playbackGeneration;
     state.playbackPending = false;
-    if (state.playbackFrameKey !== "empty") {
-      lineSource.setData(EMPTY_FEATURE_COLLECTION);
-      arrowSource.setData(EMPTY_FEATURE_COLLECTION);
-      state.playbackFrameKey = "empty";
-    }
-    state.playbackLastCount = 0;
+    painter?.clear(canvas);
     state.routeFeatureCount = 0;
     hideRouteLoading();
     setRouteLayerVisibility();
@@ -2091,41 +2104,32 @@ function updatePlaybackRouteOverlay(lineSource, arrowSource) {
   }
   const key = playbackRangeKey();
   if (state.playbackReadyKey !== key || !state.playbackPrepared) {
+    painter?.clear(canvas);
     if (state.playbackFrameKey !== "loading:" + key) {
-      lineSource.setData(EMPTY_FEATURE_COLLECTION);
-      arrowSource.setData(EMPTY_FEATURE_COLLECTION);
       state.playbackFrameKey = "loading:" + key;
-      state.playbackLastCount = 0;
       state.routeFeatureCount = 0;
       setRouteLayerVisibility();
     }
     ensurePlaybackRoutes();
-    // A prepared selection may already exist in the shared static cache.
+    // Existing cache entries can become ready synchronously.
     if (!state.playbackPending && state.playbackReadyKey === key) {
       updatePlaybackRouteOverlay(lineSource, arrowSource);
     }
     return;
   }
-  // MapLibre is asynchronous; don't make it re-parse large GeoJSON every 100ms
-  // unless the historical instant moved. Export frames are never throttled.
-  const phase = Math.round(state.currentMs / 1000) + ":" + key;
-  const now = performance.now();
-  if (phase === state.playbackFrameKey) return;
-  if (!state.exportRecording && state.timer && now - state.playbackRenderedAt < 105) return;
+
+  // The route canvas paints directly in the same animation frame as the clock.
+  // No GeoJSON setData / worker parsing / symbol placement per frame; those
+  // remain in use only for the original yellow-cumulative static route mode.
   const frame = window.DeepstrikeRouteAnimation.renderAt(
     state.playbackPrepared, state.currentMs
   );
-  // In the gaps between waves, only advance the clock: do not send empty
-  // GeoJSON to the WebGL worker at every animation tick.
-  if (frame.count || state.playbackLastCount) {
-    lineSource.setData(frame.lines);
-    arrowSource.setData(frame.arrows);
+  painter?.paint(canvas, state.map, frame);
+  state.playbackFrameKey = Math.round(state.currentMs) + ":" + key;
+  if (frame.count !== state.routeFeatureCount) {
+    state.routeFeatureCount = frame.count;
+    setRouteLayerVisibility();
   }
-  state.playbackLastCount = frame.count;
-  state.playbackFrameKey = phase;
-  state.playbackRenderedAt = now;
-  state.routeFeatureCount = frame.count;
-  setRouteLayerVisibility();
 }
 
 function setRouteLayerVisibility() {
@@ -2173,6 +2177,7 @@ function updateRouteOverlay() {
     updatePlaybackRouteOverlay(lineSource, arrowSource);
     return;
   }
+  window.DeepstrikeRouteCanvas?.clear(els.playbackRouteCanvas);
   if (state.routeLayerMode !== "cumulative") {
     if (state.playbackPending) ++state.playbackGeneration;
     state.playbackPending = false;
@@ -2267,6 +2272,7 @@ function installArchiveLayers() {
   state.appliedRouteVisibility = "";
   state.routeDrawAt = 0;
   state.routeLayerMode = "";
+  window.DeepstrikeRouteCanvas?.clear(els.playbackRouteCanvas);
   state.playbackFrameKey = "";
   state.playbackLastCount = 0;
   if (state.playbackPending) ++state.playbackGeneration;
@@ -2749,6 +2755,7 @@ async function exportTimelineVideo() {
       end,
       durationSeconds,
       routesVisible: state.routesVisible,
+      routeOverlay: els.playbackRouteCanvas,
       formatTime: ms => formatTime(ms, "Europe/Moscow"),
       formatKyiv: ms => formatTime(ms, "Europe/Kyiv"),
       formatBeijing: ms => formatTime(ms, "Asia/Shanghai"),
@@ -3341,24 +3348,45 @@ function togglePlayback() {
   state.playbackActivated = true;
   const start = selectionStartMs(), end = selectionEndMs();
   if (state.currentMs >= end) state.currentMs = start;
-  els.playButton.classList.add("is-playing"); els.playButton.textContent = "Ⅱ PAUSE";
+  els.playButton.classList.add("is-playing");
+  els.playButton.textContent = "Ⅱ PAUSE";
+
+  // DOM/feature-state changes are relatively expensive, so update the map
+  // observations/clock about 10 times/s while the route canvas itself follows
+  // every display refresh (typically ~60Hz). The historical clock is driven
+  // by actual elapsed wall-time and the user's chosen min/s speed.
   let lastFrameAt = performance.now();
-  state.timer = setInterval(() => {
-    const now = performance.now();
-    const elapsedSeconds = Math.min(0.4, Math.max(0, now - lastFrameAt) / 1000);
+  let lastMapRenderAt = -Infinity;
+  const step = now => {
+    if (!state.timer) return;
+    const elapsedSeconds = Math.min(.35, Math.max(0, now - lastFrameAt) / 1000);
     lastFrameAt = now;
     const minutesPerSecond = +els.speedSelect.value;
-    state.currentMs += minutesPerSecond * 60 * 1000 * elapsedSeconds;
-    if (state.currentMs >= end) { state.currentMs = end; stopPlayback(); }
-    render();
-  }, 100);
+    state.currentMs = Math.min(end, state.currentMs +
+      minutesPerSecond * 60000 * elapsedSeconds);
+    if (now - lastMapRenderAt >= 95 || state.currentMs >= end) {
+      render({ skipRoutes: true });
+      lastMapRenderAt = now;
+    }
+    updateRouteOverlay();
+    if (state.currentMs >= end) {
+      stopPlayback();
+      render({ skipRoutes: true });
+      return;
+    }
+    state.timer = requestAnimationFrame(step);
+  };
+  state.timer = requestAnimationFrame(step);
   updateRouteOverlay();
 }
 
 function stopPlayback() {
-  clearInterval(state.timer); state.timer = null;
-  els.playButton.classList.remove("is-playing"); els.playButton.textContent = "▶ PLAY";
-  // Keep the exact current wave at pause; no static full-length line appears.
+  if (state.timer) cancelAnimationFrame(state.timer);
+  state.timer = null;
+  els.playButton.classList.remove("is-playing");
+  els.playButton.textContent = "▶ PLAY";
+  // Pausing freezes the exact current head and tail; do not substitute a
+  // complete static route for the current dynamic frame.
 }
 
 function sourceStatusText(region) {
