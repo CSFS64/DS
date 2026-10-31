@@ -99,6 +99,9 @@
       canvas.hidden = true;
       return 0;
     }
+    // Unhide *before* querying layout dimensions; a display:none canvas
+    // reports zero clientWidth and would otherwise never become visible.
+    canvas.hidden = false;
     const width = canvas.clientWidth, height = canvas.clientHeight;
     if (!width || !height) { canvas.hidden = true; return 0; }
     const dpr = Math.min(2, Math.max(1, root?.devicePixelRatio || 1));
