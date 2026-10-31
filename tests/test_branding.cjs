@@ -93,6 +93,6 @@ test("video canvas burns two changing time labels, corner logo and faint waterma
 test("the static cumulative-route selection is not changed by branding", () => {
   assert.match(app, /function staticRouteWindow\(\)/);
   assert.match(app, /state\.viewMode !== "cumulative"/);
-  assert.match(app, /\.slice\(0, 140\)/);
+  assert.doesNotMatch(app, /\.slice\(0, 140\)/);
   assert.doesNotMatch(app, /function routeWavePeriods|function buildIllustrativeMissileRoutes/);
 });

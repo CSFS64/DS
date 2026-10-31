@@ -112,9 +112,13 @@ test("changing only the cumulative pointer requests precisely the bounded time r
   assert.equal(builds.length, 2, "playback never generates any routes");
 });
 
-test("original route selection and 140 candidate cap are restored; waves and missiles removed", () => {
+test("all static terminals are considered while the original route logic remains unchanged", () => {
   assert.match(originalBuilder, /sort\(\(a, b\) => \{\s*if \(Math\.abs\(a\.lat - b\.lat\) > 0\.15\)/);
-  assert.match(originalBuilder, /\.slice\(0, 140\)/);
+  assert.doesNotMatch(originalBuilder, /\.slice\(0, 140\)/);
+  assert.match(originalBuilder, /for \(let index = 0; index < terminals\.length; index\+\+\)/);
+  assert.match(originalBuilder, /const terminalNodeKeys = new Set\(terminals\.map\(node => node\.nodeKey\)\)/);
+  assert.match(originalBuilder, /terminalNodeKeys\.has\(support\.nodeKey\)/);
+  assert.doesNotMatch(originalBuilder, /groupWaveTerminals/);
   assert.match(originalBuilder, /rankBorderStarts\(terminal, seed, usedVisibleStarts\)\.slice\(0, 18\)/);
   assert.match(originalBuilder, /routeRegionMetrics\(coords, litRegions\)/);
   assert.match(originalBuilder, /await yieldIfNeeded\(\)/);
@@ -122,4 +126,48 @@ test("original route selection and 140 candidate cap are restored; waves and mis
   assert.match(js, /scheduleRouteRefresh\(160\)/);
   assert.match(js, /if \(leavingCumulative\) updateRouteOverlay\(\)/);
   assert.match(js, /if \(state\.exportRecording\)/);
+});
+
+
+test("fast crossing count exactly matches the original geometry test", () => {
+  const source = section("function orient2d(", "function routeLengthKm(");
+  const { countRouteCrossings, segmentsProperlyIntersect } =
+    new Function(source + "\nreturn {countRouteCrossings,segmentsProperlyIntersect};")();
+  function originalCrossings(coords, existingRoutes) {
+    let count = 0;
+    for (const item of existingRoutes) {
+      const other = item.geometry?.coordinates || item;
+      for (let i = 1; i < coords.length; i++) {
+        if (i < 3 || i > coords.length - 3) continue;
+        for (let j = 1; j < other.length; j++) {
+          if (j < 3 || j > other.length - 3) continue;
+          if (segmentsProperlyIntersect(coords[i - 1], coords[i], other[j - 1], other[j])) {
+            count++;
+            if (count >= 4) return count;
+          }
+        }
+      }
+    }
+    return count;
+  }
+  let seed = 1001;
+  const rnd = () => {
+    seed = (1664525 * seed + 1013904223) >>> 0;
+    return seed / 0x100000000;
+  };
+  const polyline = (length, xOffset, yOffset) => Array.from({length}, () => [
+    xOffset + (rnd() - .5) * 10, yOffset + (rnd() - .5) * 10
+  ]);
+  for (let run = 0; run < 150; run++) {
+    const main = polyline(7 + (run % 10), 0, 0);
+    const compare = Array.from({length: 6 + run % 8}, (_, i) => {
+      const farAway = i % 4 === 0;
+      const coords = polyline(8 + i, farAway ? 150 : 0, farAway ? 150 : 0);
+      return i % 2 ? {geometry:{type:"LineString", coordinates:coords}} : coords;
+    });
+    assert.equal(countRouteCrossings(main, compare), originalCrossings(main, compare),
+      "same crossings after spatial bounds pruning: run " + run);
+    // The WeakMap cache should never change answers on repeated identical calls.
+    assert.equal(countRouteCrossings(main, compare), originalCrossings(main, compare));
+  }
 });
