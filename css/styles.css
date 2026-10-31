@@ -178,6 +178,13 @@ button, input, select { font: inherit; }
   border-top: 1.5px solid #ff9b2f;
   border-radius: 50%;
 }
+.legend-route-missile {
+  border-top-color: #581b39;
+  box-shadow: 0 -2px 8px rgba(255,74,115,.40);
+}
+.legend-route-missile::after { border-top-color: #ff537c; }
+.route-toggle:not(.is-on) .legend-route-missile { opacity: .28; box-shadow: none; }
+
 .route-toggle {
   display: flex;
   align-items: center;

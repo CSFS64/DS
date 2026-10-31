@@ -27,6 +27,7 @@
       linesByRoute.set(feature.properties?.route_id, {
         points, confidence: Number(feature.properties?.confidence ?? .8),
         weight: Number(feature.properties?.route_weight ?? 1),
+        threat: feature.properties?.threat === "missile" ? "missile" : "uav",
       });
     }
     ctx.save();
@@ -38,23 +39,24 @@
       for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
       ctx.stroke();
     }
-    for (const {points, confidence, weight} of linesByRoute.values()) {
+    for (const {points, confidence, weight, threat} of linesByRoute.values()) {
+      const missile = threat === "missile";
       const c = clamp(confidence, 0.25, 1);
       const wt = clamp(weight, 1, 1.55);
       ctx.globalAlpha = 0.20 * c;
-      ctx.strokeStyle = "#ff8b1f";
+      ctx.strokeStyle = missile ? "#ff355d" : "#ff8b1f";
       ctx.lineWidth = glowWidth * wt;
       strokePath(points);
       ctx.globalAlpha = 0.76 * c;
-      ctx.strokeStyle = "#6f2c08";
+      ctx.strokeStyle = missile ? "#581b39" : "#6f2c08";
       ctx.lineWidth = casingWidth * wt;
       strokePath(points);
       ctx.globalAlpha = .97 * c;
-      ctx.strokeStyle = "#ff8b1f";
+      ctx.strokeStyle = missile ? "#ff4a73" : "#ff8b1f";
       ctx.lineWidth = coreWidth * wt;
       strokePath(points);
       ctx.globalAlpha = .48 * c;
-      ctx.strokeStyle = "#ffc263";
+      ctx.strokeStyle = missile ? "#ffb3c9" : "#ffc263";
       ctx.lineWidth = Math.max(.5, coreWidth * .28) * wt;
       strokePath(points);
     }
@@ -62,7 +64,8 @@
     // Triangles are drawn synchronously at the *current* wave head in this
     // same frame. There is no independent MapLibre symbol refresh to stutter.
     for (const feature of frame?.arrows?.features || []) {
-      const points = linesByRoute.get(feature.properties?.route_id)?.points;
+      const route = linesByRoute.get(feature.properties?.route_id);
+      const points = route?.points;
       if (!points || points.length < 2) continue;
       const tip = points[points.length - 1];
       let prev = points[points.length - 2];
@@ -81,8 +84,8 @@
       ctx.lineTo(bx + nx * size * .50, by + ny * size * .50);
       ctx.lineTo(bx - nx * size * .50, by - ny * size * .50);
       ctx.closePath();
-      ctx.fillStyle = "#ff9a2f";
-      ctx.strokeStyle = "#5e2608";
+      ctx.fillStyle = route.threat === "missile" ? "#ff537c" : "#ff9a2f";
+      ctx.strokeStyle = route.threat === "missile" ? "#541a32" : "#5e2608";
       ctx.lineWidth = 1.2;
       ctx.fill();
       ctx.stroke();

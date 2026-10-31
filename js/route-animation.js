@@ -60,7 +60,12 @@
     // segment, using a nominal visualization pace. The later anchor instants
     // remain the original publication times, never replaced by frame times.
     const first = anchors[0];
-    const baselineDuration = Math.max(25 * 60000, distance.total / 210 * HOUR);
+    // Do not animate fast missile events with the UAV's nominal 210 km/h
+    // baseline. Both are illustrative when location timestamps are absent.
+    const missile = feature.properties?.threat === "missile";
+    const baselineDuration = missile
+      ? Math.max(6 * 60000, distance.total / 950 * HOUR)
+      : Math.max(25 * 60000, distance.total / 210 * HOUR);
     let start = first
       ? first.at - baselineDuration * first.progress
       : arrival - baselineDuration;
@@ -78,7 +83,9 @@
     // Delay the tail. At arrival the leading tip stops, but the trailing
     // tip continues to the target; once they meet, the entire line disappears.
     const duration = arrival - start;
-    const lag = clamp(duration * .33, 12 * 60000, 90 * 60000);
+    const lag = missile
+      ? clamp(duration * .33, 3 * 60000, 20 * 60000)
+      : clamp(duration * .33, 12 * 60000, 90 * 60000);
     return { feature, coords, distance, start, arrival, end: arrival + lag, lag, checkpoints };
   }
   function headAt(route, ms) {

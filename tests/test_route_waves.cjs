@@ -99,11 +99,11 @@ test("realtime animation is independent from cumulative static route inference",
             html.indexOf('src="js/app.js"'));
   assert.match(app,/function staticRouteWindow\(\)/);
   assert.match(app,/function updatePlaybackRouteOverlay\(/);
-  assert.match(app,/const data = await buildIllustrativeUavRoutes\(/);
+  assert.match(app,/const data = await buildIllustrativeAllRoutes\(/);
   assert.match(app,/animationAnchors\.set\(props\.route_id/);
   assert.match(app,/playbackRangeKey\(\)/);
   assert.match(app,/state\.playbackActivated = true;/);
   assert.match(app,/state\.playbackActivated = previous\.playbackActivated;/);
   assert.doesNotMatch(app,/\.slice\(0, 140\)/);
-  assert.doesNotMatch(app,/function buildIllustrativeMissileRoutes/);
+  assert.match(app,/async function buildIllustrativeMissileRoutes\(/);
 });

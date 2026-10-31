@@ -129,7 +129,9 @@ test("all static terminals are considered while the original route logic remains
   assert.match(originalBuilder, /rankBorderStarts\(terminal, seed, usedVisibleStarts\)\.slice\(0, 18\)/);
   assert.match(originalBuilder, /routeRegionMetrics\(coords, litRegions\)/);
   assert.match(originalBuilder, /await yieldIfNeeded\(\)/);
-  assert.doesNotMatch(js, /function routeWavePeriods|function illustratedRoutesAtTime|function buildIllustrativeMissileRoutes/);
+  assert.doesNotMatch(js, /function routeWavePeriods|function illustratedRoutesAtTime/);
+  assert.match(js, /async function buildIllustrativeMissileRoutes\(/);
+  assert.match(js, /async function buildIllustrativeAllRoutes\(/);
   assert.match(js, /scheduleRouteRefresh\(160\)/);
   assert.match(js, /if \(leavingCumulative\) updateRouteOverlay\(\)/);
   assert.match(js, /if \(state\.exportRecording\)/);
