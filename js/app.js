@@ -1993,6 +1993,121 @@ async function buildRoutesCooperatively(start, end, key, generation) {
   }
 }
 
+// Real-time replay uses the SAME selected-window static geometry, computed
+// once. The animation module only clips a moving section of each line.
+function playbackRangeKey() {
+  return [Math.round(selectionStartMs()), Math.round(selectionEndMs()),
+    state.archive?.reports?.length || 0, state.archive?.events?.length || 0].join(":");
+}
+
+function ensurePlaybackRoutes() {
+  if (!state.routesVisible || !window.DeepstrikeRouteAnimation) return Promise.resolve(false);
+  const key = playbackRangeKey();
+  if (state.playbackReadyKey === key && state.playbackPrepared) return Promise.resolve(true);
+  if (state.playbackPending && state.playbackRequestedKey === key) return state.playbackPromise;
+
+  const generation = ++state.playbackGeneration;
+  state.playbackRequestedKey = key;
+  state.playbackPending = true;
+  state.playbackReadyKey = "";
+  state.playbackPrepared = null;
+  state.playbackFrameKey = "";
+
+  const cached = state.routeCache.get(key);
+  if (cached && cached.animationAnchors) {
+    state.playbackPrepared = window.DeepstrikeRouteAnimation.prepare({
+      ...cached.staticData, animationAnchors: cached.animationAnchors,
+    });
+    state.playbackReadyKey = key;
+    state.playbackPending = false;
+    hideRouteLoading();
+    return Promise.resolve(true);
+  }
+
+  showRouteLoading("正在准备历史路线动画（仅计算一次）…");
+  const task = (async () => {
+    try {
+      await new Promise(resolve => setTimeout(resolve, 30));
+      const cancelled = () => generation !== state.playbackGeneration ||
+        !state.routesVisible || state.viewMode !== "realtime";
+      if (cancelled()) return false;
+      const data = await buildIllustrativeUavRoutes(
+        selectionStartMs(), selectionEndMs(), cancelled
+      );
+      if (cancelled() || !data || key !== playbackRangeKey()) return false;
+      state.playbackPrepared = window.DeepstrikeRouteAnimation.prepare(data);
+      state.playbackReadyKey = key;
+      state.playbackFrameKey = "";
+      // Share the full raw geometry with static cumulative mode when its
+      // yellow cursor is at the same selected end. Keep the normal LRU size.
+      state.routeCache.delete(key);
+      state.routeCache.set(key, {
+        staticData: { lines: data.lines, arrows: data.arrows },
+        animationAnchors: data.animationAnchors,
+        count: data.lines.features.length,
+      });
+      while (state.routeCache.size > 4) {
+        state.routeCache.delete(state.routeCache.keys().next().value);
+      }
+      hideRouteLoading();
+      return true;
+    } catch (error) {
+      if (generation !== state.playbackGeneration) return false;
+      console.error("Historical route animation generation failed", error);
+      state.playbackPrepared = window.DeepstrikeRouteAnimation.prepare({
+        lines: EMPTY_FEATURE_COLLECTION,
+      });
+      state.playbackReadyKey = key;
+      hideRouteLoading();
+      return false;
+    } finally {
+      if (generation === state.playbackGeneration) {
+        state.playbackPending = false;
+        state.playbackPromise = null;
+        if (state.mapReady && state.viewMode === "realtime") updateRouteOverlay();
+      }
+    }
+  })();
+  state.playbackPromise = task;
+  return task;
+}
+
+function updatePlaybackRouteOverlay(lineSource, arrowSource) {
+  if (!state.routesVisible || !state.playbackActivated) {
+    if (state.playbackPending) ++state.playbackGeneration;
+    state.playbackPending = false;
+    if (state.playbackFrameKey !== "empty") {
+      lineSource.setData(EMPTY_FEATURE_COLLECTION);
+      arrowSource.setData(EMPTY_FEATURE_COLLECTION);
+      state.playbackFrameKey = "empty";
+    }
+    state.routeFeatureCount = 0;
+    hideRouteLoading();
+    setRouteLayerVisibility();
+    return;
+  }
+  const key = playbackRangeKey();
+  if (state.playbackReadyKey !== key || !state.playbackPrepared) {
+    ensurePlaybackRoutes();
+    return;
+  }
+  // MapLibre is asynchronous; don't make it re-parse large GeoJSON every 100ms
+  // unless the historical instant moved. Export frames are never throttled.
+  const phase = Math.round(state.currentMs / 1000) + ":" + key;
+  const now = performance.now();
+  if (phase === state.playbackFrameKey) return;
+  if (!state.exportRecording && state.timer && now - state.playbackRenderedAt < 105) return;
+  const frame = window.DeepstrikeRouteAnimation.renderAt(
+    state.playbackPrepared, state.currentMs
+  );
+  lineSource.setData(frame.lines);
+  arrowSource.setData(frame.arrows);
+  state.playbackFrameKey = phase;
+  state.playbackRenderedAt = now;
+  state.routeFeatureCount = frame.count;
+  setRouteLayerVisibility();
+}
+
 function setRouteLayerVisibility() {
   if (!state.mapReady) return;
   const visibility = state.routesVisible ? "visible" : "none";
@@ -2022,6 +2137,32 @@ function updateRouteOverlay() {
   const arrowSource = state.map.getSource("archive-uav-route-arrows");
   if (!lineSource || !arrowSource) return;
   setRouteLayerVisibility();
+
+  if (state.viewMode === "realtime") {
+    if (state.routeLayerMode !== "realtime") {
+      if (state.routeBuildPending) ++state.routeGeneration;
+      state.routeBuildPending = false;
+      state.routeSelectionKey = "";
+      state.routeFullData = null;
+      state.routeStaticData = null;
+      state.routeDisplayedPhase = "empty";
+      state.routeLayerMode = "realtime";
+      lineSource.setData(EMPTY_FEATURE_COLLECTION);
+      arrowSource.setData(EMPTY_FEATURE_COLLECTION);
+    }
+    updatePlaybackRouteOverlay(lineSource, arrowSource);
+    return;
+  }
+  if (state.routeLayerMode !== "cumulative") {
+    if (state.playbackPending) ++state.playbackGeneration;
+    state.playbackPending = false;
+    state.playbackFrameKey = "";
+    state.routeLayerMode = "cumulative";
+    state.routeDisplayedPhase = "empty";
+    lineSource.setData(EMPTY_FEATURE_COLLECTION);
+    arrowSource.setData(EMPTY_FEATURE_COLLECTION);
+    hideRouteLoading();
+  }
 
   const window = state.routesVisible ? staticRouteWindow() : null;
   if (!window) {
@@ -2104,6 +2245,10 @@ function installArchiveLayers() {
   state.routeBuildPending = false;
   state.appliedRouteVisibility = "";
   state.routeDrawAt = 0;
+  state.routeLayerMode = "";
+  state.playbackFrameKey = "";
+  if (state.playbackPending) ++state.playbackGeneration;
+  state.playbackPending = false;
   state.regionVisualStates.clear();
   state.placeVisualStates.clear();
   state.observedCountSignature = "";
@@ -2675,7 +2820,9 @@ function wireControls() {
     state.viewMode = "realtime";
     if (leavingCumulative) updateRouteOverlay();
     state.currentMs = selectionStartMs() + (selectionEndMs() - selectionStartMs()) * (+els.scrubber.value / 1000);
+    state.playbackActivated = true;
     scheduleInteractiveRender();
+    updateRouteOverlay();
   });
   els.playButton.addEventListener("click", togglePlayback);
   if (els.routeToggle) {
@@ -2683,11 +2830,13 @@ function wireControls() {
       state.routesVisible = !state.routesVisible;
       if (!state.routesVisible) {
         ++state.routeGeneration;
+        ++state.playbackGeneration;
         state.routeBuildPending = false;
+        state.playbackPending = false;
         hideRouteLoading();
       }
       setRouteLayerVisibility();
-      if (state.routesVisible) updateRouteOverlay();
+      updateRouteOverlay();
     });
   }
   if (els.cleanViewButton) els.cleanViewButton.addEventListener("click", toggleCleanView);
@@ -2720,6 +2869,9 @@ function rebuildTimeline() {
   if (!els.dateStart.value || !els.dateEnd.value) return;
   if (els.dateStart.value > els.dateEnd.value) els.dateEnd.value = els.dateStart.value;
   stopPlayback();
+  state.playbackActivated = false;
+  ++state.playbackGeneration;
+  state.playbackPending = false;
   state.timelineStartMs = parseMoscowDate(els.dateStart.value, false);
   state.timelineEndMs = parseMoscowDate(els.dateEnd.value, true);
   els.rangeStart.value = 0;
@@ -2759,6 +2911,8 @@ function updateSelection(changed, interactive = false) {
   els.rangeCumulative.value = Math.round(Math.min(1, Math.max(0, cp)) * 1000);
   updateCumulativeHandle();
   if (interactive) {
+    if (state.playbackPending) ++state.playbackGeneration;
+    state.playbackPending = false;
     scheduleInteractiveRender();
     scheduleRouteRefresh(180, true);
   } else {
@@ -3146,6 +3300,7 @@ function togglePlayback() {
   if (state.exportBusy) return;
   if (state.timer) { stopPlayback(); return; }
   state.viewMode = "realtime";
+  state.playbackActivated = true;
   const start = selectionStartMs(), end = selectionEndMs();
   if (state.currentMs >= end) state.currentMs = start;
   els.playButton.classList.add("is-playing"); els.playButton.textContent = "Ⅱ PAUSE";
@@ -3165,8 +3320,7 @@ function togglePlayback() {
 function stopPlayback() {
   clearInterval(state.timer); state.timer = null;
   els.playButton.classList.remove("is-playing"); els.playButton.textContent = "▶ PLAY";
-  // Playing/stopping never regenerates static routes. The user must move
-  // the yellow cumulative cursor to request a cumulative route snapshot.
+  // Keep the exact current wave at pause; no static full-length line appears.
 }
 
 function sourceStatusText(region) {
