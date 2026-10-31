@@ -576,3 +576,56 @@ body.clean-map-view .brand-watermark {
   pointer-events: none;
 }
 .playback-route-canvas[hidden] { display: none !important; }
+
+
+/* CLEAN VIEW and exported video use a canonical 16:9 / 1920×1080
+   presentation frame. On an unusual screen shape we fit the whole frame
+   WITHOUT distorting/cropping it; 16:9 monitors fill the screen edge-to-edge. */
+body.clean-map-view .app-shell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100vw;
+  height: 100dvh;
+  min-height: 100dvh;
+}
+body.clean-map-view .map-panel {
+  flex: 0 0 auto;
+  width: min(100vw, 177.7777778dvh);
+  height: min(100dvh, 56.25vw);
+  aspect-ratio: 16 / 9;
+  min-height: 0;
+}
+body.clean-map-view .map-branding { display: none; }
+
+.presentation-hud-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 640;
+  pointer-events: none;
+}
+.presentation-hud-canvas[hidden] { display: none !important; }
+
+.presentation-progress {
+  display: none;
+  position: absolute;
+  z-index: 660;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 5px;
+  background: #143140;
+  pointer-events: none;
+  overflow: hidden;
+}
+body.clean-map-view .presentation-progress { display: block; }
+.presentation-progress-fill {
+  height: 100%;
+  width: 100%;
+  background: #39d8ff;
+  transform: scaleX(0);
+  transform-origin: left center;
+  will-change: transform;
+}

@@ -9,6 +9,7 @@ const html = fs.readFileSync(path.join(__dirname, "../index.html"), "utf8");
 const css = fs.readFileSync(path.join(__dirname, "../css/styles.css"), "utf8");
 const app = fs.readFileSync(path.join(__dirname, "../js/app.js"), "utf8");
 const video = fs.readFileSync(path.join(__dirname, "../js/video-export.js"), "utf8");
+const presentation = fs.readFileSync(path.join(__dirname, "../js/presentation-hud.js"), "utf8");
 
 function section(source, first, last) {
   const a = source.indexOf(first), b = source.indexOf(last, a + first.length);
@@ -52,42 +53,42 @@ test("visible Kyiv and Beijing clocks follow the archived playback instant", () 
   assert.equal(els.clockBeijing.textContent,els.brandBeijingTime.textContent);
 });
 
-test("video canvas burns two changing time labels, corner logo and faint watermark into frames", () => {
-  const code = section(video, 'const BRAND_TITLE =', 'function sleep(');
-  const draw = new Function(code + "return drawVideoFrame;")();
-  const calls = [];
-  const ctx = {
-    canvas:{width:1920,height:1080},
-    fillRect:(...a)=>calls.push(["rect",...a]),
-    drawImage:(...a)=>calls.push(["image",...a]),
-    fillText:(...a)=>calls.push(["text",...a]),
-    measureText:t=>({width:t.length*22}),
-    save:()=>calls.push(["save"]),
-    restore:()=>calls.push(["restore"]),
-    set globalAlpha(x){calls.push(["alpha",x]);},
-  };
-  const mapCanvas={width:1920,height:1080};
-  const logo={naturalWidth:220,naturalHeight:208};
-  const kyiv=ms=>"10/16 "+(ms===0?"03:50":"08:38");
-  const beijing=ms=>"10/16 "+(ms===0?"08:50":"13:38");
-  draw(ctx,mapCanvas,0,0,28800000,kyiv,beijing,logo);
-  let labels=calls.filter(a=>a[0]==="text").map(a=>a[1]);
-  assert.ok(labels.includes("Deep Strike Activity Map"));
-  assert.ok(labels.includes("Kyiv time: 10/16 03:50"));
-  assert.ok(labels.includes("Beijing time: 10/16 08:50"));
-  assert.equal(calls.filter(a=>a[0]==="image").length,3,
-    "map + faint center watermark + top-right logo");
-  assert.ok(calls.some(a=>a[0]==="alpha" && a[1]===.065));
-  calls.length=0;
-  draw(ctx,mapCanvas,28800000,0,28800000,kyiv,beijing,logo);
-  labels=calls.filter(a=>a[0]==="text").map(a=>a[1]);
-  assert.ok(labels.includes("Kyiv time: 10/16 08:38"));
-  assert.ok(labels.includes("Beijing time: 10/16 13:38"));
-  assert.match(video, /await loadBrandLogo\(brandLogoSrc\)/);
-  assert.match(video, /const BRAND_PINK = "#ff7ece"/);
-  assert.match(video, /ctx\.fillStyle = BRAND_PINK;/);
+test("a single HUD paints the historical clocks and scale in both fullscreen and video", () => {
+  assert.match(video, /ctx\.drawImage\(presentationOverlay, 0, 0, w, h\)/);
+  assert.match(presentation, /const TITLE = "Deep Strike Activity Map"/);
+  assert.match(presentation, /const PINK = "#ff7ece"/);
   assert.match(app, /formatKyiv: ms => formatTime\(ms, "Europe\/Kyiv"\)/);
   assert.match(app, /formatBeijing: ms => formatTime\(ms, "Asia\/Shanghai"\)/);
+  assert.match(app, /await window\.DeepstrikePresentation\.preloadLogo\(\)/);
+  const mod = { exports: {} };
+  new Function("module", presentation)(mod);
+  const hud = mod.exports;
+  const calls = [];
+  const ctx = {
+    fillRect:(...args)=>calls.push(["rect",...args]),
+    fillText:(...args)=>calls.push(["text",...args]),
+    drawImage:(...args)=>calls.push(["image",...args]),
+    measureText:(text)=>({width:text.length*21}),
+    beginPath:()=>calls.push(["begin"]),
+    moveTo:()=>calls.push(["move"]),
+    lineTo:()=>calls.push(["line"]),
+    stroke:()=>calls.push(["stroke"]),
+    save:()=>{}, restore:()=>{},
+  };
+  const map={unproject:([x,y])=>({lng:x/100,lat:y/100})};
+  const ms=123000;
+  hud.drawHud(ctx,1920,1080,{
+    map,ms,start:0,end:345000,
+    formatKyiv:t=>"Europe/Kyiv@"+t,
+    formatBeijing:t=>"Asia/Shanghai@"+t,
+  });
+  const texts=calls.filter(a=>a[0]==="text").map(a=>a[1]);
+  assert.ok(texts.includes("Deep Strike Activity Map"));
+  assert.ok(texts.includes("Kyiv time: Europe/Kyiv@123000"));
+  assert.ok(texts.includes("Beijing time: Asia/Shanghai@123000"));
+  assert.ok(texts.some(t=>/\bkm\b|\bm\b/.test(t)),"dynamic ground scale is drawn");
+  assert.ok(!texts.some(t=>/Public-source historical alerts/i.test(t)),
+    "obsolete banner is removed");
 });
 
 test("the static cumulative-route selection is not changed by branding", () => {

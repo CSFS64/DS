@@ -70,6 +70,7 @@ const state = {
   regionVisualStates: new Map(),
   placeVisualStates: new Map(),
   cleanView: false,
+  presentationLastKey: "",
   exportBusy: false,
 };
 
@@ -89,6 +90,8 @@ const els = {
   videoExportStatus: $("videoExportStatus"),
   routeLoading: $("routeLoading"), routeLoadingText: $("routeLoadingText"),
   playbackRouteCanvas: $("playbackRouteCanvas"),
+  presentationHudCanvas: $("presentationHudCanvas"),
+  presentationProgressFill: $("presentationProgressFill"),
 };
 
 function parseMoscowDate(dateStr, endOfDay = false) {
@@ -431,6 +434,18 @@ function initMap() {
   };
   state.map.on("move", repaintPausedRoute);
   state.map.on("resize", repaintPausedRoute);
+  // Keep the fullscreen scale bar geodesically calibrated when moving,
+  // panning or zooming the basemap (including when playback is paused).
+  let presentationMoveFrame = 0;
+  const paintMovedPresentation = () => {
+    if (!state.cleanView || presentationMoveFrame) return;
+    presentationMoveFrame = requestAnimationFrame(() => {
+      presentationMoveFrame = 0;
+      paintPresentationHud();
+    });
+  };
+  state.map.on("move", paintMovedPresentation);
+  state.map.on("resize", paintMovedPresentation);
 }
 
 function firstSymbolLayerId() {
@@ -2643,11 +2658,49 @@ function initializeDates() {
   els.dateEnd.value = isoDateInZone(maxMs);
 }
 
+// The same transparent 1920×1080 HUD canvas is displayed over fullscreen
+// and composited over each video frame; there is no separately drawn video
+// title/footer with slightly different geometry.
+function paintPresentationHud(force = false) {
+  const canvas = els.presentationHudCanvas;
+  const presentation = window.DeepstrikePresentation;
+  if (!canvas) return;
+  if (!state.cleanView || !state.mapReady || !presentation) {
+    canvas.hidden = true;
+    return;
+  }
+  canvas.hidden = false;
+  const mapElement = state.map.getContainer();
+  const width = mapElement.clientWidth, height = mapElement.clientHeight;
+  const center = state.map.getCenter(), zoom = state.map.getZoom();
+  const ms = state.viewMode === "cumulative" ? state.cumulativeMs : state.currentMs;
+  const key = [width, height, zoom.toFixed(4),
+    center.lng.toFixed(4), center.lat.toFixed(4), Math.floor(ms / 60000)].join("|");
+  if (!force && state.presentationLastKey === key) return;
+  state.presentationLastKey = key;
+  presentation.paint(canvas, {
+    map: state.map, ms,
+    formatKyiv: t => formatTime(t, "Europe/Kyiv"),
+    formatBeijing: t => formatTime(t, "Asia/Shanghai"),
+  });
+}
+
+function updatePresentationProgress() {
+  if (!state.cleanView || !els.presentationProgressFill) return;
+  const presentation = window.DeepstrikePresentation;
+  if (!presentation) return;
+  const ms = state.viewMode === "cumulative" ? state.cumulativeMs : state.currentMs;
+  const fraction = presentation.progress(ms, selectionStartMs(), selectionEndMs());
+  els.presentationProgressFill.style.transform = "scaleX(" + fraction + ")";
+}
+
 function scheduleMapResize() {
   requestAnimationFrame(() => requestAnimationFrame(() => {
     if (state.map) {
       state.map.resize();
       state.map.triggerRepaint();
+      state.presentationLastKey = "";
+      paintPresentationHud(true);
     }
   }));
 }
@@ -2662,6 +2715,16 @@ function applyCleanView(enabled) {
   }
   if (state.cleanView && els.detailPanel) els.detailPanel.hidden = true;
   if (state.cleanView && document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  if (!state.cleanView) {
+    if (els.presentationHudCanvas) els.presentationHudCanvas.hidden = true;
+  } else {
+    state.presentationLastKey = "";
+    window.DeepstrikePresentation?.preloadLogo().then(() => {
+      paintPresentationHud(true);
+    }).catch(error => console.warn("Presentation logo unavailable:", error));
+    paintPresentationHud(true);
+    updatePresentationProgress();
+  }
   scheduleMapResize();
 }
 
@@ -2750,7 +2813,10 @@ async function exportTimelineVideo() {
     if (state.exportCancelled) throw new Error("视频导出已取消");
     state.exportRecording = true;
     if (!previous.clean) applyCleanView(true);
+    await window.DeepstrikePresentation.preloadLogo();
+    paintPresentationHud(true);
     await waitForMapRender();
+    paintPresentationHud(true);
     const minutesPerSecond = Number(els.speedSelect.value);
     const durationSeconds = (end - start) / (minutesPerSecond * 60 * 1000);
     const result = await window.DeepstrikeVideoExporter.record({
@@ -2760,6 +2826,7 @@ async function exportTimelineVideo() {
       durationSeconds,
       routesVisible: state.routesVisible,
       routeOverlay: els.playbackRouteCanvas,
+      presentationOverlay: els.presentationHudCanvas,
       formatTime: ms => formatTime(ms, "Europe/Moscow"),
       formatKyiv: ms => formatTime(ms, "Europe/Kyiv"),
       formatBeijing: ms => formatTime(ms, "Asia/Shanghai"),
@@ -2872,6 +2939,7 @@ function wireControls() {
     state.playbackActivated = true;
     scheduleInteractiveRender();
     updateRouteOverlay();
+    updatePresentationProgress();
   });
   els.playButton.addEventListener("click", togglePlayback);
   if (els.routeToggle) {
@@ -3069,6 +3137,8 @@ function render(options = {}) {
   renderClocks(active, reports);
   renderScrubber();
   updateCumulativeHandle();
+  paintPresentationHud();
+  updatePresentationProgress();
 }
 
 function threatClass(record) {
@@ -3373,6 +3443,7 @@ function togglePlayback() {
       lastMapRenderAt = now;
     }
     updateRouteOverlay();
+    updatePresentationProgress();
     if (state.currentMs >= end) {
       stopPlayback();
       render({ skipRoutes: true });
