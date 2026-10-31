@@ -39,6 +39,11 @@ jobs:
       - name: Run parser tests
         run: python -m unittest discover -s tests -v
       - name: Check frontend JavaScript syntax
-        run: node --check js/app.js
+        run: |
+          node --check js/app.js
+          node --check js/route-animation.js
+          node --check js/video-export.js
+      - name: Test static routes, animated waves and video branding
+        run: node --test tests/test_route_playback.cjs tests/test_route_waves.cjs tests/test_branding.cjs
       - name: Validate detailed Ukraine GeoJSON
         run: python -m json.tool data/ukraine-regions.geojson > /dev/null
