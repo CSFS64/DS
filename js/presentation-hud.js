@@ -105,7 +105,7 @@
       ctx.fillStyle = "#dce8f0";
       ctx.shadowColor = "#000";
       ctx.shadowBlur = 6;
-      ctx.fillText("© OpenStreetMap · OpenFreeMap",
+      ctx.fillText("© OpenStreetMap contributors · OpenFreeMap",
         width-right, logoTop+logoHeight+12);
       ctx.restore();
     }
