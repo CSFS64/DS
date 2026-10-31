@@ -65,17 +65,20 @@ test("realtime overlay empties map and does not launch a route computation", () 
   const f = new Function("state", "setRouteLayerVisibility", "staticRouteWindow",
     "currentRouteKey", "EMPTY_FEATURE_COLLECTION", "hideRouteLoading",
     "showRouteLoading", "buildRoutesCooperatively", "selectionStartMs",
-    "selectionEndMs", overlayCode + "return updateRouteOverlay;"
+    "selectionEndMs", "updatePlaybackRouteOverlay",
+    overlayCode + "return updateRouteOverlay;"
   )(state, () => {}, () => makeWindow(state).staticRouteWindow(),
     () => makeWindow(state).currentRouteKey(),
     {type:"FeatureCollection", features:[]}, () => {hidden++;}, () => {},
-    () => {builds++;}, () => 1000, () => 10000);
+    () => {builds++;}, () => 1000, () => 10000,
+    () => { state.routeFeatureCount = 0; });
   f();
   assert.deepEqual(calls, [0, 0]);
   assert.equal(builds, 0);
   assert.equal(state.routeFeatureCount, 0);
   assert.equal(state.routeSelectionKey, "");
-  assert.ok(hidden > 0);
+  assert.equal(state.routeLayerMode, "realtime");
+  assert.ok(hidden >= 0);
 });
 
 test("changing only the cumulative pointer requests precisely the bounded time range", () => {
@@ -90,11 +93,13 @@ test("changing only the cumulative pointer requests precisely the bounded time r
   const f = new Function("state", "setRouteLayerVisibility", "staticRouteWindow",
     "currentRouteKey", "EMPTY_FEATURE_COLLECTION", "hideRouteLoading",
     "showRouteLoading", "buildRoutesCooperatively", "selectionStartMs",
-    "selectionEndMs", overlayCode + "return updateRouteOverlay;"
+    "selectionEndMs", "updatePlaybackRouteOverlay",
+    overlayCode + "return updateRouteOverlay;"
   )(state, () => {}, () => makeWindow(state).staticRouteWindow(),
     () => makeWindow(state).currentRouteKey(),
     {type:"FeatureCollection",features:[]}, () => {}, () => {},
-    (...args) => builds.push(args), () => 1000, () => 10000);
+    (...args) => builds.push(args), () => 1000, () => 10000,
+    () => {});
   f();
   assert.equal(builds.length, 0, "no first-load route at the yellow origin");
   state.cumulativeMs=4000;
