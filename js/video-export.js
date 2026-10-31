@@ -39,108 +39,45 @@
     });
   }
 
-  const BRAND_TITLE = "Deep Strike Activity Map";
-  const BRAND_PINK = "#ff7ece"; // Match the Fire Point reference and .brand-title CSS.
-
-  function loadBrandLogo(src) {
-    return new Promise((resolve, reject) => {
-      const image = new Image();
-      image.onload = () => resolve(image);
-      image.onerror = () => reject(new Error("无法加载网站标志图片；请刷新页面后重试。"));
-      image.src = src;
-      if (image.complete && image.naturalWidth > 0) resolve(image);
-    });
-  }
-
-  function paintBrandLogo(ctx, logo, x, y, width, opacity = 1) {
-    if (!logo?.naturalWidth || !logo.naturalHeight) return;
-    const height = width * logo.naturalHeight / logo.naturalWidth;
-    ctx.save();
-    ctx.globalAlpha = opacity;
-    ctx.drawImage(logo, x, y, width, height);
-    ctx.restore();
-  }
-
-  function drawVideoFrame(ctx, mapCanvas, ms, start, end, formatKyiv, formatBeijing, logo, routeOverlay) {
+  // Full bleed, fixed 1920×1080. The LIVE map is itself constrained to 16:9
+  // before recording, so no letterboxing, black footer or image cropping.
+  // The full-screen presentation HUD is composited pixel-for-pixel, giving
+  // identical logo, title, clocks and geodesic scale bar in the video.
+  function drawVideoFrame(ctx, mapCanvas, ms, start, end, formatKyiv, formatBeijing,
+      logo, routeOverlay, presentationOverlay) {
     const w = ctx.canvas.width, h = ctx.canvas.height;
-    ctx.fillStyle = "#050a0f";
-    ctx.fillRect(0, 0, w, h);
+    const ratio = mapCanvas.width / mapCanvas.height;
+    if (!Number.isFinite(ratio) || Math.abs(ratio - 16 / 9) > .01) {
+      throw new Error("地图画面尚未调整到16:9，无法无损导出，请退出并重新进入全屏后重试。");
+    }
+    ctx.drawImage(mapCanvas, 0, 0, w, h);
 
-    // Fit the selected map framing without distortion; branding is drawn
-    // on the recording canvas because DOM overlays are not captured by WebGL.
-    const scale = Math.min(w / mapCanvas.width, h / mapCanvas.height);
-    const sw = mapCanvas.width * scale, sh = mapCanvas.height * scale;
-    ctx.drawImage(mapCanvas, (w - sw) / 2, (h - sh) / 2, sw, sh);
-    // DOM canvases are not part of MapLibre's WebGL canvas; composite the
-    // same smooth route frame BEFORE labels/watermark on every video frame.
+    // Draw the moving tail/head lines from exactly the same canvas used
+    // in fullscreen. Static cumulative routes remain inside the basemap.
     if (routeOverlay && !routeOverlay.hidden &&
         routeOverlay.width > 0 && routeOverlay.height > 0) {
-      ctx.drawImage(routeOverlay, (w - sw) / 2, (h - sh) / 2, sw, sh);
+      ctx.drawImage(routeOverlay, 0, 0, w, h);
     }
+    if (!presentationOverlay || presentationOverlay.hidden ||
+        !presentationOverlay.width || !presentationOverlay.height) {
+      throw new Error("全屏标题与比例尺未准备完成，请刷新页面后重试。");
+    }
+    ctx.drawImage(presentationOverlay, 0, 0, w, h);
 
-    // Identical image asset and approximately the same proportional watermark
-    // size/opacity as CLEAN VIEW. It must remain far below map label contrast.
-    const waterWidth = Math.min(w * .36, 560);
-    const waterHeight = waterWidth * logo.naturalHeight / logo.naturalWidth;
-    paintBrandLogo(ctx, logo, (w - waterWidth) / 2, h * .52 - waterHeight / 2,
-      waterWidth, .065);
-
-    // Upper-right official channel logo, kept away from the title and clocks.
-    paintBrandLogo(ctx, logo, w - 36 - 158, 30, 158);
-
-    // Editorial title, matching the full-screen pink monospace title ribbon.
-    ctx.save();
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.font = '800 39px "Courier New", monospace';
-    const ribbonWidth = Math.ceil(ctx.measureText(BRAND_TITLE).width) + 38;
-    ctx.shadowColor = "rgba(0, 0, 0, .27)";
-    ctx.shadowBlur = 15;
-    ctx.shadowOffsetY = 4;
-    ctx.fillStyle = BRAND_PINK;
-    ctx.fillRect(36, 36, ribbonWidth, 63);
-    ctx.shadowColor = "transparent";
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetY = 0;
-    ctx.fillStyle = "#161019";
-    ctx.fillText(BRAND_TITLE, 55, 69);
-
-    // Render the exact historical playback instant in both time zones.
-    // This deliberately does not use the viewer's current wall-clock time.
-    ctx.font = '700 27px "Courier New", monospace';
-    ctx.fillStyle = "#f5f8ff";
-    ctx.shadowColor = "rgba(0,0,0,.92)";
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetY = 2;
-    ctx.fillText("Kyiv time: " + formatKyiv(ms), 38, 149);
-    ctx.fillText("Beijing time: " + formatBeijing(ms), 38, 190);
-    ctx.restore();
-
-    // Small provenance footer, no opaque bar concealing the map.
-    ctx.save();
-    ctx.font = '15px "Courier New", monospace';
-    ctx.fillStyle = "#e0eef6";
-    ctx.shadowColor = "#000";
-    ctx.shadowBlur = 6;
-    ctx.textBaseline = "middle";
-    ctx.fillText("Public-source historical alerts · Illustrative visualization", 28, h - 31);
-    ctx.textAlign = "right";
-    ctx.fillText("Map © OpenStreetMap contributors · OpenFreeMap", w - 28, h - 31);
-    ctx.restore();
-
-    const progress = Math.min(1, Math.max(0, (ms - start) / (end - start)));
+    // This 5px blue strip is the ONLY element fixed to the bottom edge.
+    // Its palette is identical to the fullscreen CSS presentation-progress.
+    const p = end > start ? Math.min(1, Math.max(0, (ms - start) / (end - start))) : 0;
     ctx.fillStyle = "#143140";
     ctx.fillRect(0, h - 5, w, 5);
     ctx.fillStyle = "#39d8ff";
-    ctx.fillRect(0, h - 5, w * progress, 5);
+    ctx.fillRect(0, h - 5, w * p, 5);
   }
 
   function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
   async function record(options) {
     const { map, start, end, durationSeconds, renderAt, onProgress, isCancelled,
-      formatKyiv, formatBeijing, routeOverlay,
-      brandLogoSrc = "assets/kalyna-osint-logo.avif" } = options;
+      formatKyiv, formatBeijing, routeOverlay, presentationOverlay } = options;
     if (!(end > start)) throw new Error("所选时间段必须大于零。");
     if (!map?.getCanvas || typeof HTMLCanvasElement.prototype.captureStream !== "function") {
       throw new Error("当前浏览器无法录制 Canvas 视频，请使用新版 Chrome 或 Edge。");
@@ -149,7 +86,6 @@
     if (typeof formatKyiv !== "function" || typeof formatBeijing !== "function") {
       throw new Error("视频时间格式化组件未就绪。");
     }
-    const logo = await loadBrandLogo(brandLogoSrc);
     const mimeType = chooseMimeType();
     const output = document.createElement("canvas");
     output.width = WIDTH;
@@ -178,7 +114,7 @@
       await waitForMapFrame(map);
       const source = map.getCanvas();
       if (!source.width || !source.height) throw new Error("地图尚未绘制完成。");
-      drawVideoFrame(ctx, source, start, start, end, formatKyiv, formatBeijing, logo, routeOverlay);
+      drawVideoFrame(ctx, source, start, start, end, formatKyiv, formatBeijing, null, routeOverlay, presentationOverlay);
       recorder.start(1000);
       const startedAt = performance.now();
 
@@ -189,7 +125,7 @@
         const ms = start + (end - start) * progress;
         renderAt(ms);
         await waitForMapFrame(map);
-        drawVideoFrame(ctx, map.getCanvas(), ms, start, end, formatKyiv, formatBeijing, logo, routeOverlay);
+        drawVideoFrame(ctx, map.getCanvas(), ms, start, end, formatKyiv, formatBeijing, null, routeOverlay, presentationOverlay);
         onProgress(progress);
         if (progress >= 1) break;
         await sleep(Math.max(0, 1000 / FPS - (performance.now() - frameStarted)));
