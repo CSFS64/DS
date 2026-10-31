@@ -51,6 +51,7 @@ const state = {
   playbackRequestedKey: "",
   playbackFrameKey: "",
   playbackRenderedAt: 0,
+  playbackLastCount: 0,
   routeLayerMode: "",
   routeDisplayedPhase: "",
   routeGeneration: 0,
@@ -2029,7 +2030,8 @@ function ensurePlaybackRoutes() {
     try {
       await new Promise(resolve => setTimeout(resolve, 30));
       const cancelled = () => generation !== state.playbackGeneration ||
-        !state.routesVisible || state.viewMode !== "realtime";
+        !state.routesVisible || state.viewMode !== "realtime" ||
+        (state.exportBusy && state.exportCancelled);
       if (cancelled()) return false;
       const data = await buildIllustrativeUavRoutes(
         selectionStartMs(), selectionEndMs(), cancelled
@@ -2081,6 +2083,7 @@ function updatePlaybackRouteOverlay(lineSource, arrowSource) {
       arrowSource.setData(EMPTY_FEATURE_COLLECTION);
       state.playbackFrameKey = "empty";
     }
+    state.playbackLastCount = 0;
     state.routeFeatureCount = 0;
     hideRouteLoading();
     setRouteLayerVisibility();
@@ -2092,6 +2095,7 @@ function updatePlaybackRouteOverlay(lineSource, arrowSource) {
       lineSource.setData(EMPTY_FEATURE_COLLECTION);
       arrowSource.setData(EMPTY_FEATURE_COLLECTION);
       state.playbackFrameKey = "loading:" + key;
+      state.playbackLastCount = 0;
       state.routeFeatureCount = 0;
       setRouteLayerVisibility();
     }
@@ -2111,8 +2115,13 @@ function updatePlaybackRouteOverlay(lineSource, arrowSource) {
   const frame = window.DeepstrikeRouteAnimation.renderAt(
     state.playbackPrepared, state.currentMs
   );
-  lineSource.setData(frame.lines);
-  arrowSource.setData(frame.arrows);
+  // In the gaps between waves, only advance the clock: do not send empty
+  // GeoJSON to the WebGL worker at every animation tick.
+  if (frame.count || state.playbackLastCount) {
+    lineSource.setData(frame.lines);
+    arrowSource.setData(frame.arrows);
+  }
+  state.playbackLastCount = frame.count;
   state.playbackFrameKey = phase;
   state.playbackRenderedAt = now;
   state.routeFeatureCount = frame.count;
@@ -2168,6 +2177,7 @@ function updateRouteOverlay() {
     if (state.playbackPending) ++state.playbackGeneration;
     state.playbackPending = false;
     state.playbackFrameKey = "";
+    state.playbackLastCount = 0;
     state.routeLayerMode = "cumulative";
     state.routeDisplayedPhase = "empty";
     lineSource.setData(EMPTY_FEATURE_COLLECTION);
@@ -2258,6 +2268,7 @@ function installArchiveLayers() {
   state.routeDrawAt = 0;
   state.routeLayerMode = "";
   state.playbackFrameKey = "";
+  state.playbackLastCount = 0;
   if (state.playbackPending) ++state.playbackGeneration;
   state.playbackPending = false;
   state.regionVisualStates.clear();
