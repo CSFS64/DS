@@ -2217,7 +2217,7 @@ function setRouteLayerVisibility() {
     els.routeToggle.setAttribute("aria-pressed", String(state.routesVisible));
     const label = els.routeToggle.querySelector(".route-toggle-label");
     if (label) {
-      const nextLabel = "示意飞行路线 " + (state.routesVisible ? "ON" : "OFF") +
+      const nextLabel = "无人机/导弹路线 " + (state.routesVisible ? "ON" : "OFF") +
         " · " + state.routeFeatureCount;
       // The moving canvas renders at screen refresh rate. Do not mutate
       // a DOM text node every frame when this displayed count is unchanged.
