@@ -893,6 +893,24 @@ function selectedWindowUavRegions(startMs, endMs) {
   return lit;
 }
 
+function selectedWindowThreatRegions(startMs, endMs, threat = "uav") {
+  if (threat === "uav") return selectedWindowUavRegions(startMs, endMs);
+  const lit = new Set();
+  for (const report of state.archive.reports || []) {
+    const at = Date.parse(report.at);
+    if (at < startMs || at > endMs || threatClass(report) !== threat ||
+        !reportRepresentsLiveThreat(report)) continue;
+    if (report.region) lit.add(report.region);
+  }
+  for (const event of state.archive.events || []) {
+    if (threatClass(event) !== threat) continue;
+    const start = Date.parse(event.start), end = Date.parse(event.end);
+    if (end < startMs || start > endMs) continue;
+    if (event.region) lit.add(event.region);
+  }
+  return lit;
+}
+
 function routeRegionMetrics(coords, litRegions) {
   const distanceByRegion = new Map();
   const sequence = [];
@@ -1003,8 +1021,8 @@ function routeCountWeight(record) {
   return 1 + Math.min(1.8, Math.log2(count + 1) * 0.42);
 }
 
-function routeObservationPoints(record, atMs, sourceType, catalog) {
-  if (threatClass(record) !== "uav" || !reportRepresentsLiveThreat(record)) return [];
+function routeObservationPoints(record, atMs, sourceType, catalog, threat = "uav") {
+  if (threatClass(record) !== threat || !reportRepresentsLiveThreat(record)) return [];
   const points = [];
   const seen = new Set();
   const recordKey = String(record.id || record.url || [record.region, record.at || record.start, record.place].join("|"));
@@ -1049,6 +1067,7 @@ function routeObservationPoints(record, atMs, sourceType, catalog) {
       region: record.region || "",
       at: atMs,
       sourceType,
+      threat,
       kind,
       formal,
       recordKey,
@@ -1088,6 +1107,7 @@ function routeObservationPoints(record, atMs, sourceType, catalog) {
         region: record.region,
         at: atMs,
         sourceType,
+        threat,
         kind,
         formal,
         recordKey,
@@ -1366,6 +1386,10 @@ function isStrongObservationKind(kind) {
     "uav_attack_activity",
     "impact_or_debris",
     "official_uav_activity",
+    "missile_detected",
+    "missile_movement",
+    "missile_launch",
+    "official_missile_activity",
   ].includes(kind);
 }
 
@@ -1389,14 +1413,18 @@ function plausibleSegment(a, b, terminal, anchor) {
   if (a.recordKey === b.recordKey) return false;
   const dtHours = (b.at - a.at) / 3600000;
   const approximateTime = routeTimestampIsApproximate(a.kind) || routeTimestampIsApproximate(b.kind);
-  if (dtHours < 0.12 || dtHours > (approximateTime ? 8.5 : 5.5)) return false;
+  const missile = a.threat === "missile" && b.threat === "missile";
+  if (missile ? (dtHours < 1/60 || dtHours > 2.5) :
+      (dtHours < 0.12 || dtHours > (approximateTime ? 8.5 : 5.5))) return false;
 
   const distance = haversineKm(a, b);
-  if (distance < 15 || distance > 800) return false;
+  if (distance < 15 || distance > (missile ? 1800 : 800)) return false;
   const speed = distance / dtHours;
-  // Attack posts may be published after the actual strike, so their timestamp
-  // is not precise enough to enforce a minimum apparent transit speed.
-  if ((!approximateTime && speed < 55) || speed > 560) return false;
+  // These are publication timestamps, not precise missile telemetry.
+  // Keep the original UAV envelope while using a separate broad missile
+  // plausibility envelope. The resulting lines remain illustrative.
+  if (missile ? (speed < 80 || speed > 9000) :
+      ((!approximateTime && speed < 55) || speed > 560)) return false;
 
   const pa = corridorProjection(anchor, terminal, a);
   const pb = corridorProjection(anchor, terminal, b);
@@ -1413,7 +1441,9 @@ function plausibleSegment(a, b, terminal, anchor) {
 
 function bestSupportChain(nodes, terminal, anchor) {
   const termProj = corridorProjection(anchor, terminal, terminal);
-  const maxAgeHours = Math.min(8.5, Math.max(2.2, termProj.routeLengthKm / 120));
+  const maxAgeHours = terminal.threat === "missile"
+    ? Math.min(2.5, Math.max(.35, termProj.routeLengthKm / 700))
+    : Math.min(8.5, Math.max(2.2, termProj.routeLengthKm / 120));
   const candidates = nodes
     .filter(n => n !== terminal)
     .filter(n => n.at < terminal.at)
@@ -1650,22 +1680,22 @@ function routeLengthKm(coords) {
   return total;
 }
 
-async function buildIllustrativeUavRoutes(startMs, endMs, cancelled = () => false) {
+async function buildIllustrativeUavRoutes(startMs, endMs, cancelled = () => false, threat = "uav") {
   const catalog = routePlaceCatalog();
-  const litRegions = selectedWindowUavRegions(startMs, endMs);
+  const litRegions = selectedWindowThreatRegions(startMs, endMs, threat);
   const raw = [];
 
   for (const report of state.archive.reports || []) {
     const at = Date.parse(report.at);
     if (at >= startMs && at <= endMs) {
-      raw.push(...routeObservationPoints(report, at, "report", catalog));
+      raw.push(...routeObservationPoints(report, at, "report", catalog, threat));
     }
   }
   for (const event of state.archive.events || []) {
     const start = Date.parse(event.start);
     const end = Date.parse(event.end);
     if (end < startMs || start > endMs) continue;
-    raw.push(...routeObservationPoints(event, Math.max(start, startMs), "alert", catalog));
+    raw.push(...routeObservationPoints(event, Math.max(start, startMs), "alert", catalog, threat));
   }
 
   const nodes = dedupeRouteObservations(raw);
@@ -1881,7 +1911,8 @@ async function buildIllustrativeUavRoutes(startMs, endMs, cancelled = () => fals
     );
 
     const props = {
-      route_id: "uav-route-" + index,
+      route_id: threat + "-route-" + index,
+      threat,
       target: terminal.place,
       region: terminal.region,
       start_border_id: chosen.visibleStart.borderId,
@@ -1958,6 +1989,27 @@ async function buildIllustrativeUavRoutes(startMs, endMs, cancelled = () => fals
   };
 }
 
+async function buildIllustrativeMissileRoutes(startMs, endMs, cancelled = () => false) {
+  return buildIllustrativeUavRoutes(startMs, endMs, cancelled, "missile");
+}
+
+// Keep each threat's candidate search separate: no mixed UAV→missile support
+// chains and no competition for the same assumed border entry.
+async function buildIllustrativeAllRoutes(startMs, endMs, cancelled = () => false) {
+  const uav = await buildIllustrativeUavRoutes(startMs, endMs, cancelled);
+  if (!uav || cancelled()) return null;
+  const missile = await buildIllustrativeMissileRoutes(startMs, endMs, cancelled);
+  if (!missile || cancelled()) return null;
+  return {
+    lines: { type: "FeatureCollection", features:
+      [...uav.lines.features, ...missile.lines.features] },
+    arrows: { type: "FeatureCollection", features:
+      [...uav.arrows.features, ...missile.arrows.features] },
+    animationAnchors: new Map([...uav.animationAnchors, ...missile.animationAnchors]),
+    evidenceStates: [...uav.evidenceStates, ...missile.evidenceStates],
+  };
+}
+
 // Only the yellow cumulative cursor drives static route inference.
 // Normal timeline playback and the white scrubber never trigger route drawing.
 function staticRouteWindow() {
@@ -1992,7 +2044,7 @@ async function buildRoutesCooperatively(start, end, key, generation) {
     // Paint the loading indicator and yield repeatedly while scoring routes.
     await new Promise(resolve => setTimeout(resolve, 30));
     if (cancelled()) return;
-    const data = await buildIllustrativeUavRoutes(start, end, cancelled);
+    const data = await buildIllustrativeAllRoutes(start, end, cancelled);
     if (cancelled() || !data || key !== currentRouteKey()) return;
     state.routeFullData = data;
     state.routeStaticData = {
@@ -2064,7 +2116,7 @@ function ensurePlaybackRoutes() {
         !state.routesVisible || state.viewMode !== "realtime" ||
         (state.exportBusy && state.exportCancelled);
       if (cancelled()) return false;
-      const data = await buildIllustrativeUavRoutes(
+      const data = await buildIllustrativeAllRoutes(
         selectionStartMs(), selectionEndMs(), cancelled
       );
       if (cancelled() || !data || key !== playbackRangeKey()) return false;
@@ -2165,7 +2217,7 @@ function setRouteLayerVisibility() {
     els.routeToggle.setAttribute("aria-pressed", String(state.routesVisible));
     const label = els.routeToggle.querySelector(".route-toggle-label");
     if (label) {
-      const nextLabel = "示意无人机路线 " + (state.routesVisible ? "ON" : "OFF") +
+      const nextLabel = "示意飞行路线 " + (state.routesVisible ? "ON" : "OFF") +
         " · " + state.routeFeatureCount;
       // The moving canvas renders at screen refresh rate. Do not mutate
       // a DOM text node every frame when this displayed count is unchanged.
