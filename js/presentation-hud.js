@@ -125,7 +125,7 @@
       left + 2, firstY + clockFont*1.52);
     ctx.restore();
 
-    const scale = scaleAt(map, width, height);
+    const scale = config.preparedScale || scaleAt(map, width, height);
     if (scale) {
       ctx.save();
       const lineW = Math.max(1.7, 2.5 * factor);
@@ -150,35 +150,37 @@
       ctx.restore();
     }
 
-    // Same small attribution on the actual video and on fullscreen playback.
-    ctx.save();
-    ctx.textAlign = "right";
-    ctx.textBaseline = "middle";
-    ctx.font = Math.max(9, Math.min(15, 15*factor)) + 'px "Courier New", monospace';
-    ctx.fillStyle = "#dce8f0";
-    ctx.shadowColor = "rgba(0,0,0,.9)";
-    ctx.shadowBlur = 5;
-    ctx.fillText("© OpenStreetMap contributors · OpenFreeMap",
-      width - Math.max(12, 27*factor), height - Math.max(18, 30*factor));
-    ctx.restore();
+    // No opaque footer or "Public-source historical alerts" band. The
+    // only element at the bottom edge is the blue playback progress strip,
+    // which is composed separately in fullscreen and exported videos.
     return scale;
   }
 
+  // Render once into the *canonical* 1920×1080 frame. Fullscreen scales
+  // this canvas uniformly inside a 16:9 map panel, while export composites
+  // the same pixels without drawing a second, divergent layout.
+  const FRAME_W = 1920, FRAME_H = 1080;
   function paint(canvas, config) {
-    if (!canvas) return null;
-    const width = canvas.clientWidth, height = canvas.clientHeight;
-    if (!width || !height) return null;
-    const dpr = Math.min(2, Math.max(1, root?.devicePixelRatio || 1));
-    const pixelW = Math.round(width*dpr), pixelH = Math.round(height*dpr);
-    if (canvas.width !== pixelW || canvas.height !== pixelH) {
-      canvas.width = pixelW;
-      canvas.height = pixelH;
+    if (!canvas || !config?.map) return null;
+    const cssWidth = canvas.clientWidth, cssHeight = canvas.clientHeight;
+    if (!cssWidth || !cssHeight) return null;
+    if (canvas.width !== FRAME_W || canvas.height !== FRAME_H) {
+      canvas.width = FRAME_W;
+      canvas.height = FRAME_H;
     }
+    const rawScale = scaleAt(config.map, cssWidth, cssHeight);
+    const ratioX = FRAME_W / cssWidth, ratioY = FRAME_H / cssHeight;
+    const preparedScale = rawScale ? {
+      ...rawScale,
+      x: rawScale.x * ratioX,
+      y: rawScale.y * ratioY,
+      px: rawScale.px * ratioX,
+    } : null;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
-    ctx.setTransform(pixelW / width, 0, 0, pixelH / height, 0, 0);
-    ctx.clearRect(0, 0, width, height);
-    return drawHud(ctx, width, height, config);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, FRAME_W, FRAME_H);
+    return drawHud(ctx, FRAME_W, FRAME_H, {...config, preparedScale});
   }
 
   function progress(ms, start, end) {
@@ -186,7 +188,7 @@
     return clamp((ms - start) / (end - start), 0, 1);
   }
 
-  const api = { preloadLogo, paint, drawHud, scaleAt, haversineKm, progress };
+  const api = { preloadLogo, paint, drawHud, scaleAt, haversineKm, progress, FRAME_W, FRAME_H };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (root) root.DeepstrikePresentation = api;
 })(typeof window !== "undefined" ? window : null);
