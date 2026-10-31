@@ -2088,7 +2088,18 @@ function updatePlaybackRouteOverlay(lineSource, arrowSource) {
   }
   const key = playbackRangeKey();
   if (state.playbackReadyKey !== key || !state.playbackPrepared) {
+    if (state.playbackFrameKey !== "loading:" + key) {
+      lineSource.setData(EMPTY_FEATURE_COLLECTION);
+      arrowSource.setData(EMPTY_FEATURE_COLLECTION);
+      state.playbackFrameKey = "loading:" + key;
+      state.routeFeatureCount = 0;
+      setRouteLayerVisibility();
+    }
     ensurePlaybackRoutes();
+    // A prepared selection may already exist in the shared static cache.
+    if (!state.playbackPending && state.playbackReadyKey === key) {
+      updatePlaybackRouteOverlay(lineSource, arrowSource);
+    }
     return;
   }
   // MapLibre is asynchronous; don't make it re-parse large GeoJSON every 100ms
@@ -2691,10 +2702,11 @@ async function exportTimelineVideo() {
     return;
   }
   stopPlayback();
-  const previous = { ms: state.currentMs, cumulativeMs: state.cumulativeMs, mode: state.viewMode, clean: state.cleanView };
+  const previous = { ms: state.currentMs, cumulativeMs: state.cumulativeMs,
+    mode: state.viewMode, clean: state.cleanView, playbackActivated: state.playbackActivated };
   const originalText = els.exportVideoButton?.textContent || "EXPORT VIDEO";
   state.exportBusy = true;
-  state.exportRecording = true;
+  state.exportRecording = false;
   state.exportCancelled = false;
   if (els.exportVideoButton) {
     els.exportVideoButton.disabled = true;
@@ -2705,6 +2717,17 @@ async function exportTimelineVideo() {
     els.videoExportStatus.textContent = "PREPARING VIDEO · ESC 取消 · 保持标签页在前台";
   }
   try {
+    // Route geometry must be ready BEFORE MediaRecorder begins, or the
+    // beginning of a video would be blank while the async builder runs.
+    state.viewMode = "realtime";
+    state.playbackActivated = state.routesVisible;
+    updateRouteOverlay();
+    if (state.routesVisible && !(await ensurePlaybackRoutes())) {
+      if (state.exportCancelled) throw new Error("视频导出已取消");
+      throw new Error("无法准备路线动画，请检查控制台后重试");
+    }
+    if (state.exportCancelled) throw new Error("视频导出已取消");
+    state.exportRecording = true;
     if (!previous.clean) applyCleanView(true);
     await waitForMapRender();
     const minutesPerSecond = Number(els.speedSelect.value);
@@ -2756,6 +2779,8 @@ async function exportTimelineVideo() {
     state.currentMs = previous.ms;
     state.cumulativeMs = previous.cumulativeMs;
     state.viewMode = previous.mode;
+    state.playbackActivated = previous.playbackActivated;
+    state.playbackFrameKey = "";
     state.routeDisplayedPhase = "";
     if (!previous.clean) applyCleanView(false);
     render();
@@ -2801,6 +2826,8 @@ function wireControls() {
     state.cumulativeMs = timelineMsFromRange(+els.rangeCumulative.value);
     state.cumulativeMs = Math.min(Math.max(state.cumulativeMs, selectionStartMs()), selectionEndMs());
     state.currentMs = state.cumulativeMs;
+    state.playbackActivated = false;
+    updateRouteOverlay();
     updateCumulativeHandle();
     // The previous snapshot is no longer valid at the new yellow cutoff.
     // Clear it once, without doing heavy route work inside the drag event.
