@@ -93,8 +93,20 @@
       ctx.shadowColor = "rgba(0,0,0,.72)";
       ctx.shadowBlur = 7 * Math.max(.65, factor);
       ctx.shadowOffsetY = 2 * Math.max(.65, factor);
-      ctx.drawImage(logo, width-right-logoWidth, compact ? 16 : Math.max(height*.028,18),
-        logoWidth,logoHeight);
+      const logoTop = compact ? 16 : Math.max(height*.028,18);
+      ctx.drawImage(logo, width-right-logoWidth, logoTop, logoWidth,logoHeight);
+      ctx.restore();
+
+      // Keep map-tile credit discreet but legible. No bottom credits bar.
+      ctx.save();
+      ctx.font = '11px "Courier New", monospace';
+      ctx.textAlign = "right";
+      ctx.textBaseline = "top";
+      ctx.fillStyle = "#dce8f0";
+      ctx.shadowColor = "#000";
+      ctx.shadowBlur = 6;
+      ctx.fillText("© OpenStreetMap · OpenFreeMap",
+        width-right, logoTop+logoHeight+12);
       ctx.restore();
     }
 
