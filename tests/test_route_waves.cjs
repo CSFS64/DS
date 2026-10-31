@@ -90,8 +90,8 @@ test("performance: only selected hour bucket is examined, not all history",()=>{
     route("r"+i,base+(i*4+2)*H));
   const prep=ready(all);
   assert.equal(prep.count,800);
-  assert.ok((prep.index.get(Math.floor((base+3*H)/H))||[]).length<10);
-  assert.equal(wave.renderAt(prep,base+3*H).count,1);
+  assert.ok((prep.index.get(Math.floor((base+1.5*H)/H))||[]).length<10);
+  assert.equal(wave.renderAt(prep,base+1.5*H).count,1);
 });
 test("realtime animation is independent from cumulative static route inference",()=>{
   assert.match(html, /src="js\/route-animation\.js"/);
