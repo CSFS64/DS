@@ -42,6 +42,16 @@ const state = {
   routeFullData: null,
   routeStaticData: null,
   routeCache: new Map(),
+  playbackActivated: false,
+  playbackGeneration: 0,
+  playbackPending: false,
+  playbackPromise: null,
+  playbackPrepared: null,
+  playbackReadyKey: "",
+  playbackRequestedKey: "",
+  playbackFrameKey: "",
+  playbackRenderedAt: 0,
+  routeLayerMode: "",
   routeDisplayedPhase: "",
   routeGeneration: 0,
   routeDrawAt: 0,
@@ -1656,6 +1666,9 @@ async function buildIllustrativeUavRoutes(startMs, endMs, cancelled = () => fals
   };
   const lineFeatures = [];
   const arrowFeatures = [];
+  // Metadata is separate from displayed GeoJSON: the static geometry,
+  // route ranking, and browser-map feature properties stay exactly as before.
+  const animationAnchors = new Map();
   const linkedNodeKeys = new Set();
   const terminalNodeKeys = new Set(terminals.map(node => node.nodeKey));
   const usedVisibleStarts = [];
@@ -1882,6 +1895,9 @@ async function buildIllustrativeUavRoutes(startMs, endMs, cancelled = () => fals
       geometry: { type: "LineString", coordinates: displayCoords },
     };
     lineFeatures.push(feature);
+    animationAnchors.set(props.route_id, chosen.chain.map(node => ({
+      at: node.at, lon: node.lon, lat: node.lat,
+    })));
 
     const a = displayCoords[displayCoords.length - 2];
     const b = displayCoords[displayCoords.length - 1];
@@ -1905,6 +1921,7 @@ async function buildIllustrativeUavRoutes(startMs, endMs, cancelled = () => fals
   return {
     lines: { type: "FeatureCollection", features: lineFeatures },
     arrows: { type: "FeatureCollection", features: arrowFeatures },
+    animationAnchors,
     evidenceStates,
   };
 }
@@ -1952,7 +1969,11 @@ async function buildRoutesCooperatively(start, end, key, generation) {
     };
     state.routeFeatureCount = data.lines.features.length;
     state.routeCache.delete(key);
-    state.routeCache.set(key, { staticData: state.routeStaticData, count: state.routeFeatureCount });
+    state.routeCache.set(key, {
+      staticData: state.routeStaticData,
+      animationAnchors: data.animationAnchors,
+      count: state.routeFeatureCount,
+    });
     while (state.routeCache.size > 4) {
       state.routeCache.delete(state.routeCache.keys().next().value);
     }
