@@ -563,3 +563,16 @@ body.clean-map-view .brand-watermark {
   }
   body.clean-map-view .brand-watermark { width: min(54vw, 340px); }
 }
+
+
+/* Continuous playback-only route canvas. GeoJSON layers remain the only
+   renderer for the unchanged static/yellow-cumulative route mode. */
+.playback-route-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 350;
+  pointer-events: none;
+}
+.playback-route-canvas[hidden] { display: none !important; }

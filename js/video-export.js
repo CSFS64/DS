@@ -61,7 +61,7 @@
     ctx.restore();
   }
 
-  function drawVideoFrame(ctx, mapCanvas, ms, start, end, formatKyiv, formatBeijing, logo) {
+  function drawVideoFrame(ctx, mapCanvas, ms, start, end, formatKyiv, formatBeijing, logo, routeOverlay) {
     const w = ctx.canvas.width, h = ctx.canvas.height;
     ctx.fillStyle = "#050a0f";
     ctx.fillRect(0, 0, w, h);
@@ -71,6 +71,12 @@
     const scale = Math.min(w / mapCanvas.width, h / mapCanvas.height);
     const sw = mapCanvas.width * scale, sh = mapCanvas.height * scale;
     ctx.drawImage(mapCanvas, (w - sw) / 2, (h - sh) / 2, sw, sh);
+    // DOM canvases are not part of MapLibre's WebGL canvas; composite the
+    // same smooth route frame BEFORE labels/watermark on every video frame.
+    if (routeOverlay && !routeOverlay.hidden &&
+        routeOverlay.width > 0 && routeOverlay.height > 0) {
+      ctx.drawImage(routeOverlay, (w - sw) / 2, (h - sh) / 2, sw, sh);
+    }
 
     // Identical image asset and approximately the same proportional watermark
     // size/opacity as CLEAN VIEW. It must remain far below map label contrast.
@@ -133,7 +139,8 @@
 
   async function record(options) {
     const { map, start, end, durationSeconds, renderAt, onProgress, isCancelled,
-      formatKyiv, formatBeijing, brandLogoSrc = "assets/kalyna-osint-logo.avif" } = options;
+      formatKyiv, formatBeijing, routeOverlay,
+      brandLogoSrc = "assets/kalyna-osint-logo.avif" } = options;
     if (!(end > start)) throw new Error("所选时间段必须大于零。");
     if (!map?.getCanvas || typeof HTMLCanvasElement.prototype.captureStream !== "function") {
       throw new Error("当前浏览器无法录制 Canvas 视频，请使用新版 Chrome 或 Edge。");
@@ -171,7 +178,7 @@
       await waitForMapFrame(map);
       const source = map.getCanvas();
       if (!source.width || !source.height) throw new Error("地图尚未绘制完成。");
-      drawVideoFrame(ctx, source, start, start, end, formatKyiv, formatBeijing, logo);
+      drawVideoFrame(ctx, source, start, start, end, formatKyiv, formatBeijing, logo, routeOverlay);
       recorder.start(1000);
       const startedAt = performance.now();
 
@@ -182,7 +189,7 @@
         const ms = start + (end - start) * progress;
         renderAt(ms);
         await waitForMapFrame(map);
-        drawVideoFrame(ctx, map.getCanvas(), ms, start, end, formatKyiv, formatBeijing, logo);
+        drawVideoFrame(ctx, map.getCanvas(), ms, start, end, formatKyiv, formatBeijing, logo, routeOverlay);
         onProgress(progress);
         if (progress >= 1) break;
         await sleep(Math.max(0, 1000 / FPS - (performance.now() - frameStarted)));

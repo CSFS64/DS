@@ -65,13 +65,14 @@ test("realtime overlay empties map and does not launch a route computation", () 
   const f = new Function("state", "setRouteLayerVisibility", "staticRouteWindow",
     "currentRouteKey", "EMPTY_FEATURE_COLLECTION", "hideRouteLoading",
     "showRouteLoading", "buildRoutesCooperatively", "selectionStartMs",
-    "selectionEndMs", "updatePlaybackRouteOverlay",
+    "selectionEndMs", "updatePlaybackRouteOverlay", "window", "els",
     overlayCode + "return updateRouteOverlay;"
   )(state, () => {}, () => makeWindow(state).staticRouteWindow(),
     () => makeWindow(state).currentRouteKey(),
     {type:"FeatureCollection", features:[]}, () => {hidden++;}, () => {},
     () => {builds++;}, () => 1000, () => 10000,
-    () => { state.routeFeatureCount = 0; });
+    () => { state.routeFeatureCount = 0; },
+    {DeepstrikeRouteCanvas:{clear:()=>{}}}, {playbackRouteCanvas:null});
   f();
   assert.deepEqual(calls, [0, 0]);
   assert.equal(builds, 0);
@@ -93,13 +94,14 @@ test("changing only the cumulative pointer requests precisely the bounded time r
   const f = new Function("state", "setRouteLayerVisibility", "staticRouteWindow",
     "currentRouteKey", "EMPTY_FEATURE_COLLECTION", "hideRouteLoading",
     "showRouteLoading", "buildRoutesCooperatively", "selectionStartMs",
-    "selectionEndMs", "updatePlaybackRouteOverlay",
+    "selectionEndMs", "updatePlaybackRouteOverlay", "window", "els",
     overlayCode + "return updateRouteOverlay;"
   )(state, () => {}, () => makeWindow(state).staticRouteWindow(),
     () => makeWindow(state).currentRouteKey(),
     {type:"FeatureCollection",features:[]}, () => {}, () => {},
     (...args) => builds.push(args), () => 1000, () => 10000,
-    () => {});
+    () => {},
+    {DeepstrikeRouteCanvas:{clear:()=>{}}}, {playbackRouteCanvas:null});
   f();
   assert.equal(builds.length, 0, "no first-load route at the yellow origin");
   state.cumulativeMs=4000;
