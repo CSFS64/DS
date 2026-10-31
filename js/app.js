@@ -2190,8 +2190,8 @@ function updateRouteOverlay() {
     hideRouteLoading();
   }
 
-  const window = state.routesVisible ? staticRouteWindow() : null;
-  if (!window) {
+  const routeWindow = state.routesVisible ? staticRouteWindow() : null;
+  if (!routeWindow) {
     // Realtime playback and initial page load have NO route geometry.
     if (state.routeUpdateTimer) {
       clearTimeout(state.routeUpdateTimer);
@@ -2243,7 +2243,7 @@ function updateRouteOverlay() {
     }
     state.routeBuildPending = true;
     showRouteLoading("正在根据黄色汇总指针计算静态路线…");
-    buildRoutesCooperatively(window.start, window.end, key, generation);
+    buildRoutesCooperatively(routeWindow.start, routeWindow.end, key, generation);
     return;
   }
 
@@ -2252,7 +2252,7 @@ function updateRouteOverlay() {
       const generation = ++state.routeGeneration;
       state.routeBuildPending = true;
       showRouteLoading("正在准备静态路线…");
-      buildRoutesCooperatively(window.start, window.end, key, generation);
+      buildRoutesCooperatively(routeWindow.start, routeWindow.end, key, generation);
     }
     return;
   }
