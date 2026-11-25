@@ -256,6 +256,11 @@ async function init() {
   prepareActiveArchiveIndex();
   initializeDates();
   wireControls();
+  window.DeepstrikeArchiveEvents?.init({
+    map: () => state.mapReady ? state.map : null,
+    frame: () => ({ms:state.currentMs,start:selectionStartMs(),end:selectionEndMs(),
+      mode:state.viewMode,running:Boolean(state.timer)||state.exportRecording,exporting:state.exportRecording}),
+  });
   rebuildTimeline();
   updateDataStatus();
 
@@ -2842,6 +2847,7 @@ async function exportTimelineVideo() {
     mode: state.viewMode, clean: state.cleanView, playbackActivated: state.playbackActivated };
   const originalText = els.exportVideoButton?.textContent || "EXPORT VIDEO";
   state.exportBusy = true;
+  document.body.classList.add("archive-exporting");
   state.exportRecording = false;
   state.exportCancelled = false;
   if (els.exportVideoButton) {
@@ -2871,6 +2877,7 @@ async function exportTimelineVideo() {
     paintPresentationHud(true);
     const minutesPerSecond = Number(els.speedSelect.value);
     const durationSeconds = (end - start) / (minutesPerSecond * 60 * 1000);
+    window.DeepstrikeArchiveEvents?.begin(start,true);
     const result = await window.DeepstrikeVideoExporter.record({
       map: state.map,
       start,
@@ -2878,6 +2885,7 @@ async function exportTimelineVideo() {
       durationSeconds,
       routesVisible: state.routesVisible,
       routeOverlay: els.playbackRouteCanvas,
+      archiveEventOverlay: $("archiveEventCanvas"),
       presentationOverlay: els.presentationHudCanvas,
       formatTime: ms => formatTime(ms, "Europe/Moscow"),
       formatKyiv: ms => formatTime(ms, "Europe/Kyiv"),
@@ -2887,6 +2895,7 @@ async function exportTimelineVideo() {
         state.viewMode = "realtime";
         state.currentMs = ms;
         render();
+        window.DeepstrikeArchiveEvents?.sync();
       },
       onProgress: progress => {
         if (els.videoExportStatus) {
@@ -2916,11 +2925,13 @@ async function exportTimelineVideo() {
   } finally {
     state.exportRecording = false;
     state.exportBusy = false;
+    document.body.classList.remove("archive-exporting");
     state.exportCancelled = false;
     state.currentMs = previous.ms;
     state.cumulativeMs = previous.cumulativeMs;
     state.viewMode = previous.mode;
     state.playbackActivated = previous.playbackActivated;
+    window.DeepstrikeArchiveEvents?.seek(state.currentMs);
     state.playbackFrameKey = "";
     state.routeDisplayedPhase = "";
     if (!previous.clean) applyCleanView(false);
@@ -2988,6 +2999,7 @@ function wireControls() {
     state.viewMode = "realtime";
     if (leavingCumulative) updateRouteOverlay();
     state.currentMs = selectionStartMs() + (selectionEndMs() - selectionStartMs()) * (+els.scrubber.value / 1000);
+    window.DeepstrikeArchiveEvents?.seek(state.currentMs);
     state.playbackActivated = true;
     scheduleInteractiveRender();
     updateRouteOverlay();
@@ -3047,6 +3059,7 @@ function rebuildTimeline() {
   els.rangeEnd.value = 1000;
   els.rangeCumulative.value = 0;
   state.currentMs = state.timelineStartMs;
+  window.DeepstrikeArchiveEvents?.seek(state.currentMs);
   state.cumulativeMs = state.timelineStartMs;
   state.viewMode = "realtime";
   buildTicks();
@@ -3474,6 +3487,7 @@ function togglePlayback() {
   state.playbackActivated = true;
   const start = selectionStartMs(), end = selectionEndMs();
   if (state.currentMs >= end) state.currentMs = start;
+  window.DeepstrikeArchiveEvents?.begin(state.currentMs,state.currentMs===start);
   els.playButton.classList.add("is-playing");
   els.playButton.textContent = "Ⅱ PAUSE";
 
@@ -3497,6 +3511,7 @@ function togglePlayback() {
     updateRouteOverlay();
     updatePresentationProgress();
     if (state.currentMs >= end) {
+      window.DeepstrikeArchiveEvents?.sync();
       stopPlayback();
       render({ skipRoutes: true });
       return;

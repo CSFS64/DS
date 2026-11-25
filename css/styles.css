@@ -636,3 +636,23 @@ body.clean-map-view .presentation-progress { display: block; }
   transform-origin: left center;
   will-change: transform;
 }
+
+/* Manual historical annotations. The overlay is composited into video;
+   the editor is never visible in clean/fullscreen or export mode. */
+.archive-event-canvas {position:absolute;inset:0;width:100%;height:100%;z-index:420;pointer-events:none}
+.archive-event-canvas[hidden] {display:none!important}
+.archive-event-panel {position:absolute;z-index:750;top:64px;right:14px;width:min(320px,calc(100% - 28px));max-height:calc(100% - 78px);overflow:auto;background:rgba(5,15,23,.96);border:1px solid var(--line-hot);color:var(--text);font-size:11px;box-shadow:0 8px 25px var(--shadow)}
+.archive-event-panel:not([open]) {width:auto}
+.archive-event-panel summary {cursor:pointer;padding:9px 11px;font-weight:700;letter-spacing:.07em;color:var(--cyan)}
+.archive-event-content {padding:0 10px 10px;display:grid;gap:8px}
+.archive-event-content p {margin:0;color:#a8beca;line-height:1.4;overflow-wrap:anywhere}
+.archive-event-content form {display:grid;gap:7px}
+.archive-event-content label {display:grid;gap:3px;color:var(--muted);font-size:10px}
+.archive-event-content input,.archive-event-content select {width:100%;min-width:0;background:var(--panel-2);border:1px solid var(--line);color:var(--text);padding:6px;border-radius:3px;color-scheme:dark;font-size:12px}
+.archive-event-actions {display:flex;gap:6px;flex-wrap:wrap}
+.archive-event-content button {background:var(--panel-2);border:1px solid var(--line-hot);border-radius:3px;color:var(--cyan);font-size:10px;padding:5px 8px;cursor:pointer}
+.archive-event-content button:disabled {opacity:.45;cursor:default}
+.archive-event-list {display:grid;gap:5px;max-height:180px;overflow:auto}
+.archive-event-row {display:flex;gap:4px;align-items:center;border-top:1px solid var(--line);padding-top:5px}
+.archive-event-row span {flex:1;min-width:0;overflow-wrap:anywhere}
+body.clean-map-view .archive-event-panel,body.archive-exporting .archive-event-panel,:fullscreen .archive-event-panel {display:none!important}

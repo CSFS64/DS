@@ -15,6 +15,7 @@
     <section class="map-panel">
       <div id="map" aria-label="历史无人机与导弹活动地图"></div>
       <canvas id="playbackRouteCanvas" class="playback-route-canvas" aria-hidden="true" hidden></canvas>
+      <canvas id="archiveEventCanvas" class="archive-event-canvas" aria-hidden="true" hidden></canvas>
       <canvas id="presentationHudCanvas" class="presentation-hud-canvas" aria-hidden="true" hidden></canvas>
       <div class="presentation-progress" aria-hidden="true">
         <div id="presentationProgressFill" class="presentation-progress-fill"></div>
@@ -65,6 +66,24 @@
 
 
       </div>
+
+      <details id="archiveEventPanel" class="archive-event-panel">
+        <summary>HISTORICAL EVENTS · <span id="archiveEventCount">0</span></summary>
+        <div class="archive-event-content">
+          <p>手动录入的历史记录（至少延迟 24h）。公开归档，不存储敏感信息。</p>
+          <form id="archiveEventForm">
+            <label>NAME<input id="archiveEventName" maxlength="120" required></label>
+            <label>COORDINATES · LAT, LON<input id="archiveEventCoordinates" placeholder="纬度, 经度" required></label>
+            <label>DATE / TIME<input id="archiveEventTime" type="datetime-local" step="1" required></label>
+            <label>TIME ZONE<select id="archiveEventZone"><option value="Europe/Kyiv">Kyiv</option><option value="Europe/Moscow">Moscow</option><option value="Asia/Shanghai">Beijing</option><option value="UTC">UTC</option></select></label>
+            <div class="archive-event-actions"><button id="archiveEventSave" type="submit" disabled>ADD EVENT</button><button id="archiveEventCancel" type="button">CLEAR</button></div>
+          </form>
+          <label>GITHUB TOKEN · 当前页面<input id="archiveEventToken" type="password" autocomplete="off" spellcheck="false" placeholder="Fine-grained PAT"></label>
+          <div class="archive-event-actions"><button id="archiveEventReload" type="button">RELOAD</button><button id="archiveEventClearToken" type="button">CLEAR TOKEN</button></div>
+          <p id="archiveEventStatus" role="status" aria-live="polite">正在加载…</p>
+          <div id="archiveEventList" class="archive-event-list"></div>
+        </div>
+      </details>
 
       <aside id="detailPanel" class="detail-panel" hidden>
         <button id="detailClose" class="icon-button" type="button" aria-label="关闭">×</button>
@@ -132,6 +151,7 @@
   <script src="js/route-animation.js"></script>
   <script src="js/route-canvas.js"></script>
   <script src="js/presentation-hud.js"></script>
+  <script src="js/archive-events.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

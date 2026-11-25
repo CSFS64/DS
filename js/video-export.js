@@ -44,7 +44,7 @@
   // The full-screen presentation HUD is composited pixel-for-pixel, giving
   // identical logo, title, clocks and geodesic scale bar in the video.
   function drawVideoFrame(ctx, mapCanvas, ms, start, end, formatKyiv, formatBeijing,
-      logo, routeOverlay, presentationOverlay) {
+      logo, routeOverlay, presentationOverlay, archiveEventOverlay) {
     const w = ctx.canvas.width, h = ctx.canvas.height;
     const ratio = mapCanvas.width / mapCanvas.height;
     if (!Number.isFinite(ratio) || Math.abs(ratio - 16 / 9) > .01) {
@@ -57,6 +57,9 @@
     if (routeOverlay && !routeOverlay.hidden &&
         routeOverlay.width > 0 && routeOverlay.height > 0) {
       ctx.drawImage(routeOverlay, 0, 0, w, h);
+    }
+    if (archiveEventOverlay && !archiveEventOverlay.hidden && archiveEventOverlay.width && archiveEventOverlay.height) {
+      ctx.drawImage(archiveEventOverlay, 0, 0, w, h);
     }
     if (!presentationOverlay || presentationOverlay.hidden ||
         !presentationOverlay.width || !presentationOverlay.height) {
@@ -77,7 +80,7 @@
 
   async function record(options) {
     const { map, start, end, durationSeconds, renderAt, onProgress, isCancelled,
-      formatKyiv, formatBeijing, routeOverlay, presentationOverlay } = options;
+      formatKyiv, formatBeijing, routeOverlay, presentationOverlay, archiveEventOverlay } = options;
     if (!(end > start)) throw new Error("所选时间段必须大于零。");
     if (!map?.getCanvas || typeof HTMLCanvasElement.prototype.captureStream !== "function") {
       throw new Error("当前浏览器无法录制 Canvas 视频，请使用新版 Chrome 或 Edge。");
@@ -114,7 +117,7 @@
       await waitForMapFrame(map);
       const source = map.getCanvas();
       if (!source.width || !source.height) throw new Error("地图尚未绘制完成。");
-      drawVideoFrame(ctx, source, start, start, end, formatKyiv, formatBeijing, null, routeOverlay, presentationOverlay);
+      drawVideoFrame(ctx, source, start, start, end, formatKyiv, formatBeijing, null, routeOverlay, presentationOverlay, archiveEventOverlay);
       recorder.start(1000);
       const startedAt = performance.now();
 
@@ -125,7 +128,7 @@
         const ms = start + (end - start) * progress;
         renderAt(ms);
         await waitForMapFrame(map);
-        drawVideoFrame(ctx, map.getCanvas(), ms, start, end, formatKyiv, formatBeijing, null, routeOverlay, presentationOverlay);
+        drawVideoFrame(ctx, map.getCanvas(), ms, start, end, formatKyiv, formatBeijing, null, routeOverlay, presentationOverlay, archiveEventOverlay);
         onProgress(progress);
         if (progress >= 1) break;
         await sleep(Math.max(0, 1000 / FPS - (performance.now() - frameStarted)));
