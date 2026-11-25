@@ -19,28 +19,44 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  build:
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    outputs:
+      artifact_name: ${{ steps.artifact_name.outputs.name }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: main
       - uses: actions/configure-pages@v5
+      - name: Set unique artifact name
+        id: artifact_name
+        run: echo "name=github-pages-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-pages-artifact@v3
         with:
+          name: ${{ steps.artifact_name.outputs.name }}
           path: .
+
+  deploy:
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      # actions/deploy-pages#451: the internal artifact listing can lag
+      # behind the public REST listing even after the upload succeeds.
+      - name: Allow artifact indexing to settle
+        run: sleep 60
       - name: Wait for Pages artifact metadata
         env:
           GH_TOKEN: ${{ github.token }}
+          ARTIFACT_NAME: ${{ needs.build.outputs.artifact_name }}
         shell: bash
         run: |
           set -euo pipefail
           for attempt in $(seq 1 15); do
-            if gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts?name=github-pages" \
+            if gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts?name=${ARTIFACT_NAME}" \
               --jq '.artifacts[] | select(.expired == false) | .id' > "$RUNNER_TEMP/pages-artifact-ids" &&
               test -s "$RUNNER_TEMP/pages-artifact-ids"; then
               echo "Pages artifact metadata available."
@@ -55,3 +71,5 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: ${{ needs.build.outputs.artifact_name }}
