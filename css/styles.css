@@ -656,3 +656,5 @@ body.clean-map-view .presentation-progress { display: block; }
 .archive-event-row {display:flex;gap:4px;align-items:center;border-top:1px solid var(--line);padding-top:5px}
 .archive-event-row span {flex:1;min-width:0;overflow-wrap:anywhere}
 body.clean-map-view .archive-event-panel,body.archive-exporting .archive-event-panel,:fullscreen .archive-event-panel {display:none!important}
+
+.archive-event-content select:disabled {opacity:.65;cursor:default}

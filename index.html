@@ -70,8 +70,9 @@
       <details id="archiveEventPanel" class="archive-event-panel">
         <summary>HISTORICAL EVENTS · <span id="archiveEventCount">0</span></summary>
         <div class="archive-event-content">
-          <p>手动录入的历史记录（至少延迟 24h）。公开归档，不存储敏感信息。</p>
+          <p>公开历史归档延迟 24h；LOCAL PREVIEW 可立即制作本地演示及视频，不上传数据。</p>
           <form id="archiveEventForm">
+            <label>ENTRY MODE<select id="archiveEventMode"><option value="archive">PUBLIC ARCHIVE</option><option value="preview">LOCAL PREVIEW · 仅本地演示</option></select></label>
             <label>NAME<input id="archiveEventName" maxlength="120" required></label>
             <label>COORDINATES · LAT, LON<input id="archiveEventCoordinates" placeholder="纬度, 经度" required></label>
             <label>DATE / TIME<input id="archiveEventTime" type="datetime-local" step="1" required></label>

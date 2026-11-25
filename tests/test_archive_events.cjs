@@ -1,6 +1,6 @@
 const test=require("node:test");
 const assert=require("node:assert/strict");
-const {Timeline,parseCoordinates,parseZoned,normalizeList,historical,LIFE_MS,DELAY_MS}=require("../js/archive-events.js");
+const {Timeline,parseCoordinates,parseZoned,normalizeList,historical,displayRows,layoutLabels,animationState,LIFE_MS,DELAY_MS}=require("../js/archive-events.js");
 const row=(id,ms)=>({id,name:"Historical record "+id,lat:0,lon:0,datetime:new Date(ms).toISOString()});
 const f=(ms,mode="realtime",running=true,start=0,end=100000000)=>({ms,mode,running,start,end});
 test("validates coordinates and exact UTC conversions",()=>{
@@ -33,4 +33,24 @@ test("seek does not trigger skipped records; replay triggers again; paused marke
 test("delayed records only and duplicate ids rejected",()=>{
   assert.equal(historical([row("a",0),row("b",1)],DELAY_MS).length,1);
   assert.throws(()=>normalizeList([row("a",0),row("a",1)]));
+});
+
+test("local preview can be rendered immediately without relaxing public archive delay",()=>{
+  const now=DELAY_MS+1000;
+  const result=displayRows([row("old",0),row("recent-public",now-1)],[row("local",now-1)],now);
+  assert.deepEqual(result.map(r=>r.id),["old","local"]);
+});
+test("labels use separate screen positions for coincident points and stay in view",()=>{
+  const points=Array.from({length:6},()=>({x:200,y:130,w:100,h:24}));
+  const boxes=layoutLabels(points,500,300);
+  assert.equal(boxes.length,points.length);
+  assert.equal(new Set(boxes.map(b=>b.x+":"+b.y)).size,boxes.length);
+  for(const b of boxes)assert.ok(b.x>=0&&b.y>=0&&b.x+b.w<=500&&b.y+b.h<=300);
+});
+test("burst evolves from white flash to fire and smoke and ends at fixed wall time",()=>{
+  assert.equal(animationState(0).flash,1);
+  assert.ok(animationState(150).fire>0);
+  assert.equal(animationState(600).flash,0);
+  assert.ok(animationState(1800).smoke>0);
+  assert.equal(animationState(LIFE_MS).label,0);
 });

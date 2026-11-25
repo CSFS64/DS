@@ -258,6 +258,13 @@ async function init() {
   wireControls();
   globalThis.DeepstrikeArchiveEvents?.init({
     map: () => state.mapReady ? state.map : null,
+    includeTime: ms => {
+      if (ms >= selectionStartMs() && ms <= selectionEndMs()) return;
+      const day = isoDateInZone(ms);
+      if (day < els.dateStart.value) els.dateStart.value = day;
+      if (day > els.dateEnd.value) els.dateEnd.value = day;
+      rebuildTimeline();
+    },
     frame: () => ({ms:state.currentMs,start:selectionStartMs(),end:selectionEndMs(),
       mode:state.viewMode,running:Boolean(state.timer)||state.exportRecording,exporting:state.exportRecording}),
   });
