@@ -1,6 +1,6 @@
 const test=require("node:test");
 const assert=require("node:assert/strict");
-const {Timeline,parseCoordinates,parseZoned,normalizeList,historical,displayRows,layoutLabels,animationState,LIFE_MS,DELAY_MS}=require("../js/archive-events.js");
+const {Timeline,parseCoordinates,parseZoned,normalizeList,historical,displayRows,layoutLabels,animationState,leaderGeometry,drawLabel,drawLeader,drawBurst,LIFE_MS,DELAY_MS}=require("../js/archive-events.js");
 const row=(id,ms)=>({id,name:"Historical record "+id,lat:0,lon:0,datetime:new Date(ms).toISOString()});
 const f=(ms,mode="realtime",running=true,start=0,end=100000000)=>({ms,mode,running,start,end});
 test("validates coordinates and exact UTC conversions",()=>{
@@ -47,10 +47,41 @@ test("labels use separate screen positions for coincident points and stay in vie
   assert.equal(new Set(boxes.map(b=>b.x+":"+b.y)).size,boxes.length);
   for(const b of boxes)assert.ok(b.x>=0&&b.y>=0&&b.x+b.w<=500&&b.y+b.h<=300);
 });
-test("burst evolves from white flash to fire and smoke and ends at fixed wall time",()=>{
-  assert.equal(animationState(0).flash,1);
-  assert.ok(animationState(150).fire>0);
-  assert.equal(animationState(600).flash,0);
-  assert.ok(animationState(1800).smoke>0);
-  assert.equal(animationState(LIFE_MS).label,0);
+test("compact marker, progressive leader and delayed text share fixed wall-clock lifetime",()=>{
+  const a0=animationState(0),a1=animationState(300),a2=animationState(620),a3=animationState(900);
+  assert.equal(a0.flash,1);assert.equal(a0.leader,0);assert.equal(a0.label,0);
+  assert.equal(a1.flash,0);assert.ok(a1.leader>0&&a1.leader<1);assert.equal(a1.label,0);
+  assert.equal(a2.leader,1);assert.ok(a2.label>0&&a2.label<1);assert.ok(a2.labelSlide>0);
+  assert.equal(a3.label,1);assert.equal(a3.labelSlide,0);
+  assert.ok(animationState(4600).label<1);
+  assert.equal(animationState(LIFE_MS).label,0);assert.equal(animationState(LIFE_MS).marker,0);
+  assert.equal(animationState(LIFE_MS).leaderAlpha,0);
+});
+test("leader reveals the diagonal before its horizontal end",()=>{
+  const point={x:20,y:40},box={x:110,y:5,w:70,h:20};
+  const empty=leaderGeometry(point,box,0).path;
+  const partial=leaderGeometry(point,box,.3).path;
+  const full=leaderGeometry(point,box,1).path;
+  assert.equal(empty.length,1);assert.equal(partial.length,2);assert.equal(full.length,3);
+  assert.deepEqual(full.at(-1),{x:110,y:15});
+  assert.ok(partial[1].x<full[1].x);
+  assert.deepEqual(leaderGeometry({x:200,y:50},box,1).path.at(-1),{x:180,y:15});
+});
+test("renderer uses no filled label background and text appears only after leader begins",()=>{
+  const ops=[];
+  const ctx={save(){},restore(){},beginPath(){},stroke(){},fill(){},translate(){},
+    moveTo(x,y){ops.push(["move",x,y])},lineTo(x,y){ops.push(["line",x,y])},
+    closePath(){},arc(x,y,r){ops.push(["arc",r])},
+    fillRect(){ops.push(["background"])},
+    fillText(s){ops.push(["text",s])},strokeText(s){ops.push(["outline",s])}};
+  const point={x:20,y:40,lines:["Example"]},box={x:110,y:5,w:70,h:20};
+  drawLeader(ctx,point,box,animationState(0));drawLabel(ctx,point,box,animationState(0));
+  assert.equal(ops.length,0);
+  drawLeader(ctx,point,box,animationState(300));drawLabel(ctx,point,box,animationState(300));
+  assert.ok(ops.some(op=>op[0]==="line"));assert.ok(!ops.some(op=>op[0]==="text"));
+  drawBurst(ctx,{static:false,age:150},20,40);
+  drawLabel(ctx,point,box,animationState(900));
+  assert.ok(ops.some(op=>op[0]==="text"));assert.ok(ops.some(op=>op[0]==="outline"));
+  assert.ok(!ops.some(op=>op[0]==="background"));
+  assert.ok(ops.filter(op=>op[0]==="arc").every(op=>op[1]<=20));
 });

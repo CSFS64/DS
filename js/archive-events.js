@@ -253,65 +253,112 @@
   function circle(ctx,x,y,r,fill){
     ctx.fillStyle=fill;ctx.beginPath();ctx.arc(x,y,Math.max(.1,r),0,Math.PI*2);ctx.fill();
   }
-  function glow(ctx,x,y,r,stops){
-    if(r<=0)return;
-    const g=ctx.createRadialGradient(x,y,0,x,y,r);
-    for(const [at,color] of stops)g.addColorStop(at,color);
-    circle(ctx,x,y,r,g);
-  }
-  function seeded(id){
-    let n=2166136261;
-    for(const c of String(id)){n=Math.imul(n^c.charCodeAt(0),16777619);}
-    return ()=>{n=(Math.imul(n,1664525)+1013904223)|0;return(n>>>0)/4294967296;};
-  }
+  function easeOut(t){t=clamp(t,0,1);return 1-Math.pow(1-t,3);}
+  function smooth(t){t=clamp(t,0,1);return t*t*(3-2*t);}
+  // All times are actual elapsed milliseconds, not archive playback time.
   function animationState(age){
-    const t=clamp(age/1000,0,LIFE_MS/1000);
-    return {t,flash:Math.max(0,1-t/.22),fire:Math.min(1,t/.10)*Math.max(0,1-t/1.45),
-      smoke:Math.min(1,t/.48)*Math.max(0,1-t/4.4),label:Math.min(1,Math.max(0,(LIFE_MS-age)/850))};
+    const t=clamp(age,0,LIFE_MS),fade=1-smooth((t-3900)/1100);
+    const labelIn=smooth((t-490)/260);
+    return {
+      flash:1-smooth(t/160),
+      expansion:easeOut(t/540),
+      pulse:1-smooth(t/780),
+      marker:fade,
+      leader:easeOut((t-135)/410),
+      leaderAlpha:fade,
+      label:labelIn*fade,
+      labelSlide:7*(1-easeOut((t-490)/260))
+    };
+  }
+  function markerStroke(ctx,r,alpha,color){
+    if(alpha<=0)return;
+    ctx.globalAlpha=alpha;ctx.strokeStyle=color;ctx.lineWidth=1;
+    ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.stroke();
   }
   function drawBurst(ctx,item,x,y){
+    const a=item.static?{flash:0,expansion:1,pulse:0,marker:1}:animationState(item.age);
+    if(a.marker<=0)return;
     ctx.save();ctx.translate(x,y);
-    if(item.static){
-      ctx.fillStyle="#ffb24b";ctx.strokeStyle="#fff1c8";ctx.lineWidth=1;
-      ctx.beginPath();
-      for(let i=0;i<16;i++){const a=-Math.PI/2+i*Math.PI/8,r=i%2?3.5:8;
-        if(i===0)ctx.moveTo(Math.cos(a)*r,Math.sin(a)*r);else ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r);}
-      ctx.closePath();ctx.fill();ctx.stroke();circle(ctx,0,0,2.4,"#fff9e6");
-      ctx.restore();return;
+    // Small, hollow, map-scale symbols use the same amber as the archive legend.
+    // No opaque fill, fireball, smoke, or large radial-gradient sprite.
+    if(a.pulse>0){
+      markerStroke(ctx,5+15*a.expansion,.7*a.pulse,"#ffc15a");
+      markerStroke(ctx,3+9*a.expansion,.5*a.pulse,"#fff0cf");
     }
-    const {t,flash,fire,smoke}=animationState(item.age);
-    const random=seeded(item.row.id);
-    if(smoke>0){
-      for(let i=0;i<10;i++){
-        const a=random()*Math.PI*2,speed=3+random()*8,sz=5+random()*6;
-        const px=Math.cos(a)*speed*t,py=Math.sin(a)*speed*t-t*3;
-        const r=sz+4*t;
-        glow(ctx,px,py,r,[[0,"rgba(76,70,65,"+(.38*smoke)+")"],[.62,"rgba(48,46,44,"+(.28*smoke)+")"],[1,"rgba(40,38,37,0)"]]);
-      }
+    ctx.globalAlpha=a.marker;
+    ctx.strokeStyle="#ffc15a";ctx.lineWidth=1.2;
+    ctx.beginPath();
+    const r=6.5;
+    ctx.moveTo(0,-r);ctx.lineTo(r,0);ctx.lineTo(0,r);ctx.lineTo(-r,0);ctx.closePath();
+    ctx.stroke();
+    // Discrete outward ticks evoke the burst without covering map content.
+    ctx.globalAlpha=a.marker*(item.static?.72:.76+.24*a.pulse);
+    ctx.strokeStyle="#ffc15a";ctx.lineWidth=1.1;ctx.beginPath();
+    const inner=9+2*a.pulse,outer=12+4*a.pulse;
+    for(let i=0;i<4;i++){
+      const angle=Math.PI/4+i*Math.PI/2;
+      ctx.moveTo(Math.cos(angle)*inner,Math.sin(angle)*inner);
+      ctx.lineTo(Math.cos(angle)*outer,Math.sin(angle)*outer);
     }
-    if(t<1){
-      ctx.globalAlpha=(1-t)*.75;ctx.strokeStyle="#ffe4a1";ctx.lineWidth=1.4;
-      ctx.beginPath();ctx.arc(0,0,5+46*t,0,Math.PI*2);ctx.stroke();ctx.globalAlpha=1;
+    ctx.stroke();
+    ctx.globalAlpha=a.marker;ctx.shadowColor="#ffc15a";ctx.shadowBlur=3;
+    circle(ctx,0,0,2,"#ffe4ae");ctx.shadowBlur=0;
+    if(a.flash>0){
+      ctx.globalAlpha=a.flash*.9;
+      circle(ctx,0,0,2+2*a.flash,"#fffdf2");
     }
-    if(fire>0){
-      const spread=5+16*Math.min(1,t/.65);
-      for(let i=0;i<12;i++){
-        const a=random()*Math.PI*2,d=random()*spread,r=5+random()*8+spread*.25;
-        glow(ctx,Math.cos(a)*d,Math.sin(a)*d,r,[[0,"rgba(255,248,181,"+fire+")"],[.25,"rgba(255,187,56,"+fire+")"],[.65,"rgba(243,77,12,"+(.8*fire)+")"],[1,"rgba(150,24,4,0)"]]);
-      }
-      glow(ctx,0,0,12+spread*.35,[[0,"rgba(255,255,230,"+fire+")"],[.4,"rgba(255,191,52,"+fire+")"],[1,"rgba(255,82,4,0)"]]);
+    ctx.restore();
+  }
+  // Reveal a two-segment leader by physical path length, including the elbow.
+  // The line begins outside the event symbol and ends at the label edge.
+  function leaderGeometry(point,box,progress){
+    const endX=box.x+box.w/2>=point.x?box.x:box.x+box.w;
+    const endY=box.y+box.h/2;
+    const side=endX>=point.x?1:-1;
+    const elbow={x:endX-side*12,y:endY};
+    const dx=elbow.x-point.x,dy=elbow.y-point.y;
+    const initial=Math.hypot(dx,dy);
+    const gap=Math.min(8,initial*.45);
+    const start=initial?{x:point.x+dx*gap/initial,y:point.y+dy*gap/initial}:{x:point.x,y:point.y};
+    const end={x:endX,y:endY};
+    const first=Math.hypot(elbow.x-start.x,elbow.y-start.y);
+    const second=Math.hypot(end.x-elbow.x,end.y-elbow.y);
+    let left=(first+second)*clamp(progress,0,1);
+    const path=[start];
+    if(left<=0)return {path,side};
+    if(first>0&&left<first){
+      path.push({x:start.x+(elbow.x-start.x)*left/first,y:start.y+(elbow.y-start.y)*left/first});
+      return {path,side};
     }
-    if(t<1.8){
-      const sparkAlpha=Math.max(0,1-t/1.8);
-      ctx.lineWidth=1.2;ctx.lineCap="round";
-      for(let i=0;i<15;i++){
-        const a=random()*Math.PI*2,v=13+random()*30,d=v*Math.min(t,1.4);
-        ctx.strokeStyle="rgba(255,192,82,"+sparkAlpha+")";
-        ctx.beginPath();ctx.moveTo(Math.cos(a)*d,Math.sin(a)*d);ctx.lineTo(Math.cos(a)*(d+3),Math.sin(a)*(d+3));ctx.stroke();
-      }
+    path.push(elbow);left-=first;
+    if(second>0&&left>0){
+      const fraction=clamp(left/second,0,1);
+      path.push({x:elbow.x+(end.x-elbow.x)*fraction,y:elbow.y+(end.y-elbow.y)*fraction});
     }
-    if(flash>0)glow(ctx,0,0,24+10*flash,[[0,"rgba(255,255,255,"+flash+")"],[.32,"rgba(255,241,171,"+flash+")"],[1,"rgba(255,150,45,0)"]]);
-    if(t>=1.25){const a=animationState(item.age).label;circle(ctx,0,0,2.5,"rgba(255,194,105,"+a+")");}
+    return {path,side};
+  }
+  function drawLeader(ctx,p,b,a){
+    if(a.leader<=0||a.leaderAlpha<=0)return;
+    const {path}=leaderGeometry(p,b,a.leader);
+    if(path.length<2)return;
+    ctx.save();ctx.globalAlpha=.9*a.leaderAlpha;
+    ctx.strokeStyle="#f5f7fa";ctx.lineWidth=1;
+    ctx.lineCap="round";ctx.lineJoin="round";
+    ctx.beginPath();ctx.moveTo(path[0].x,path[0].y);
+    for(const v of path.slice(1))ctx.lineTo(v.x,v.y);
+    ctx.stroke();ctx.restore();
+  }
+  function drawLabel(ctx,p,b,a){
+    if(a.label<=0)return;
+    const side=b.x+b.w/2>=p.x?1:-1;
+    ctx.save();ctx.globalAlpha=a.label;
+    // Only a very fine dark glyph outline for legibility, not a tooltip box.
+    ctx.strokeStyle="rgba(4,10,15,.92)";ctx.lineWidth=2;
+    ctx.lineJoin="round";ctx.fillStyle="#f5f7fa";
+    p.lines.forEach((line,j)=>{
+      const x=b.x+4+side*a.labelSlide,y=b.y+9+j*15;
+      ctx.strokeText(line,x,y);ctx.fillText(line,x,y);
+    });
     ctx.restore();
   }
   function paint(items,map){
@@ -328,32 +375,22 @@
     if(canvas.height!==ch)canvas.height=ch;
     const ctx=canvas.getContext("2d");if(!ctx)return;
     ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
-    ctx.font="600 13px system-ui, sans-serif";ctx.textAlign="left";ctx.textBaseline="middle";
+    ctx.font="500 12px system-ui, sans-serif";ctx.textAlign="left";ctx.textBaseline="middle";
     const points=[];
     for(const item of items){
       const p=map.project([item.row.lon,item.row.lat]),x=p.x,y=p.y;
       if(!Number.isFinite(x)||!Number.isFinite(y)||x<-70||x>w+70||y<-70||y>h+70)continue;
       const lines=wrapLabel(ctx,item.row.name,Math.min(220,Math.max(65,w-20)));
-      const width=Math.max(...lines.map(l=>ctx.measureText(l).width))+12;
-      points.push({item,x,y,lines,w:width,h:lines.length*16+6});
+      const width=Math.max(...lines.map(l=>ctx.measureText(l).width))+8;
+      points.push({item,x,y,lines,w:width,h:lines.length*15+3});
       drawBurst(ctx,item,x,y);
     }
     const boxes=layoutLabels(points,w,h);
-    // Render the leaders after all fire/smoke, and the labels last.
-    points.forEach((p,i)=>{
-      const b=boxes[i],a=p.item.static?1:animationState(p.item.age).label;
-      const endX=b.x+b.w/2>=p.x?b.x:b.x+b.w,endY=b.y+b.h/2;
-      ctx.save();ctx.globalAlpha=a;ctx.lineWidth=1.1;ctx.strokeStyle="#fff";
-      ctx.beginPath();ctx.moveTo(p.x,p.y);
-      const elbow=endX+(endX>p.x?-8:8);
-      ctx.lineTo(elbow,endY);ctx.lineTo(endX,endY);ctx.stroke();ctx.restore();
-    });
-    points.forEach((p,i)=>{
-      const b=boxes[i],a=p.item.static?1:animationState(p.item.age).label;
-      ctx.save();ctx.globalAlpha=a;
-      ctx.fillStyle="rgba(4,10,15,.78)";ctx.fillRect(b.x,b.y,b.w,b.h);
-      ctx.fillStyle="#fff";p.lines.forEach((l,j)=>ctx.fillText(l,b.x+6,b.y+11+j*16));ctx.restore();
-    });
+    // Paint line and glyphs separately, above the same compact symbol.
+    const visualStates=points.map(p=>p.item.static?
+      {leader:1,leaderAlpha:1,label:1,labelSlide:0}:animationState(p.item.age));
+    points.forEach((p,i)=>drawLeader(ctx,p,boxes[i],visualStates[i]));
+    points.forEach((p,i)=>drawLabel(ctx,p,boxes[i],visualStates[i]));
   }
   function sync(){
     if(!timeline||!options)return;
@@ -397,7 +434,7 @@
     function tick(){if(!options.frame().exporting)sync();raf=requestAnimationFrame(tick);}
     raf=requestAnimationFrame(tick);
   }
-  const api={init,sync,begin,seek,Timeline,parseCoordinates,parseZoned,zoneParts,normalizeList,historical,displayRows,layoutLabels,animationState,LIFE_MS,DELAY_MS};
+  const api={init,sync,begin,seek,Timeline,parseCoordinates,parseZoned,zoneParts,normalizeList,historical,displayRows,layoutLabels,animationState,leaderGeometry,drawLabel,drawLeader,drawBurst,LIFE_MS,DELAY_MS};
   if(typeof module!=="undefined"&&module.exports)module.exports=api;
   if(root)root.DeepstrikeArchiveEvents=api;
 })(typeof window!=="undefined"?window:null);
