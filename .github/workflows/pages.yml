@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 
@@ -32,6 +33,25 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
+      - name: Wait for Pages artifact metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 15); do
+            if gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts?name=github-pages" \
+              --jq '.artifacts[] | select(.expired == false) | .id' > "$RUNNER_TEMP/pages-artifact-ids" &&
+              test -s "$RUNNER_TEMP/pages-artifact-ids"; then
+              echo "Pages artifact metadata available."
+              cat "$RUNNER_TEMP/pages-artifact-ids"
+              exit 0
+            fi
+            echo "Waiting for artifact metadata ($attempt/15)..."
+            sleep 4
+          done
+          echo "::error::Pages artifact metadata is still unavailable after upload."
+          exit 1
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

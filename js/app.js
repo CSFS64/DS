@@ -256,7 +256,7 @@ async function init() {
   prepareActiveArchiveIndex();
   initializeDates();
   wireControls();
-  window.DeepstrikeArchiveEvents?.init({
+  globalThis.DeepstrikeArchiveEvents?.init({
     map: () => state.mapReady ? state.map : null,
     frame: () => ({ms:state.currentMs,start:selectionStartMs(),end:selectionEndMs(),
       mode:state.viewMode,running:Boolean(state.timer)||state.exportRecording,exporting:state.exportRecording}),
@@ -2877,7 +2877,7 @@ async function exportTimelineVideo() {
     paintPresentationHud(true);
     const minutesPerSecond = Number(els.speedSelect.value);
     const durationSeconds = (end - start) / (minutesPerSecond * 60 * 1000);
-    window.DeepstrikeArchiveEvents?.begin(start,true);
+    globalThis.DeepstrikeArchiveEvents?.begin(start,true);
     const result = await window.DeepstrikeVideoExporter.record({
       map: state.map,
       start,
@@ -2895,7 +2895,7 @@ async function exportTimelineVideo() {
         state.viewMode = "realtime";
         state.currentMs = ms;
         render();
-        window.DeepstrikeArchiveEvents?.sync();
+        globalThis.DeepstrikeArchiveEvents?.sync();
       },
       onProgress: progress => {
         if (els.videoExportStatus) {
@@ -2931,7 +2931,7 @@ async function exportTimelineVideo() {
     state.cumulativeMs = previous.cumulativeMs;
     state.viewMode = previous.mode;
     state.playbackActivated = previous.playbackActivated;
-    window.DeepstrikeArchiveEvents?.seek(state.currentMs);
+    globalThis.DeepstrikeArchiveEvents?.seek(state.currentMs);
     state.playbackFrameKey = "";
     state.routeDisplayedPhase = "";
     if (!previous.clean) applyCleanView(false);
@@ -2999,7 +2999,7 @@ function wireControls() {
     state.viewMode = "realtime";
     if (leavingCumulative) updateRouteOverlay();
     state.currentMs = selectionStartMs() + (selectionEndMs() - selectionStartMs()) * (+els.scrubber.value / 1000);
-    window.DeepstrikeArchiveEvents?.seek(state.currentMs);
+    globalThis.DeepstrikeArchiveEvents?.seek(state.currentMs);
     state.playbackActivated = true;
     scheduleInteractiveRender();
     updateRouteOverlay();
@@ -3059,7 +3059,7 @@ function rebuildTimeline() {
   els.rangeEnd.value = 1000;
   els.rangeCumulative.value = 0;
   state.currentMs = state.timelineStartMs;
-  window.DeepstrikeArchiveEvents?.seek(state.currentMs);
+  globalThis.DeepstrikeArchiveEvents?.seek(state.currentMs);
   state.cumulativeMs = state.timelineStartMs;
   state.viewMode = "realtime";
   buildTicks();
@@ -3487,7 +3487,7 @@ function togglePlayback() {
   state.playbackActivated = true;
   const start = selectionStartMs(), end = selectionEndMs();
   if (state.currentMs >= end) state.currentMs = start;
-  window.DeepstrikeArchiveEvents?.begin(state.currentMs,state.currentMs===start);
+  globalThis.DeepstrikeArchiveEvents?.begin(state.currentMs,state.currentMs===start);
   els.playButton.classList.add("is-playing");
   els.playButton.textContent = "Ⅱ PAUSE";
 
@@ -3511,7 +3511,7 @@ function togglePlayback() {
     updateRouteOverlay();
     updatePresentationProgress();
     if (state.currentMs >= end) {
-      window.DeepstrikeArchiveEvents?.sync();
+      globalThis.DeepstrikeArchiveEvents?.sync();
       stopPlayback();
       render({ skipRoutes: true });
       return;
