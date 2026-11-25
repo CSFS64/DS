@@ -219,13 +219,13 @@
   // silently discarded, including when the selected range is very crowded.
   function layoutLabels(points,w,h){
     const used=[],out=[];
-    const obstacles=points.map(p=>({x:p.x-13,y:p.y-13,w:26,h:26}));
+    const obstacles=points.map(p=>({x:p.x-23,y:p.y-23,w:46,h:46}));
     for(const p of points){
       let best=null,score=Infinity;
       for(const distance of [0,24,48,76,112,156]){
         for(const side of [1,-1]){
           for(const vertical of [-1,1,0]){
-            const dx=side*(42+distance),dy=vertical*(32+distance*.68);
+            const dx=side*(54+distance),dy=vertical*(38+distance*.72);
             const x=clamp(p.x+dx+(side<0?-p.w:0),5,w-p.w-5);
             const y=clamp(p.y+dy-p.h/2,5,h-p.h-5);
             const box={x,y,w:p.w,h:p.h};
@@ -264,6 +264,7 @@
       expansion:easeOut(t/540),
       pulse:1-smooth(t/780),
       marker:fade,
+      backing:fade*(.92+.08*smooth(t/160)),
       leader:easeOut((t-135)/410),
       leaderAlpha:fade,
       label:labelIn*fade,
@@ -275,37 +276,47 @@
     ctx.globalAlpha=alpha;ctx.strokeStyle=color;ctx.lineWidth=1;
     ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.stroke();
   }
+  // A small dark backplate separates the annotation from the underlying
+  // city dot. Render all backplates before any symbols so adjacent events
+  // cannot erase one another's foreground graphics.
+  function drawMarkerBacking(ctx,item,x,y){
+    const a=item.static?1:animationState(item.age).backing;
+    if(a<=0)return;
+    ctx.save();ctx.translate(x,y);ctx.globalAlpha=a;
+    circle(ctx,0,0,item.static?12:14,"#091219");
+    ctx.restore();
+  }
   function drawBurst(ctx,item,x,y){
     const a=item.static?{flash:0,expansion:1,pulse:0,marker:1}:animationState(item.age);
     if(a.marker<=0)return;
     ctx.save();ctx.translate(x,y);
-    // Small, hollow, map-scale symbols use the same amber as the archive legend.
-    // No opaque fill, fireball, smoke, or large radial-gradient sprite.
+    // Compact map annotation, not a physically scaled explosion.
     if(a.pulse>0){
-      markerStroke(ctx,5+15*a.expansion,.7*a.pulse,"#ffc15a");
-      markerStroke(ctx,3+9*a.expansion,.5*a.pulse,"#fff0cf");
+      markerStroke(ctx,10+13*a.expansion,.72*a.pulse,"#ffc15a");
+      markerStroke(ctx,7+7*a.expansion,.45*a.pulse,"#fff0cf");
     }
+    const r=item.static?7:8;
+    ctx.globalAlpha=a.marker*.92;ctx.strokeStyle="#ffc15a";ctx.lineWidth=1.4;
+    ctx.beginPath();ctx.arc(0,0,item.static?11:13,0,Math.PI*2);ctx.stroke();
     ctx.globalAlpha=a.marker;
-    ctx.strokeStyle="#ffc15a";ctx.lineWidth=1.2;
+    ctx.fillStyle="#091219";ctx.strokeStyle="#ffd17c";ctx.lineWidth=1.5;
     ctx.beginPath();
-    const r=6.5;
     ctx.moveTo(0,-r);ctx.lineTo(r,0);ctx.lineTo(0,r);ctx.lineTo(-r,0);ctx.closePath();
-    ctx.stroke();
-    // Discrete outward ticks evoke the burst without covering map content.
-    ctx.globalAlpha=a.marker*(item.static?.72:.76+.24*a.pulse);
-    ctx.strokeStyle="#ffc15a";ctx.lineWidth=1.1;ctx.beginPath();
-    const inner=9+2*a.pulse,outer=12+4*a.pulse;
+    ctx.fill();ctx.stroke();
+    // Four radial ticks remain readable even at an overlapping city point.
+    const inner=item.static?13:15,outer=item.static?16:19;
+    ctx.lineWidth=1.5;ctx.lineCap="round";ctx.beginPath();
     for(let i=0;i<4;i++){
-      const angle=Math.PI/4+i*Math.PI/2;
+      const angle=i*Math.PI/2;
       ctx.moveTo(Math.cos(angle)*inner,Math.sin(angle)*inner);
       ctx.lineTo(Math.cos(angle)*outer,Math.sin(angle)*outer);
     }
     ctx.stroke();
-    ctx.globalAlpha=a.marker;ctx.shadowColor="#ffc15a";ctx.shadowBlur=3;
-    circle(ctx,0,0,2,"#ffe4ae");ctx.shadowBlur=0;
+    ctx.shadowColor="#ffc15a";ctx.shadowBlur=3;
+    circle(ctx,0,0,item.static?2.4:3,"#ffe4ae");ctx.shadowBlur=0;
     if(a.flash>0){
-      ctx.globalAlpha=a.flash*.9;
-      circle(ctx,0,0,2+2*a.flash,"#fffdf2");
+      ctx.globalAlpha=a.flash*.95;
+      circle(ctx,0,0,3+2*a.flash,"#fffdf2");
     }
     ctx.restore();
   }
@@ -318,7 +329,7 @@
     const elbow={x:endX-side*12,y:endY};
     const dx=elbow.x-point.x,dy=elbow.y-point.y;
     const initial=Math.hypot(dx,dy);
-    const gap=Math.min(8,initial*.45);
+    const gap=Math.min(19,initial*.45);
     const start=initial?{x:point.x+dx*gap/initial,y:point.y+dy*gap/initial}:{x:point.x,y:point.y};
     const end={x:endX,y:endY};
     const first=Math.hypot(elbow.x-start.x,elbow.y-start.y);
@@ -342,7 +353,7 @@
     const {path}=leaderGeometry(p,b,a.leader);
     if(path.length<2)return;
     ctx.save();ctx.globalAlpha=.9*a.leaderAlpha;
-    ctx.strokeStyle="#f5f7fa";ctx.lineWidth=1;
+    ctx.strokeStyle="#f5f7fa";ctx.lineWidth=1.15;
     ctx.lineCap="round";ctx.lineJoin="round";
     ctx.beginPath();ctx.moveTo(path[0].x,path[0].y);
     for(const v of path.slice(1))ctx.lineTo(v.x,v.y);
@@ -353,7 +364,7 @@
     const side=b.x+b.w/2>=p.x?1:-1;
     ctx.save();ctx.globalAlpha=a.label;
     // Only a very fine dark glyph outline for legibility, not a tooltip box.
-    ctx.strokeStyle="rgba(4,10,15,.92)";ctx.lineWidth=2;
+    ctx.strokeStyle="rgba(4,10,15,.96)";ctx.lineWidth=2.5;
     ctx.lineJoin="round";ctx.fillStyle="#f5f7fa";
     p.lines.forEach((line,j)=>{
       const x=b.x+4+side*a.labelSlide,y=b.y+9+j*15;
@@ -383,8 +394,9 @@
       const lines=wrapLabel(ctx,item.row.name,Math.min(220,Math.max(65,w-20)));
       const width=Math.max(...lines.map(l=>ctx.measureText(l).width))+8;
       points.push({item,x,y,lines,w:width,h:lines.length*15+3});
-      drawBurst(ctx,item,x,y);
     }
+    points.forEach(p=>drawMarkerBacking(ctx,p.item,p.x,p.y));
+    points.forEach(p=>drawBurst(ctx,p.item,p.x,p.y));
     const boxes=layoutLabels(points,w,h);
     // Paint line and glyphs separately, above the same compact symbol.
     const visualStates=points.map(p=>p.item.static?
@@ -427,14 +439,35 @@
       }catch(e){notice(e.message||"输入无效");}
     });
     byId("archiveEventCancel").onclick=()=>{clearForm();notice("已取消编辑");};
-    byId("archiveEventClearToken").onclick=()=>{byId("archiveEventToken").value="";notice("已清除令牌");};
+    const credentialForm=byId("archiveCredentialForm");
+    const rememberButton=byId("archiveEventRememberToken");
+    rememberButton.disabled=false;
+    credentialForm.addEventListener("submit",async e=>{
+      e.preventDefault();
+      const token=byId("archiveEventToken").value.trim();
+      if(!token){notice("请先输入 GitHub Token");return;}
+      if(typeof window.PasswordCredential!=="function"||typeof navigator.credentials?.store!=="function"){
+        notice("当前浏览器不支持网页主动保存。请在浏览器密码管理器中添加本网站的凭据，或使用自动填充。");
+        return;
+      }
+      try{
+        const credential=new window.PasswordCredential({id:"DS Archive Editor",password:token,name:"DS Archive Editor"});
+        const result=await navigator.credentials.store(credential);
+        notice(result?"已向浏览器请求保存令牌；下次可使用密码管理器填充。":"浏览器未确认保存，请检查密码管理器设置。");
+      }catch(_){notice("浏览器拒绝保存请求，请在密码管理器中手动保存。");}
+    });
+    byId("archiveEventClearToken").onclick=()=>{
+      byId("archiveEventToken").value="";
+      // Clearing the field does not delete a credential from the vault.
+      notice("当前输入已清除；如需删除已保存令牌，请打开浏览器密码管理器。");
+    };
     byId("archiveEventReload").onclick=load;
     window.addEventListener("pagehide",()=>{byId("archiveEventToken").value="";});
     load();
     function tick(){if(!options.frame().exporting)sync();raf=requestAnimationFrame(tick);}
     raf=requestAnimationFrame(tick);
   }
-  const api={init,sync,begin,seek,Timeline,parseCoordinates,parseZoned,zoneParts,normalizeList,historical,displayRows,layoutLabels,animationState,leaderGeometry,drawLabel,drawLeader,drawBurst,LIFE_MS,DELAY_MS};
+  const api={init,sync,begin,seek,Timeline,parseCoordinates,parseZoned,zoneParts,normalizeList,historical,displayRows,layoutLabels,animationState,leaderGeometry,drawLabel,drawLeader,drawBurst,drawMarkerBacking,LIFE_MS,DELAY_MS};
   if(typeof module!=="undefined"&&module.exports)module.exports=api;
   if(root)root.DeepstrikeArchiveEvents=api;
 })(typeof window!=="undefined"?window:null);

@@ -79,8 +79,13 @@
             <label>TIME ZONE<select id="archiveEventZone"><option value="Europe/Kyiv">Kyiv</option><option value="Europe/Moscow">Moscow</option><option value="Asia/Shanghai">Beijing</option><option value="UTC">UTC</option></select></label>
             <div class="archive-event-actions"><button id="archiveEventSave" type="submit" disabled>ADD EVENT</button><button id="archiveEventCancel" type="button">CLEAR</button></div>
           </form>
-          <label>GITHUB TOKEN · 当前页面<input id="archiveEventToken" type="password" autocomplete="off" spellcheck="false" placeholder="Fine-grained PAT"></label>
-          <div class="archive-event-actions"><button id="archiveEventReload" type="button">RELOAD</button><button id="archiveEventClearToken" type="button">CLEAR TOKEN</button></div>
+          <form id="archiveCredentialForm" method="post" autocomplete="on" onsubmit="return false">
+            <label>ACCOUNT<input id="archiveEventAccount" name="username" type="text" autocomplete="username" value="DS Archive Editor" readonly></label>
+            <label>GITHUB TOKEN<input id="archiveEventToken" type="password" autocomplete="current-password" spellcheck="false" autocapitalize="none" placeholder="Fine-grained PAT"></label>
+            <div class="archive-event-actions"><button id="archiveEventRememberToken" type="submit" disabled>SAVE IN BROWSER</button><button id="archiveEventClearToken" type="button">CLEAR TOKEN</button></div>
+            <p>使用浏览器密码管理器保存令牌；网页不会把令牌写入本地存储或 GitHub。</p>
+          </form>
+          <div class="archive-event-actions"><button id="archiveEventReload" type="button">RELOAD</button></div>
           <p id="archiveEventStatus" role="status" aria-live="polite">正在加载…</p>
           <div id="archiveEventList" class="archive-event-list"></div>
         </div>

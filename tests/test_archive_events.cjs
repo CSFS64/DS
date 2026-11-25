@@ -1,6 +1,6 @@
 const test=require("node:test");
 const assert=require("node:assert/strict");
-const {Timeline,parseCoordinates,parseZoned,normalizeList,historical,displayRows,layoutLabels,animationState,leaderGeometry,drawLabel,drawLeader,drawBurst,LIFE_MS,DELAY_MS}=require("../js/archive-events.js");
+const {Timeline,parseCoordinates,parseZoned,normalizeList,historical,displayRows,layoutLabels,animationState,leaderGeometry,drawLabel,drawLeader,drawBurst,drawMarkerBacking,LIFE_MS,DELAY_MS}=require("../js/archive-events.js");
 const row=(id,ms)=>({id,name:"Historical record "+id,lat:0,lon:0,datetime:new Date(ms).toISOString()});
 const f=(ms,mode="realtime",running=true,start=0,end=100000000)=>({ms,mode,running,start,end});
 test("validates coordinates and exact UTC conversions",()=>{
@@ -83,5 +83,21 @@ test("renderer uses no filled label background and text appears only after leade
   drawLabel(ctx,point,box,animationState(900));
   assert.ok(ops.some(op=>op[0]==="text"));assert.ok(ops.some(op=>op[0]==="outline"));
   assert.ok(!ops.some(op=>op[0]==="background"));
-  assert.ok(ops.filter(op=>op[0]==="arc").every(op=>op[1]<=20));
+  assert.ok(ops.filter(op=>op[0]==="arc").every(op=>op[1]<=23));
+});
+
+test("annotation backplate covers the city dot before the foreground symbol and fades at end",()=>{
+  const ops=[];
+  const ctx={save(){},restore(){},translate(){},beginPath(){},closePath(){},moveTo(){},lineTo(){},
+    arc(x,y,r){ops.push(["arc",r])},
+    fill(){ops.push(["fill",this.fillStyle,this.globalAlpha])},
+    stroke(){ops.push(["stroke",this.strokeStyle])}};
+  const item={static:false,age:900};
+  drawMarkerBacking(ctx,item,0,0);drawBurst(ctx,item,0,0);
+  assert.deepEqual(ops[0],["arc",14]);assert.equal(ops[1][1],"#091219");
+  assert.ok(ops[1][2]>.9);
+  assert.ok(ops.some(o=>o[0]==="stroke"&&o[1]==="#ffc15a"));
+  assert.equal(animationState(LIFE_MS).backing,0);
+  ops.length=0;drawMarkerBacking(ctx,{static:false,age:LIFE_MS},0,0);
+  assert.equal(ops.length,0);
 });
