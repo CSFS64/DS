@@ -60,6 +60,12 @@
   function displayRows(published, now=Date.now()) {
     return normalizeList(historical(published,now));
   }
+  function localDisplayRows(published,drafts,now=Date.now()){
+    // The local view may include unpublished records from this browser.
+    // A published ID takes precedence; drafts never enter the remote payload.
+    const publishedIds=new Set(published.map(r=>r.id));
+    return mergeDrafts(displayRows(published,now),drafts.filter(r=>!publishedIds.has(r.id)));
+  }
   function mergeDrafts(...groups){
     const merged=new Map();
     for(const group of groups)for(const row of group)merged.set(row.id,row);
@@ -177,7 +183,7 @@
     const next=normalizeList(rows);
     // Do not report a durable save if the browser refuses storage.
     localStorage.setItem(DRAFT_KEY,JSON.stringify(next));
-    drafts=next;refreshList();
+    drafts=next;refreshTimeline();
   }
   function showTab(name){
     const submit=name==="submit";
@@ -190,7 +196,7 @@
     byId("archiveEventSave").textContent=editing?"SAVE EDIT":"SUBMIT";
   }
   function refreshTimeline(){
-    timeline.setRows(displayRows(records));
+    timeline.setRows(localDisplayRows(records,drafts));
     const frame=options.frame();
     if(!frame.running&&frame.mode==="realtime"&&Number.isFinite(frame.ms)&&frame.end>frame.start)
       timeline.seek(frame,true);
@@ -556,8 +562,9 @@
         }else{
           // Keep a durable pending copy until GitHub confirms the write.
           saveDrafts([...drafts.filter(r=>r.id!==id),row]);
+          options.includeTime?.(Date.parse(datetime));
           if(Date.parse(datetime)>Date.now()-DELAY_MS){
-            clearForm();showTab("records");notice("已保存待提交记录 · 尚未达到公开归档时间");
+            clearForm();showTab("records");notice("已保存在本机 · PENDING");
           }else{
             mutate({kind:"add",row}).then(ok=>{
               if(!ok){const reason=byId("archiveEventStatus").textContent;clearForm();showTab("records");notice(reason+" · 已保留待提交记录");}
@@ -601,7 +608,7 @@
     }
     raf=requestAnimationFrame(tick);
   }
-  const api={init,sync,begin,seek,Timeline,parseCoordinates,parseZoned,zoneParts,normalizeList,historical,displayRows,mergeDrafts,dateFilter,layoutLabels,StableLabels,animationState,leaderGeometry,drawLabel,drawLeader,drawBurst,drawMarkerBacking,LIFE_MS,DELAY_MS};
+  const api={init,sync,begin,seek,Timeline,parseCoordinates,parseZoned,zoneParts,normalizeList,historical,displayRows,localDisplayRows,mergeDrafts,dateFilter,layoutLabels,StableLabels,animationState,leaderGeometry,drawLabel,drawLeader,drawBurst,drawMarkerBacking,LIFE_MS,DELAY_MS};
   if(typeof module!=="undefined"&&module.exports)module.exports=api;
   if(root)root.DeepstrikeArchiveEvents=api;
 })(typeof window!=="undefined"?window:null);

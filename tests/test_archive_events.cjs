@@ -1,6 +1,6 @@
 const test=require("node:test");
 const assert=require("node:assert/strict");
-const {Timeline,parseCoordinates,parseZoned,normalizeList,historical,displayRows,mergeDrafts,dateFilter,layoutLabels,StableLabels,animationState,leaderGeometry,drawLabel,drawLeader,drawBurst,drawMarkerBacking,LIFE_MS,DELAY_MS}=require("../js/archive-events.js");
+const {Timeline,parseCoordinates,parseZoned,normalizeList,historical,displayRows,localDisplayRows,mergeDrafts,dateFilter,layoutLabels,StableLabels,animationState,leaderGeometry,drawLabel,drawLeader,drawBurst,drawMarkerBacking,LIFE_MS,DELAY_MS}=require("../js/archive-events.js");
 const row=(id,ms)=>({id,name:"Historical record "+id,lat:0,lon:0,datetime:new Date(ms).toISOString()});
 const f=(ms,mode="realtime",running=true,start=0,end=100000000)=>({ms,mode,running,start,end});
 test("validates coordinates and exact UTC conversions",()=>{
@@ -132,4 +132,19 @@ test("label offsets remain stable throughout a moving camera gesture",()=>{
   assert.equal(d.x,c.x);assert.equal(d.y,c.y);
   const e=layout.frame(pts(410,230),500,300,"c",false,240)[0];
   assert.ok(e.x>=0&&e.x+100<=500&&e.y>=0&&e.y+24<=300);
+});
+
+test("local pending records appear in playback but do not enter public display",()=>{
+  const now=DELAY_MS+1000;
+  const published=[row("old",0),row("recent-public",now-1)];
+  const drafts=[row("local",now-1),row("old",1)];
+  const local=localDisplayRows(published,drafts,now);
+  assert.deepEqual(local.map(r=>r.id),["old","local"]);
+  assert.equal(local[0].datetime,row("old",0).datetime);
+  assert.deepEqual(displayRows(published,now).map(r=>r.id),["old"]);
+  const timeline=new Timeline();
+  timeline.setRows(local);
+  assert.deepEqual(timeline.frame(f(0,"cumulative",false,0,now),0).map(x=>x.row.id),["old","local"]);
+  assert.deepEqual(localDisplayRows(published,[],now).map(r=>r.id),["old"]);
+  assert.equal(historical([row("twelve",now-12*3600000)],now).length,0);
 });
