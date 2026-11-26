@@ -191,6 +191,9 @@
   }
   function refreshTimeline(){
     timeline.setRows(displayRows(records));
+    const frame=options.frame();
+    if(!frame.running&&frame.mode==="realtime"&&Number.isFinite(frame.ms)&&frame.end>frame.start)
+      timeline.seek(frame,true);
     lastDrawKey="";refreshList();
   }
   function setRecords(rows){
@@ -516,6 +519,8 @@
       {leader:1,leaderAlpha:1,label:1,labelSlide:0}:animationState(p.item.age));
     points.forEach((p,i)=>drawLeader(ctx,p,boxes[i],visualStates[i]));
     points.forEach((p,i)=>drawLabel(ctx,p,boxes[i],visualStates[i]));
+    // Always paint the last interpolation frame before allowing static cache hits.
+    if(stableLabels.transitioning(now))lastDrawKey="";
   }
   function sync(){
     if(!timeline||!options)return;
@@ -555,7 +560,7 @@
             clearForm();showTab("records");notice("已保存待提交记录 · 尚未达到公开归档时间");
           }else{
             mutate({kind:"add",row}).then(ok=>{
-              if(!ok){clearForm();showTab("records");notice("尚未写入 GitHub · 已保留待提交记录");}
+              if(!ok){const reason=byId("archiveEventStatus").textContent;clearForm();showTab("records");notice(reason+" · 已保留待提交记录");}
             });
           }
         }
