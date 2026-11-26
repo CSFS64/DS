@@ -1,6 +1,6 @@
 const test=require("node:test");
 const assert=require("node:assert/strict");
-const {Timeline,parseCoordinates,parseZoned,normalizeList,historical,displayRows,layoutLabels,animationState,leaderGeometry,drawLabel,drawLeader,drawBurst,drawMarkerBacking,LIFE_MS,DELAY_MS}=require("../js/archive-events.js");
+const {Timeline,parseCoordinates,parseZoned,normalizeList,historical,displayRows,mergeDrafts,dateFilter,layoutLabels,StableLabels,animationState,leaderGeometry,drawLabel,drawLeader,drawBurst,drawMarkerBacking,LIFE_MS,DELAY_MS}=require("../js/archive-events.js");
 const row=(id,ms)=>({id,name:"Historical record "+id,lat:0,lon:0,datetime:new Date(ms).toISOString()});
 const f=(ms,mode="realtime",running=true,start=0,end=100000000)=>({ms,mode,running,start,end});
 test("validates coordinates and exact UTC conversions",()=>{
@@ -35,10 +35,12 @@ test("delayed records only and duplicate ids rejected",()=>{
   assert.throws(()=>normalizeList([row("a",0),row("a",1)]));
 });
 
-test("local preview can be rendered immediately without relaxing public archive delay",()=>{
+test("public archive shows only eligible published rows, and migration retains drafts",()=>{
   const now=DELAY_MS+1000;
-  const result=displayRows([row("old",0),row("recent-public",now-1)],[row("local",now-1)],now);
-  assert.deepEqual(result.map(r=>r.id),["old","local"]);
+  const result=displayRows([row("old",0),row("recent-public",now-1)],now);
+  assert.deepEqual(result.map(r=>r.id),["old"]);
+  assert.deepEqual(mergeDrafts([row("a",1)],[row("a",2),row("b",3)]).map(r=>r.id),["a","b"]);
+  assert.equal(mergeDrafts([row("a",1)],[row("a",2)])[0].datetime,row("a",2).datetime);
 });
 test("labels use separate screen positions for coincident points and stay in view",()=>{
   const points=Array.from({length:6},()=>({x:200,y:130,w:100,h:24}));
@@ -100,4 +102,34 @@ test("annotation backplate covers the city dot before the foreground symbol and 
   assert.equal(animationState(LIFE_MS).backing,0);
   ops.length=0;drawMarkerBacking(ctx,{static:false,age:LIFE_MS},0,0);
   assert.equal(ops.length,0);
+});
+
+test("date filters are inclusive Kyiv calendar dates and handle UTC day changes",()=>{
+  const rows=[row("a",Date.parse("2025-01-01T21:59:00Z")),row("b",Date.parse("2025-01-01T22:00:00Z")),row("c",Date.parse("2025-01-02T22:00:00Z"))];
+  assert.deepEqual(dateFilter(rows,"2025-01-02","2025-01-02").map(r=>r.id),["b"]);
+  assert.equal(dateFilter(rows,"","").length,3);
+});
+test("scrubber shows events inside representable slider tick in both directions and does not expire",()=>{
+  const t=new Timeline();t.setRows([row("a",1000000),row("b",2500000)]);
+  const frame=ms=>f(ms,"realtime",false,0,100000000);
+  t.seek(frame(1020000),true);
+  assert.deepEqual(t.frame(frame(1020000),1).map(x=>x.row.id),["a"]);
+  assert.equal(t.frame(frame(1020000),9999999).length,1);
+  t.seek(frame(2500000),true);assert.deepEqual(t.frame(frame(2500000),2).map(x=>x.row.id),["b"]);
+  t.seek(frame(1000000),true);assert.deepEqual(t.frame(frame(1000000),3).map(x=>x.row.id),["a"]);
+  t.begin({...frame(1000000),running:true});
+  const played=t.frame({...frame(1000000),running:true},4);
+  assert.equal(played.length,1);assert.equal(played[0].static,false);
+});
+test("label offsets remain stable throughout a moving camera gesture",()=>{
+  const layout=new StableLabels(),pts=(x,y)=>[{x,y,w:100,h:24,item:{row:{id:"a"}}}];
+  const a=layout.frame(pts(200,130),500,300,"a",false,0)[0];
+  const b=layout.frame(pts(201,131),500,300,"b",true,20)[0];
+  const c=layout.frame(pts(410,230),500,300,"c",true,40)[0];
+  assert.equal(b.x-201,a.x-200);assert.equal(b.y-131,a.y-130);
+  assert.equal(c.x-410,a.x-200);assert.equal(c.y-230,a.y-130);
+  const d=layout.frame(pts(410,230),500,300,"c",false,60)[0];
+  assert.equal(d.x,c.x);assert.equal(d.y,c.y);
+  const e=layout.frame(pts(410,230),500,300,"c",false,240)[0];
+  assert.ok(e.x>=0&&e.x+100<=500&&e.y>=0&&e.y+24<=300);
 });

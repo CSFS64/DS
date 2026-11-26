@@ -42,10 +42,7 @@
       </div>
 
       <header class="hud-header">
-        <div>
-          <h1>DEEPSTRIKE / ALERT ARCHIVE</h1>
-          <div id="dataStatus" class="hud-sub" hidden aria-hidden="true">LOADING ARCHIVE…</div>
-        </div>
+        <div id="dataStatus" class="hud-sub" hidden aria-hidden="true">LOADING ARCHIVE…</div>
         <div id="archiveLamp" class="archive-lamp" title="当前回放时刻存在活动或警报"></div>
       </header>
 
@@ -68,26 +65,39 @@
       </div>
 
       <details id="archiveEventPanel" class="archive-event-panel">
-        <summary>HISTORICAL EVENTS · <span id="archiveEventCount">0</span></summary>
+        <summary>PUBLIC ARCHIVE · <span id="archiveEventCount">0</span></summary>
         <div class="archive-event-content">
-          <p>公开历史归档延迟 24h；LOCAL PREVIEW 可立即制作本地演示及视频，不上传数据。</p>
-          <form id="archiveEventForm">
-            <label>ENTRY MODE<select id="archiveEventMode"><option value="archive">PUBLIC ARCHIVE</option><option value="preview">LOCAL PREVIEW · 仅本地演示</option></select></label>
-            <label>NAME<input id="archiveEventName" maxlength="120" required></label>
-            <label>COORDINATES · LAT, LON<input id="archiveEventCoordinates" placeholder="纬度, 经度" required></label>
-            <label>DATE / TIME<input id="archiveEventTime" type="datetime-local" step="1" required></label>
-            <label>TIME ZONE<select id="archiveEventZone"><option value="Europe/Kyiv">Kyiv</option><option value="Europe/Moscow">Moscow</option><option value="Asia/Shanghai">Beijing</option><option value="UTC">UTC</option></select></label>
-            <div class="archive-event-actions"><button id="archiveEventSave" type="submit" disabled>ADD EVENT</button><button id="archiveEventCancel" type="button">CLEAR</button></div>
-          </form>
+          <div class="archive-tabs" role="tablist" aria-label="Archive">
+            <button id="archiveSubmitTab" type="button" role="tab" aria-controls="archiveSubmitPane" aria-selected="true">SUBMIT</button>
+            <button id="archiveRecordsTab" type="button" role="tab" aria-controls="archiveRecordsPane" aria-selected="false">RECORDS</button>
+          </div>
+          <section id="archiveSubmitPane" role="tabpanel" aria-labelledby="archiveSubmitTab" class="archive-pane">
+            <form id="archiveEventForm">
+              <label>NAME<input id="archiveEventName" maxlength="120" required></label>
+              <label>COORDINATES · LAT, LON<input id="archiveEventCoordinates" placeholder="纬度, 经度" required></label>
+              <label>DATE / TIME<input id="archiveEventTime" type="datetime-local" step="1" required></label>
+              <label>TIME ZONE<select id="archiveEventZone"><option value="Europe/Kyiv">Kyiv</option><option value="Europe/Moscow">Moscow</option><option value="Asia/Shanghai">Beijing</option><option value="UTC">UTC</option></select></label>
+              <div class="archive-event-actions"><button id="archiveEventSave" type="submit" disabled>SUBMIT</button><button id="archiveEventCancel" type="button">CLEAR</button></div>
+            </form>
           <form id="archiveCredentialForm" method="post" autocomplete="on" onsubmit="return false">
             <label>ACCOUNT<input id="archiveEventAccount" name="username" type="text" autocomplete="username" value="DS Archive Editor" readonly></label>
             <label>GITHUB TOKEN<input id="archiveEventToken" type="password" autocomplete="current-password" spellcheck="false" autocapitalize="none" placeholder="Fine-grained PAT"></label>
             <div class="archive-event-actions"><button id="archiveEventRememberToken" type="submit" disabled>SAVE IN BROWSER</button><button id="archiveEventClearToken" type="button">CLEAR TOKEN</button></div>
-            <p>使用浏览器密码管理器保存令牌；网页不会把令牌写入本地存储或 GitHub。</p>
           </form>
-          <div class="archive-event-actions"><button id="archiveEventReload" type="button">RELOAD</button></div>
-          <p id="archiveEventStatus" role="status" aria-live="polite">正在加载…</p>
-          <div id="archiveEventList" class="archive-event-list"></div>
+          </section>
+          <section id="archiveRecordsPane" role="tabpanel" aria-labelledby="archiveRecordsTab" class="archive-pane" hidden>
+            <div class="archive-date-filter">
+              <label>FROM · KYIV<input id="archiveFilterStart" type="date"></label>
+              <label>TO · KYIV<input id="archiveFilterEnd" type="date"></label>
+            </div>
+            <div class="archive-event-actions">
+              <button id="archiveFilterClear" type="button">RESET</button>
+              <button id="archiveEventReload" type="button">RELOAD</button>
+              <span id="archiveFilterCount"></span>
+            </div>
+            <div id="archiveEventList" class="archive-event-list"></div>
+          </section>
+          <p id="archiveEventStatus" role="status" aria-live="polite"></p>
         </div>
       </details>
 

@@ -57,9 +57,19 @@
   function historical(rows, now=Date.now()) {
     return rows.filter(r=>Date.parse(r.datetime)<=now-DELAY_MS);
   }
-  // Local editorial previews are not committed to the public archive.
-  function displayRows(published, previews, now=Date.now()) {
-    return normalizeList([...historical(published,now),...previews]);
+  function displayRows(published, now=Date.now()) {
+    return normalizeList(historical(published,now));
+  }
+  function mergeDrafts(...groups){
+    const merged=new Map();
+    for(const group of groups)for(const row of group)merged.set(row.id,row);
+    return normalizeList([...merged.values()]);
+  }
+  function dateFilter(rows,from,to,zone="Europe/Kyiv"){
+    return rows.filter(row=>{
+      const day=zoneParts(Date.parse(row.datetime),zone).slice(0,10);
+      return (!from||day>=from)&&(!to||day<=to);
+    });
   }
   function lowerBound(rows, time) {
     let lo=0,hi=rows.length;
@@ -67,12 +77,22 @@
     return lo;
   }
   class Timeline {
-    constructor(){this.rows=[];this.active=[];this.previous=null;this.key="";}
+    constructor(){this.rows=[];this.active=[];this.previous=null;this.key="";this.snapshot=false;}
     setRows(rows){this.rows=rows.map(r=>({...r,ms:Date.parse(r.datetime)})).sort((a,b)=>a.ms-b.ms);this.reset();}
-    reset(){this.active=[];this.previous=null;this.key="";}
-    context(f){const key=f.mode+":"+f.start+":"+f.end;if(key!==this.key){this.active=[];this.previous=null;this.key=key;}}
-    begin(f,fresh=false){this.context(f);if(fresh||this.previous===null||this.previous!==f.ms){this.active=[];this.previous=f.ms-1;}}
-    seek(f){this.context(f);this.active=[];this.previous=f.ms;}
+    reset(){this.active=[];this.previous=null;this.key="";this.snapshot=false;}
+    context(f){const key=f.mode+":"+f.start+":"+f.end;if(key!==this.key){this.active=[];this.previous=null;this.key=key;this.snapshot=false;}}
+    begin(f,fresh=false){this.context(f);const wasSnapshot=this.snapshot;this.snapshot=false;if(fresh||wasSnapshot||this.previous===null||this.previous!==f.ms){this.active=[];this.previous=f.ms-1;}}
+    seek(f,showSnapshot=false){this.context(f);this.active=[];this.previous=f.ms;this.snapshot=showSnapshot;}
+    snapshotAt(f){
+      // Match the nearest representable scrubber position, not the speed.
+      // A long time range has a coarse slider; do not miss events between ticks.
+      const half=Math.max(1,(f.end-f.start)/2000);
+      const lo=lowerBound(this.rows,Math.max(f.start,f.ms-half));
+      const out=[];
+      for(let i=lo;i<this.rows.length&&this.rows[i].ms<=Math.min(f.end,f.ms+half);i++)
+        out.push({row:this.rows[i],age:0,static:true});
+      return out;
+    }
     frame(f,now){
       this.context(f);
       if(f.mode==="cumulative"){
@@ -81,6 +101,7 @@
         for(let i=lo;i<this.rows.length&&this.rows[i].ms<=f.end;i++)out.push({row:this.rows[i],age:0,static:true});
         return out;
       }
+      if(this.snapshot&&!f.running)return this.snapshotAt(f);
       if(this.previous===null)this.previous=f.running?f.ms-1:f.ms;
       if(f.ms<this.previous||(!f.running&&f.ms!==this.previous)){this.active=[];this.previous=f.ms;}
       if(f.running){
@@ -114,6 +135,8 @@
     return res.json();
   }
   async function saveRemote(token,operation){
+    if(operation.row&&Date.parse(operation.row.datetime)>Date.now()-DELAY_MS)
+      throw new Error("记录尚未达到公开归档时间");
     const remote=await github(token,"GET");
     if(remote.encoding!=="base64"||typeof remote.content!=="string"||!remote.sha)throw new Error("无法读取 GitHub 归档文件");
     const rows=normalizeList(JSON.parse(base64Decode(remote.content)));
@@ -132,82 +155,137 @@
     return {rows:next,commit:result.commit?.sha||""};
   }
 
-  const PREVIEW_KEY="ds.archive.editorial-preview.v1";
-  let timeline,options,canvas,records=[],previews=[],editing=null,busy=false,loaded=false,raf=0,lastDrawKey="";
-  function readPreviews(){
-    try{return normalizeList(JSON.parse(sessionStorage.getItem(PREVIEW_KEY)||"[]"));}
-    catch(_){return [];}
-  }
-  function savePreviews(rows){
-    previews=normalizeList(rows);
-    try{sessionStorage.setItem(PREVIEW_KEY,JSON.stringify(previews));}catch(_){}
-    refreshTimeline();
-  }
-  function refreshTimeline(){
-    timeline.setRows(displayRows(records,previews));
-    lastDrawKey="";
-    refreshList();
-  }
-  function isPreview(row){return previews.some(r=>r.id===row.id);}
-  function updateMode(){
-    const local=byId("archiveEventMode").value==="preview";
-    byId("archiveEventSave").disabled=busy||(!local&&!loaded);
-    byId("archiveEventSave").textContent=editing?"SAVE EDIT":local?"ADD LOCAL PREVIEW":"ADD EVENT";
-  }
+  const DRAFT_KEY="ds.archive.pending.v2",LEGACY_KEY="ds.archive.editorial-preview.v1";
+  let timeline,options,canvas,records=[],drafts=[],editing=null,editingDraft=false,busy=false,loaded=false,raf=0,lastDrawKey="";
   const byId=id=>document.getElementById(id);
   function notice(s){byId("archiveEventStatus").textContent=s;}
+  function readRows(storage,key){
+    try{return normalizeList(JSON.parse(storage.getItem(key)||"[]"));}catch(_){return [];}
+  }
+  function recoverDrafts(){
+    let persisted=[],legacy=[];
+    try{persisted=readRows(localStorage,DRAFT_KEY);}catch(_){}
+    try{legacy=readRows(sessionStorage,LEGACY_KEY);}catch(_){}
+    const recovered=mergeDrafts(persisted,legacy);
+    if(recovered.length){
+      try{localStorage.setItem(DRAFT_KEY,JSON.stringify(recovered));sessionStorage.removeItem(LEGACY_KEY);}
+      catch(_){/* keep original session copy if migration cannot persist */}
+    }
+    return recovered;
+  }
+  function saveDrafts(rows){
+    const next=normalizeList(rows);
+    // Do not report a durable save if the browser refuses storage.
+    localStorage.setItem(DRAFT_KEY,JSON.stringify(next));
+    drafts=next;refreshList();
+  }
+  function showTab(name){
+    const submit=name==="submit";
+    byId("archiveSubmitTab").setAttribute("aria-selected",String(submit));
+    byId("archiveRecordsTab").setAttribute("aria-selected",String(!submit));
+    byId("archiveSubmitPane").hidden=!submit;byId("archiveRecordsPane").hidden=submit;
+  }
+  function updateControls(){
+    byId("archiveEventSave").disabled=busy;
+    byId("archiveEventSave").textContent=editing?"SAVE EDIT":"SUBMIT";
+  }
+  function refreshTimeline(){
+    timeline.setRows(displayRows(records));
+    lastDrawKey="";refreshList();
+  }
   function setRecords(rows){
     records=normalizeList(rows);
+    // Clear only drafts confirmed present in the repository, never on a failed request.
+    const published=new Set(records.map(r=>r.id));
+    const keep=drafts.filter(r=>!published.has(r.id));
+    if(keep.length!==drafts.length){
+      try{saveDrafts(keep);}catch(_){drafts=keep;}
+    }
     refreshTimeline();
+  }
+  function editRow(r,pending){
+    editing=r;editingDraft=pending;
+    byId("archiveEventName").value=r.name;
+    byId("archiveEventCoordinates").value=r.lat+", "+r.lon;
+    // UTC remains exact even for the two repeated DST hours.
+    byId("archiveEventZone").value="UTC";
+    byId("archiveEventTime").value=r.datetime.slice(0,19);
+    updateControls();showTab("submit");notice("EDIT · "+r.name);
   }
   function refreshList(){
     const list=byId("archiveEventList");
     list.replaceChildren();
-    for(const r of displayRows(records,previews).slice().reverse()){
+    const known=new Set(records.map(r=>r.id));
+    const pending=drafts.filter(r=>!known.has(r.id));
+    const from=byId("archiveFilterStart").value,to=byId("archiveFilterEnd").value;
+    const all=mergeDrafts(records,pending);
+    const visible=dateFilter(all,from,to).reverse();
+    for(const r of visible){
+      const local=!known.has(r.id);
       const li=document.createElement("div");li.className="archive-event-row";
-      const local=isPreview(r);
-      const label=document.createElement("span");label.textContent=(local?"[LOCAL] ":"")+r.name+" · "+zoneParts(Date.parse(r.datetime),"Europe/Kyiv").replace("T"," ");
+      const info=document.createElement("div");info.className="archive-event-info";
+      const name=document.createElement("strong");name.textContent=r.name;
+      const date=document.createElement("small");
+      date.textContent=zoneParts(Date.parse(r.datetime),"Europe/Kyiv").replace("T"," ")+(local?" · PENDING":"");
+      info.append(name,date);
       const edit=document.createElement("button");edit.type="button";edit.textContent="EDIT";edit.disabled=busy;
-      edit.onclick=()=>{editing=r;byId("archiveEventName").value=r.name;byId("archiveEventCoordinates").value=r.lat+", "+r.lon;
-        byId("archiveEventZone").value="Europe/Kyiv";byId("archiveEventTime").value=zoneParts(Date.parse(r.datetime),"Europe/Kyiv");
-        byId("archiveEventMode").value=local?"preview":"archive";byId("archiveEventMode").disabled=true;
-        updateMode();notice("正在编辑 · "+r.name);};
+      edit.onclick=()=>editRow(r,local);
       const del=document.createElement("button");del.type="button";del.textContent="DELETE";del.disabled=busy;
-      del.onclick=()=>{if(confirm("删除这条记录？")){
-        if(local){savePreviews(previews.filter(x=>x.id!==r.id));if(editing?.id===r.id)clearForm();notice("本地记录已删除");}
+      del.onclick=()=>{if(!confirm("删除这条记录？"))return;
+        if(local){try{saveDrafts(drafts.filter(x=>x.id!==r.id));if(editing?.id===r.id)clearForm();notice("待提交记录已删除");}catch(e){notice(e.message);}}
         else mutate({kind:"delete",before:r});
-      }};
-      li.append(label,edit,del);list.append(li);
+      };
+      li.append(info,edit);
+      if(local){
+        const publish=document.createElement("button");publish.type="button";publish.textContent="SUBMIT";
+        publish.disabled=busy||!loaded||Date.parse(r.datetime)>Date.now()-DELAY_MS;
+        publish.onclick=()=>mutate({kind:"add",row:r});
+        li.append(publish);
+      }
+      li.append(del);list.append(li);
     }
-    byId("archiveEventCount").textContent=String(historical(records).length)+(previews.length?" + "+previews.length+" LOCAL":"");
+    byId("archiveEventCount").textContent=String(records.length);
+    byId("archiveFilterCount").textContent=visible.length+" / "+all.length+(pending.length?" · "+pending.length+" PENDING":"");
   }
   function clearForm(){
-    const mode=byId("archiveEventMode").value;
-    editing=null;byId("archiveEventForm").reset();byId("archiveEventMode").value=mode;
-    byId("archiveEventMode").disabled=false;updateMode();
-    // Token is deliberately a separate field; never included in form/reset.
+    editing=null;editingDraft=false;byId("archiveEventForm").reset();updateControls();
   }
   async function mutate(op){
-    if(busy||!loaded)return;
+    if(busy)return;
     const token=byId("archiveEventToken").value.trim();
-    if(!token){notice("请输入仅限 DS 仓库的 GitHub 写入令牌");return;}
-    busy=true;byId("archiveEventSave").disabled=true;refreshList();notice("正在写入 GitHub…");
+    if(!loaded||!token){
+      notice(!loaded?"归档尚未加载，请重试":"请输入 GitHub Token");
+      return false;
+    }
+    busy=true;updateControls();refreshList();notice("正在提交…");
     try{
       const r=await saveRemote(token,op);
       setRecords(r.rows);clearForm();
-      notice("GitHub 已保存 · "+r.commit.slice(0,7)+" · Pages 将自动发布");
-    }catch(e){notice(e.message||"写入失败");}
-    finally{busy=false;updateMode();refreshList();}
+      notice("GitHub 已保存 · "+r.commit.slice(0,7));
+      showTab("records");return true;
+    }catch(e){notice(e.message||"写入失败");return false;}
+    finally{busy=false;updateControls();refreshList();}
   }
   async function load(){
     if(busy)return;
-    loaded=false;updateMode();notice("正在读取归档…");
+    loaded=false;updateControls();notice("正在读取归档…");
     try{
-      const res=await fetch("data/strike-events.json",{cache:"no-store"});
-      if(!res.ok)throw new Error("归档读取失败（HTTP "+res.status+"）");
-      setRecords(await res.json());loaded=true;notice("公开历史归档已加载 · 可独立添加本地演示");
+      // Read the repository's latest version when available, independent of
+      // Pages redeploy latency. Fall back to its bundled static snapshot.
+      let rows;
+      try{
+        const res=await fetch("https://raw.githubusercontent.com/CSFS64/DS/main/data/strike-events.json",{cache:"no-store",credentials:"omit"});
+        if(!res.ok)throw new Error("HTTP "+res.status);
+        rows=normalizeList(await res.json());
+      }catch(_){
+        const res=await fetch("data/strike-events.json",{cache:"no-store"});
+        if(!res.ok)throw new Error("归档读取失败（HTTP "+res.status+"）");
+        rows=normalizeList(await res.json());
+      }
+      setRecords(rows);loaded=true;
+      notice(drafts.length?"已读取归档 · "+drafts.length+" 条待提交记录":"");
     }catch(e){notice(e.message||"归档读取失败");}
-    finally{updateMode();}
+    finally{updateControls();refreshList();}
   }
 
   function clamp(v,a,b){return Math.min(Math.max(v,a),Math.max(a,b));}
@@ -241,6 +319,39 @@
     }
     return out;
   }
+  class StableLabels {
+    constructor(){this.offsets=new Map();this.key="";this.moving=false;this.camera="";}
+    reset(){this.offsets.clear();this.key="";this.moving=false;this.camera="";}
+    frame(points,w,h,camera,moving,now){
+      const key=points.map(p=>p.item.row.id+":"+p.w+":"+p.h).join("|")+":"+w+":"+h;
+      const changed=key!==this.key;
+      const settled=!moving&&(this.moving||this.camera!==camera);
+      if(changed||settled){
+        const targets=layoutLabels(points,w,h);
+        const next=new Map();
+        points.forEach((p,i)=>{
+          const id=p.item.row.id,old=this.offsets.get(id);
+          const target={dx:targets[i].x-p.x,dy:targets[i].y-p.y};
+          if(moving&&old){next.set(id,old);return;}
+          const from=old?this.current(old,now):target;
+          next.set(id,{from,target,since:now});
+        });
+        this.offsets=next;this.key=key;
+      }
+      this.moving=moving;this.camera=camera;
+      return points.map(p=>{
+        const o=this.offsets.get(p.item.row.id);
+        const v=o?this.current(o,now):{dx:0,dy:0};
+        return {x:p.x+v.dx,y:p.y+v.dy,w:p.w,h:p.h};
+      });
+    }
+    current(o,now){
+      const f=smooth((now-o.since)/180);
+      return {dx:o.from.dx+(o.target.dx-o.from.dx)*f,dy:o.from.dy+(o.target.dy-o.from.dy)*f};
+    }
+    transitioning(now){return [...this.offsets.values()].some(o=>now-o.since<180&&(o.from.dx!==o.target.dx||o.from.dy!==o.target.dy));}
+  }
+  const stableLabels=new StableLabels();
   function wrapLabel(ctx,text,maxWidth){
     const lines=[];let line="";
     for(const ch of Array.from(text)){
@@ -372,15 +483,17 @@
     });
     ctx.restore();
   }
-  function paint(items,map){
-    if(!map||!items.length){canvas.hidden=true;lastDrawKey="";return;}
+  function paint(items,map,now){
+    if(!map||!items.length){canvas.hidden=true;lastDrawKey="";stableLabels.reset();return;}
     const container=map.getContainer(),w=container.clientWidth,h=container.clientHeight;
     if(!w||!h){canvas.hidden=true;return;}
     const dpr=Math.min(2,Math.max(1,window.devicePixelRatio||1));
     const cw=Math.round(w*dpr),ch=Math.round(h*dpr);
     const center=map.getCenter(),staticOnly=items.every(x=>x.static);
-    const key=staticOnly?[cw,ch,center.lng,center.lat,map.getZoom(),map.getBearing(),map.getPitch(),items.map(x=>x.row.id).join(",")].join("|"):"";
-    if(staticOnly&&key===lastDrawKey&&!canvas.hidden)return;
+    const camera=[center.lng,center.lat,map.getZoom(),map.getBearing(),map.getPitch()].join("|");
+    const moving=Boolean(map.isMoving?.());
+    const key=staticOnly?[cw,ch,camera,items.map(x=>x.row.id).join(","),moving].join("|"):"";
+    if(staticOnly&&key===lastDrawKey&&!canvas.hidden&&!stableLabels.transitioning(now))return;
     lastDrawKey=key;canvas.hidden=false;
     if(canvas.width!==cw)canvas.width=cw;
     if(canvas.height!==ch)canvas.height=ch;
@@ -397,7 +510,7 @@
     }
     points.forEach(p=>drawMarkerBacking(ctx,p.item,p.x,p.y));
     points.forEach(p=>drawBurst(ctx,p.item,p.x,p.y));
-    const boxes=layoutLabels(points,w,h);
+    const boxes=stableLabels.frame(points,w,h,camera,moving,now);
     // Paint line and glyphs separately, above the same compact symbol.
     const visualStates=points.map(p=>p.item.static?
       {leader:1,leaderAlpha:1,label:1,labelSlide:0}:animationState(p.item.age));
@@ -408,15 +521,21 @@
     if(!timeline||!options)return;
     const f=options.frame();
     if(!Number.isFinite(f.ms)||!Number.isFinite(f.start)||!Number.isFinite(f.end))return;
-    paint(timeline.frame(f,performance.now()),options.map());
+    const now=performance.now();
+    paint(timeline.frame(f,now),options.map(),now);
   }
   function begin(ms,fresh=false){if(timeline){timeline.begin({...options.frame(),ms},fresh);lastDrawKey="";}}
-  function seek(ms){if(timeline){timeline.seek({...options.frame(),ms});lastDrawKey="";}}
+  function seek(ms,showSnapshot=false){if(timeline){timeline.seek({...options.frame(),ms},showSnapshot);lastDrawKey="";sync();}}
   function init(config){
     if(timeline)return;
     options=config;timeline=new Timeline();canvas=byId("archiveEventCanvas");
-    previews=readPreviews();refreshTimeline();
-    byId("archiveEventMode").addEventListener("change",updateMode);updateMode();
+    drafts=recoverDrafts();refreshTimeline();updateControls();
+    byId("archiveSubmitTab").onclick=()=>showTab("submit");
+    byId("archiveRecordsTab").onclick=()=>{showTab("records");refreshList();};
+    byId("archiveFilterStart").onchange=refreshList;
+    byId("archiveFilterEnd").onchange=refreshList;
+    byId("archiveFilterClear").onclick=()=>{byId("archiveFilterStart").value="";byId("archiveFilterEnd").value="";refreshList();};
+    showTab("submit");
     byId("archiveEventForm").addEventListener("submit",e=>{
       e.preventDefault();
       try{
@@ -424,18 +543,22 @@
         if(!name||name.length>120)throw new Error("请输入名称（最多 120 字符）");
         const coords=parseCoordinates(byId("archiveEventCoordinates").value);
         const datetime=parseZoned(byId("archiveEventTime").value,byId("archiveEventZone").value);
-        const local=byId("archiveEventMode").value==="preview";
-        if(!local&&Date.parse(datetime)>Date.now()-DELAY_MS){
-          throw new Error("公开历史归档延迟 24h；请选择 LOCAL PREVIEW 立即制作演示");
-        }
         const id=editing?editing.id:(globalThis.crypto?.randomUUID?.()||"event-"+Date.now()+"-"+Math.random().toString(36).slice(2));
         const row=normalize({id,name,...coords,datetime});
-        if(local){
-          savePreviews(editing?previews.map(r=>r.id===id?row:r):[...previews,row]);
-          clearForm();
-          options.includeTime?.(Date.parse(datetime));
-          notice("本地演示已保存 · 可立即播放和导出 · 不上传 GitHub");
-        }else mutate(editing?{kind:"edit",before:editing,row}:{kind:"add",row});
+        if(editing&&!editingDraft){
+          if(Date.parse(datetime)>Date.now()-DELAY_MS)throw new Error("记录尚未达到公开归档时间");
+          mutate({kind:"edit",before:editing,row});
+        }else{
+          // Keep a durable pending copy until GitHub confirms the write.
+          saveDrafts([...drafts.filter(r=>r.id!==id),row]);
+          if(Date.parse(datetime)>Date.now()-DELAY_MS){
+            clearForm();showTab("records");notice("已保存待提交记录 · 尚未达到公开归档时间");
+          }else{
+            mutate({kind:"add",row}).then(ok=>{
+              if(!ok){clearForm();showTab("records");notice("尚未写入 GitHub · 已保留待提交记录");}
+            });
+          }
+        }
       }catch(e){notice(e.message||"输入无效");}
     });
     byId("archiveEventCancel").onclick=()=>{clearForm();notice("已取消编辑");};
@@ -464,10 +587,16 @@
     byId("archiveEventReload").onclick=load;
     window.addEventListener("pagehide",()=>{byId("archiveEventToken").value="";});
     load();
-    function tick(){if(!options.frame().exporting)sync();raf=requestAnimationFrame(tick);}
+    function tick(){
+      const map=options.map();
+      // During camera gestures, use MapLibre's render event rather than an
+      // independent animation-frame projection of a different camera state.
+      if(!options.frame().exporting&&!map?.isMoving?.())sync();
+      raf=requestAnimationFrame(tick);
+    }
     raf=requestAnimationFrame(tick);
   }
-  const api={init,sync,begin,seek,Timeline,parseCoordinates,parseZoned,zoneParts,normalizeList,historical,displayRows,layoutLabels,animationState,leaderGeometry,drawLabel,drawLeader,drawBurst,drawMarkerBacking,LIFE_MS,DELAY_MS};
+  const api={init,sync,begin,seek,Timeline,parseCoordinates,parseZoned,zoneParts,normalizeList,historical,displayRows,mergeDrafts,dateFilter,layoutLabels,StableLabels,animationState,leaderGeometry,drawLabel,drawLeader,drawBurst,drawMarkerBacking,LIFE_MS,DELAY_MS};
   if(typeof module!=="undefined"&&module.exports)module.exports=api;
   if(root)root.DeepstrikeArchiveEvents=api;
 })(typeof window!=="undefined"?window:null);

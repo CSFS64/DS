@@ -431,6 +431,13 @@ function initMap() {
   });
 
   state.map.on("click", (ev) => handleMapClick(ev));
+  state.map.on("render", () => {
+    if(state.mapReady&&!state.exportRecording&&state.map.isMoving?.())
+      globalThis.DeepstrikeArchiveEvents?.sync();
+  });
+  state.map.on("moveend", () => {
+    if(state.mapReady&&!state.exportRecording)globalThis.DeepstrikeArchiveEvents?.sync();
+  });
 
   // A paused wave must remain attached to its geographic path when the map
   // is panned/zoomed. During playback the main rAF loop already repaints it.
@@ -2986,6 +2993,7 @@ function wireControls() {
     state.cumulativeMs = Math.min(Math.max(state.cumulativeMs, selectionStartMs()), selectionEndMs());
     state.currentMs = state.cumulativeMs;
     state.playbackActivated = false;
+    globalThis.DeepstrikeArchiveEvents?.sync();
     updateRouteOverlay();
     updateCumulativeHandle();
     // The previous snapshot is no longer valid at the new yellow cutoff.
@@ -3002,11 +3010,12 @@ function wireControls() {
     scheduleRouteRefresh(160);
   });
   els.scrubber.addEventListener("input", () => {
+    stopPlayback();
     const leavingCumulative = state.viewMode === "cumulative";
     state.viewMode = "realtime";
     if (leavingCumulative) updateRouteOverlay();
     state.currentMs = selectionStartMs() + (selectionEndMs() - selectionStartMs()) * (+els.scrubber.value / 1000);
-    globalThis.DeepstrikeArchiveEvents?.seek(state.currentMs);
+    globalThis.DeepstrikeArchiveEvents?.seek(state.currentMs,true);
     state.playbackActivated = true;
     scheduleInteractiveRender();
     updateRouteOverlay();
@@ -3066,9 +3075,9 @@ function rebuildTimeline() {
   els.rangeEnd.value = 1000;
   els.rangeCumulative.value = 0;
   state.currentMs = state.timelineStartMs;
-  globalThis.DeepstrikeArchiveEvents?.seek(state.currentMs);
   state.cumulativeMs = state.timelineStartMs;
   state.viewMode = "realtime";
+  globalThis.DeepstrikeArchiveEvents?.seek(state.currentMs,true);
   buildTicks();
   buildEventBars();
   buildReportDots();
@@ -3099,6 +3108,7 @@ function updateSelection(changed, interactive = false) {
   const cp = (state.cumulativeMs - state.timelineStartMs) / (state.timelineEndMs - state.timelineStartMs);
   els.rangeCumulative.value = Math.round(Math.min(1, Math.max(0, cp)) * 1000);
   updateCumulativeHandle();
+  if(state.viewMode==="realtime"&&!state.timer)globalThis.DeepstrikeArchiveEvents?.seek(state.currentMs,true);
   if (interactive) {
     if (state.playbackPending) ++state.playbackGeneration;
     state.playbackPending = false;
